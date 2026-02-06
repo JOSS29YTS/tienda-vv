@@ -2,8 +2,10 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaBoxOpen, FaChartLine, FaUsers, FaArrowRight } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
 
 const LandingPage = () => {
+    const { user } = useAuth();
     return (
         <div className="min-h-screen hero-gradient-bg text-white overflow-hidden relative font-primary">
             {/* Background Decorations */}
@@ -28,12 +30,21 @@ const LandingPage = () => {
                     <a href="#about" className="hover:text-emerald-400 transition-colors">Nosotros</a>
                 </div>
                 <div className="flex gap-4">
-                    <Link to="/login" className="px-6 py-2.5 rounded-xl border border-emerald-400/30 text-emerald-50 hover:bg-emerald-800/50 transition-all text-sm font-semibold backdrop-blur-sm">
-                        Iniciar Sesión
-                    </Link>
-                    <Link to="/register" className="hidden sm:inline-block px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm font-bold">
-                        Registrarse
-                    </Link>
+                    {user ? (
+                        <Link to="/dashboard" className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm font-bold flex items-center gap-2">
+                            <span>Ir al Dashboard</span>
+                            <FaArrowRight className="text-xs" />
+                        </Link>
+                    ) : (
+                        <>
+                            <Link to="/login" className="px-6 py-2.5 rounded-xl border border-emerald-400/30 text-emerald-50 hover:bg-emerald-800/50 transition-all text-sm font-semibold backdrop-blur-sm">
+                                Iniciar Sesión
+                            </Link>
+                            <Link to="/register" className="hidden sm:inline-block px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm font-bold">
+                                Registrarse
+                            </Link>
+                        </>
+                    )}
                 </div>
             </nav>
 
@@ -62,8 +73,8 @@ const LandingPage = () => {
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center lg:justify-start">
-                        <Link to="/login" className="px-8 py-4 rounded-2xl bg-white text-emerald-900 font-bold text-lg shadow-xl shadow-emerald-900/20 hover:scale-105 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 group">
-                            Comenzar Ahora
+                        <Link to={user ? "/dashboard" : "/login"} className="px-8 py-4 rounded-2xl bg-white text-emerald-900 font-bold text-lg shadow-xl shadow-emerald-900/20 hover:scale-105 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 group">
+                            {user ? "Ir al Dashboard" : "Comenzar Ahora"}
                             <FaArrowRight className="group-hover:translate-x-1 transition-transform text-emerald-600" />
                         </Link>
                         <button className="px-8 py-4 rounded-2xl glass-panel text-white font-bold text-lg hover:bg-white/10 transition-colors border border-white/20">

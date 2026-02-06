@@ -3,8 +3,17 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
+import UsersPage from './pages/dashboard/UsersPage';
+import ProductsPage from './pages/dashboard/ProductsPage';
+import SalesPage from './pages/dashboard/SalesPage';
+
+import ClientsPage from './pages/dashboard/ClientsPage';
+import PurchasesPage from './pages/dashboard/PurchasesPage';
+import InventoryPage from './pages/dashboard/InventoryPage';
+import HistoryPage from './pages/dashboard/HistoryPage';
 
 // Placeholder components
 const PlaceholderComponent = ({ title }) => (
@@ -23,6 +32,8 @@ const PlaceholderComponent = ({ title }) => (
 
 import { AuthProvider } from './context/AuthContext';
 
+import ProtectedRoute from './components/auth/ProtectedRoute';
+
 function App() {
   return (
     <AuthProvider>
@@ -31,22 +42,31 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Protected Dashboard Routes */}
-          <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }>
             <Route index element={<DashboardHome />} />
-            <Route path="products" element={<PlaceholderComponent title="Productos" />} />
-            <Route path="inventory" element={<PlaceholderComponent title="Inventario" />} />
-            <Route path="sales" element={<PlaceholderComponent title="Ventas" />} />
-            <Route path="purchases" element={<PlaceholderComponent title="Compras" />} />
-            <Route path="clients" element={<PlaceholderComponent title="Clientes" />} />
-            <Route path="history" element={<PlaceholderComponent title="Historial" />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="sales" element={<SalesPage />} />
+            <Route path="purchases" element={<PurchasesPage />} />
+            <Route path="clients" element={<ClientsPage />} />
+            <Route path="clients" element={<ClientsPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="history" element={<HistoryPage />} />
           </Route>
 
+
+
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+        </Routes >
+      </BrowserRouter >
+    </AuthProvider >
   );
 }
 

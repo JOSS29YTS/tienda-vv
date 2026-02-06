@@ -11,8 +11,13 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Por favor ingrese email y contraseña' });
         }
 
-        // Buscar usuario por email
-        const [users] = await pool.query('SELECT * FROM usuario WHERE email = ?', [email]);
+        // Buscar usuario por email con su rol
+        const [users] = await pool.query(`
+            SELECT u.*, r.nb_rol as rol 
+            FROM usuario u 
+            LEFT JOIN rol r ON u.id_rol = r.id_rol 
+            WHERE u.email = ?
+        `, [email]);
 
         if (users.length === 0) {
             return res.status(401).json({ message: 'Credenciales inválidas' });
@@ -27,10 +32,7 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
-        // Si el usuario tiene rol 'pendiente', no puede entrar
-        if (user.rol === 'pendiente') {
-            return res.status(403).json({ message: 'Tu cuenta aún no ha sido aprobada por un administrador.' });
-        }
+
 
         // Generar Token JWT
         const token = jwt.sign(
@@ -145,21 +147,14 @@ exports.registerComplete = async (req, res) => {
         // Create User
         const { nombre, apellido, email, passwordHash } = decoded.userData;
 
-        // Default role: 'pendiente' (Wait for admin approval) OR 'bodeguero' as default?
-        // Prompt says "roles: bodeguero, administrativo, contador". 
-        // Usually new registrations are pending approval or have a base role. 
-        // Let's set to 'bodeguero' by default for now so they can log in, or 'pendiente' if requested?
-        // User request: "cuando alguien se registre... llega codigo...". Does not specify role.
-        // I'll set to 'pendiente' as per schema default, BUT the user might want immediate access if they verify?
-        // The schema says `DEFAULT 'pendiente'`.
-        // I'll insert it.
+        // Default role: 'Vendedor'
+        const [roles] = await pool.query("SELECT id_rol FROM rol WHERE nb_rol = 'Vendedor'");
+        const defaultRoleId = roles.length > 0 ? roles[0].id_rol : null;
 
         await pool.query(
-            `INSERT INTO usuario (nombre, apellido, email, password, rol) VALUES (?, ?, ?, ?, 'bodeguero')`, // Auto-approve as bodeguero for testing? Or stick to pending?
-            [nombre, apellido, email, passwordHash]
+            `INSERT INTO usuario (nombre, apellido, email, password, id_rol) VALUES (?, ?, ?, ?, ?)`,
+            [nombre, apellido, email, passwordHash, defaultRoleId]
         );
-        // Let's use 'bodeguero' as default active role for this Demo so they can login.
-        // If 'pendiente', they can't login (as per my login logic).
 
         res.json({
             message: 'Usuario registrado exitosamente. Ya puedes iniciar sesión.'
@@ -167,6 +162,76 @@ exports.registerComplete = async (req, res) => {
 
     } catch (error) {
         console.error('Error en registerComplete:', error);
+        res.status(500).json({ message: 'Error en el servidor' });
+    }
+};
+
+exports.forgotPassword = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const [users] = await pool.query('SELECT * FROM usuario WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'El correo electrónico no está registrado.' });
+        }
+
+        const user = users[0];
+        // Generate code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const codeHash = await bcrypt.hash(code, 10);
+
+        // Create recovery token
+        const recoveryToken = jwt.sign(
+            { email, codeHash },
+            process.env.JWT_SECRET || 'secreto_super_seguro',
+            { expiresIn: '15m' }
+        );
+
+        console.log(`[RECOVERY] Code for ${email}: ${code}`);
+
+        await emailService.sendPasswordRecovery(email, code, user.nombre);
+
+        res.json({ message: 'Código de recuperación enviado.', recoveryToken });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error en el servidor' });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, code, newPassword, recoveryToken } = req.body;
+
+        if (!email || !code || !newPassword || !recoveryToken) {
+            return res.status(400).json({ message: 'Faltan datos requeridos.' });
+        }
+
+        // Verify Token
+        let decoded;
+        try {
+            decoded = jwt.verify(recoveryToken, process.env.JWT_SECRET || 'secreto_super_seguro');
+        } catch (err) {
+            return res.status(400).json({ message: 'El tiempo de espera ha expirado. Solicita un nuevo código.' });
+        }
+
+        if (decoded.email !== email) {
+            return res.status(400).json({ message: 'Token inválido para este correo.' });
+        }
+
+        // Verify Code
+        const isMatch = await bcrypt.compare(code, decoded.codeHash);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Código de verificación incorrecto.' });
+        }
+
+        // Start password update
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        await pool.query('UPDATE usuario SET password = ? WHERE email = ?', [passwordHash, email]);
+
+        res.json({ message: 'Contraseña actualizada correctamente.' });
+
+    } catch (error) {
+        console.error('Error en resetPassword:', error);
         res.status(500).json({ message: 'Error en el servidor' });
     }
 };

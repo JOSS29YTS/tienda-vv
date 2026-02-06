@@ -30,18 +30,30 @@ const DashboardLayout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const navItems = [
-        { to: "/dashboard", icon: FaHome, label: "Inicio" },
-        { to: "/dashboard/products", icon: FaBox, label: "Productos" },
-        { to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" },
-        { to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" },
-        { to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" },
-        { to: "/dashboard/history", icon: FaHistory, label: "Historial" },
+    let navItems = [
+        { to: "/dashboard", icon: FaHome, label: "Inicio" }
     ];
 
-    // Add Inventario for Contador role
-    if (user && user.rol === 'contador') {
-        navItems.splice(1, 0, { to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
+    if (user) {
+        const role = user.rol.toLowerCase();
+
+        if (role === 'vendedor') {
+            navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
+            navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
+        } else {
+            // Administrador & Gerente
+            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
+            navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
+            navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
+            navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
+            navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
+
+            // Only Admin sees Users and History
+            if (role === 'administrador') {
+                navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
+                navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuarios" });
+            }
+        }
     }
 
     const isActive = (path) => {
@@ -65,12 +77,12 @@ const DashboardLayout = () => {
                 className={`bg-[#0f172a] h-full flex flex-col shadow-2xl z-30 overflow-hidden flex-shrink-0 relative`}
                 style={{ position: window.innerWidth < 1024 ? 'absolute' : 'relative' }}
             >
-                <div className="p-6 flex items-center gap-4 border-b border-slate-800/50">
-                    <div className="bg-gradient-to-br from-emerald-500 to-teal-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20">
+                <Link to="/" className="p-6 flex items-center gap-4 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
+                    <div className="bg-gradient-to-br from-emerald-500 to-teal-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
                         <img src="/img/venalta-logo.png" alt="Venalta" className="h-8 w-auto" />
                     </div>
-                    <span className="text-2xl font-bold text-white font-heading tracking-wide">Venalta</span>
-                </div>
+                    <span className="text-2xl font-bold text-white font-heading tracking-wide group-hover:text-emerald-400 transition-colors">Venalta</span>
+                </Link>
 
                 <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mb-2 font-heading">Menu Principal</div>
@@ -79,7 +91,14 @@ const DashboardLayout = () => {
                     ))}
                 </div>
 
-                <div className="p-4 border-t border-slate-800/50">
+                <div className="p-4 border-t border-slate-800/50 space-y-2">
+                    <Link
+                        to="/"
+                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-slate-400 hover:bg-white/5 hover:text-white transition-all font-medium group"
+                    >
+                        <FaHome className="group-hover:text-emerald-400 transition-colors" />
+                        <span>Volver al Inicio</span>
+                    </Link>
                     <button
                         onClick={handleLogout}
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all font-medium group"

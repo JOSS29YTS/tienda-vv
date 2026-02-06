@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaUser, FaEnvelope, FaLock, FaArrowLeft, FaCheckCircle, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaLock, FaArrowLeft, FaCheckCircle, FaEye, FaEyeSlash, FaExclamationCircle, FaInfoCircle } from 'react-icons/fa';
+import { useAuth } from '../../context/AuthContext';
 
 const RegisterPage = () => {
     const navigate = useNavigate();
+    const { user, loading: authLoading } = useAuth();
     const [step, setStep] = useState(1); // 1: Form, 2: Verification
     const [isLoading, setIsLoading] = useState(false);
+
+    React.useEffect(() => {
+        if (user && !authLoading) {
+            navigate('/dashboard');
+        }
+    }, [user, authLoading, navigate]);
 
     // Visibility States
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showRequirements, setShowRequirements] = useState(false);
 
     // Form States
     const [formData, setFormData] = useState({
@@ -28,15 +37,33 @@ const RegisterPage = () => {
     const [tempToken, setTempToken] = useState(null);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({
+            ...formData,
+            [name]: (name === 'nombre' || name === 'apellido') ? value.toUpperCase() : value
+        });
+    };
+
+    const [notification, setNotification] = useState(null);
+
+    const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 5000);
     };
 
     const handleRegister = async (e) => {
         e.preventDefault();
 
-        // Basic Validation
+        // Password Validation
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        if (!passwordRegex.test(formData.password)) {
+            showNotification("La contraseña no cumple con los requisitos mínimos.", "error");
+            setShowRequirements(true); // Auto show requirements
+            return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
-            alert("Las contraseñas no coinciden. Por favor, verifícalas.");
+            showNotification("Las contraseñas no coinciden.", "error");
             return;
         }
 
@@ -81,8 +108,12 @@ const RegisterPage = () => {
 
             if (!response.ok) throw new Error(data.message || 'Error de verificación');
 
-            alert("¡Registro exitoso! Ahora puedes iniciar sesión.");
-            navigate('/login');
+            // Success Notification
+            showNotification("¡Registro exitoso! Redirigiendo...", "success");
+
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
 
         } catch (error) {
             alert(error.message);
@@ -180,7 +211,35 @@ const RegisterPage = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-emerald-100/80 ml-1">Contraseña</label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-sm font-medium text-emerald-100/80 ml-1">Contraseña</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRequirements(!showRequirements)}
+                                            className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1 transition-colors focus:outline-none"
+                                        >
+                                            <FaInfoCircle /> Requisitos
+                                        </button>
+                                    </div>
+
+                                    <AnimatePresence>
+                                        {showRequirements && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                                                className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 text-xs text-slate-300 backdrop-blur-md overflow-hidden mb-2"
+                                            >
+                                                <p className="font-bold text-emerald-400 mb-2">Tu contraseña debe incluir:</p>
+                                                <ul className="space-y-1 pl-1">
+                                                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Mínimo 8 caracteres</li>
+                                                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Una mayúscula</li>
+                                                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Un carácter especial</li>
+                                                </ul>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
                                     <div className="relative group">
                                         <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 group-focus-within:text-emerald-300 transition-colors" />
                                         <input
@@ -310,6 +369,29 @@ const RegisterPage = () => {
                     )}
                 </div>
             </motion.div>
+
+            {/* Notification Toast */}
+            <AnimatePresence>
+                {notification && (
+                    <motion.div
+                        initial={{ opacity: 0, x: 50, y: 0 }}
+                        animate={{ opacity: 1, x: 0, y: 0 }}
+                        exit={{ opacity: 0, x: 50, y: 0 }}
+                        className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 border backdrop-blur-md ${notification.type === 'success'
+                            ? 'bg-emerald-600/90 text-white border-emerald-400/50 shadow-emerald-900/20'
+                            : 'bg-red-600/90 text-white border-red-400/50 shadow-red-900/20'
+                            }`}
+                    >
+                        <div className={`p-2 rounded-full ${notification.type === 'success' ? 'bg-emerald-500/50' : 'bg-red-500/50'}`}>
+                            {notification.type === 'success' ? <FaCheckCircle className="text-xl" /> : <FaExclamationCircle className="text-xl" />}
+                        </div>
+                        <div>
+                            <p className="font-bold text-base font-heading">{notification.type === 'success' ? '¡Excelente!' : 'Atención'}</p>
+                            <p className="text-sm font-medium opacity-90">{notification.message}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

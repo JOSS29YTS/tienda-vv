@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const LoginPage = () => {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, user, loading: authLoading } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -14,6 +14,12 @@ const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    React.useEffect(() => {
+        if (user && !authLoading) {
+            navigate('/dashboard');
+        }
+    }, [user, authLoading, navigate]);
 
     const handleChange = (e) => {
         setFormData({
@@ -129,12 +135,8 @@ const LoginPage = () => {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-sm text-emerald-200/80">
-                            <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
-                                <input type="checkbox" className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-offset-0 focus:ring-emerald-500/50" />
-                                Recordarme
-                            </label>
-                            <a href="#" className="hover:text-white transition-colors font-medium hover:underline decoration-emerald-500">¿Olvidaste tu contraseña?</a>
+                        <div className="flex justify-end text-sm text-emerald-200/80">
+                            <Link to="/forgot-password" className="hover:text-white transition-colors font-medium hover:underline decoration-emerald-500">¿Olvidaste tu contraseña?</Link>
                         </div>
 
                         <button
