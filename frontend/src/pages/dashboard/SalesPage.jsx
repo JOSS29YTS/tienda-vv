@@ -3,20 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
+import { useRate } from '../../context/RateContext';
+
 const SalesPage = () => {
     const { user } = useAuth();
+    const { rate, setRate } = useRate();
     // Current Date
     const today = new Date().toLocaleDateString('es-VE');
-
-    // Stats State
-    const [rate, setRate] = useState(() => {
-        return localStorage.getItem('bodega_exchange_rate') || '';
-    });
 
     const handleRateChange = (e) => {
         const newRate = e.target.value;
         setRate(newRate);
-        localStorage.setItem('bodega_exchange_rate', newRate);
     };
 
     // Data State
@@ -359,7 +356,7 @@ const SalesPage = () => {
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Ventas</h2>
                     <p className="text-slate-500">Registro diario de ventas tipo hoja de cálculo.</p>
                 </div>
-                {user && (user.rol === 'contador' || user.rol === 'Gerente') && (
+                {user && user.rol === 'Administrador' && (
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -491,7 +488,7 @@ const SalesPage = () => {
                                                 min="1"
                                                 value={row.quantity}
                                                 onChange={(e) => updateRow(row.id, 'quantity', parseFloat(e.target.value))}
-                                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold text-slate-900 focus:border-emerald-500 outline-none"
+                                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold text-slate-900 focus:border-emerald-500 outline-none show-spinner"
                                             />
                                         </td>
 
@@ -743,7 +740,16 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método</label>
                         <select
                             value={currentMethod}
-                            onChange={(e) => setCurrentMethod(e.target.value)}
+                            onChange={(e) => {
+                                const method = e.target.value;
+                                setCurrentMethod(method);
+                                // Auto-set currency based on method
+                                if (method === 'DIVISAS') {
+                                    setCurrency('USD');
+                                } else if (method !== '') {
+                                    setCurrency('BS');
+                                }
+                            }}
                             className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                         >
                             <option value="">Seleccionar...</option>
@@ -794,7 +800,9 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         <div key={p.id} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
                             <div className="flex items-center gap-3">
                                 <div className="font-bold text-slate-700">{p.method}</div>
-                                <div className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold">{p.currency}</div>
+                                {p.method !== 'PENDIENTE POR COBRAR' && (
+                                    <div className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-bold">{p.currency}</div>
+                                )}
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="text-right">
@@ -804,6 +812,11 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                                     {p.currency === 'BS' && (
                                         <div className="text-xs text-slate-400 font-mono">
                                             = $ {p.amountInUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </div>
+                                    )}
+                                    {p.currency === 'USD' && (
+                                        <div className="text-xs text-slate-400 font-mono">
+                                            = Bs. {(p.amount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                         </div>
                                     )}
                                 </div>
@@ -841,7 +854,20 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         Cancelar
                     </button>
                     <button
-                        onClick={() => onConfirm(payments)}
+                        onClick={() => {
+                            let finalPayments = [...payments];
+                            // Automatically register debt if there is a remaining amount
+                            if (remainingUSD > 0.01) {
+                                finalPayments.push({
+                                    id: Date.now(),
+                                    method: 'PENDIENTE POR COBRAR',
+                                    amount: parseFloat(remainingUSD.toFixed(3)), // Ensure precision
+                                    currency: 'USD',
+                                    amountInUSD: parseFloat(remainingUSD.toFixed(3))
+                                });
+                            }
+                            onConfirm(finalPayments);
+                        }}
                         className="px-6 py-3 bg-[#0f172a] text-white font-bold rounded-xl hover:bg-slate-800 transition-colors"
                     >
                         Confirmar Pagos

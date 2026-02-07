@@ -24,11 +24,6 @@ const LandingPage = () => {
                     </div>
                     <span className="text-2xl font-bold font-heading tracking-tight text-white drop-shadow-md">Venalta</span>
                 </div>
-                <div className="hidden md:flex gap-8 items-center text-sm font-medium text-emerald-100/90">
-                    <a href="#" className="hover:text-emerald-400 transition-colors">Inicio</a>
-                    <a href="#features" className="hover:text-emerald-400 transition-colors">Características</a>
-                    <a href="#about" className="hover:text-emerald-400 transition-colors">Nosotros</a>
-                </div>
                 <div className="flex gap-4">
                     {user ? (
                         <Link to="/dashboard" className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm font-bold flex items-center gap-2">
@@ -77,9 +72,6 @@ const LandingPage = () => {
                             {user ? "Ir al Dashboard" : "Comenzar Ahora"}
                             <FaArrowRight className="group-hover:translate-x-1 transition-transform text-emerald-600" />
                         </Link>
-                        <button className="px-8 py-4 rounded-2xl glass-panel text-white font-bold text-lg hover:bg-white/10 transition-colors border border-white/20">
-                            Ver Documentación
-                        </button>
                     </div>
                 </motion.div>
 

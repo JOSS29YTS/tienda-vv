@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRate } from '../../context/RateContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaUser, FaSearch, FaMoneyBillWave, FaHandHoldingUsd, FaFileInvoiceDollar, FaTimes, FaCheckCircle, FaExclamationCircle, FaHistory } from 'react-icons/fa';
 
@@ -8,7 +9,7 @@ const ClientsPage = () => {
     // Persisted Search & Rate
     const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem('clientSearchTerm') || '');
     const [filterDate, setFilterDate] = useState('');
-    const [rate, setRate] = useState(() => localStorage.getItem('clientRate') || 35.5);
+    const { rate, setRate } = useRate();
 
     // Payment Modal State (Persisted)
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(() => localStorage.getItem('clientIsPaymentModalOpen') === 'true');
@@ -78,11 +79,11 @@ const ClientsPage = () => {
     // Persist State
     useEffect(() => {
         localStorage.setItem('clientSearchTerm', searchTerm);
-        localStorage.setItem('clientRate', rate);
+        // Global rate used
         localStorage.setItem('clientIsPaymentModalOpen', isPaymentModalOpen);
         localStorage.setItem('clientSelectedClient', JSON.stringify(selectedClient));
         localStorage.setItem('clientPayments', JSON.stringify(payments));
-    }, [searchTerm, rate, isPaymentModalOpen, selectedClient, payments]);
+    }, [searchTerm, isPaymentModalOpen, selectedClient, payments]);
 
     const handleOpenPaymentModal = (client) => {
         setSelectedClient(client);
@@ -394,7 +395,15 @@ const ClientsPage = () => {
                                         <div key={index} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
                                             <select
                                                 value={payment.method}
-                                                onChange={(e) => handlePaymentChange(index, 'method', e.target.value)}
+                                                onChange={(e) => {
+                                                    handlePaymentChange(index, 'method', e.target.value);
+                                                    // Auto-set currency logic
+                                                    if (e.target.value === 'DIVISAS') {
+                                                        handlePaymentChange(index, 'currency', 'USD');
+                                                    } else {
+                                                        handlePaymentChange(index, 'currency', 'BS');
+                                                    }
+                                                }}
                                                 className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-1/3 p-2.5 font-bold"
                                             >
                                                 {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'PENDIENTE POR COBRAR').map(m => (

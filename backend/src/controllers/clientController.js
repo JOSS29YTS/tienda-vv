@@ -174,7 +174,10 @@ exports.getPaymentHistory = async (req, res) => {
                 dv.id_detalle_venta,
                 (SELECT COALESCE(SUM(dp.monto), 0) FROM detalle_pago dp WHERE dp.id_pago = p.id_pago) as total_abono,
                 (
-                    SELECT GROUP_CONCAT(CONCAT(mp.nb_metodo_pago, ': $', CAST(dp.monto AS DECIMAL(10,2))) SEPARATOR ', ')
+                    SELECT CONCAT(
+                        GROUP_CONCAT(CONCAT(mp.nb_metodo_pago, ': $', CAST(dp.monto AS DECIMAL(10,2))) SEPARATOR ', '),
+                        ' (Tasa: ', CAST(p.tasa_dia AS DECIMAL(10,2)), ' Bs/$)'
+                    )
                     FROM detalle_pago dp
                     JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
                     WHERE dp.id_pago = p.id_pago

@@ -35,22 +35,33 @@ exports.getHistory = async (req, res) => {
             }
 
             // Aggregate Totals
-            // Assuming DIVISAS (ID 1) is USD, others are BS.
-            // Adjust ID check if Metodo Pago IDs change, but standard seed uses 1 for DIVISAS.
-            const isUSD = row.metodo.toUpperCase() === 'DIVISAS';
+            // DIVISAS is USD. Everything else is treated as BS (converted from stored USD).
+            const isUSD = row.metodo.toUpperCase() === 'DIVISAS' || row.metodo.toUpperCase() === 'PENDIENTE POR COBRAR';
+            // Note: PENDIENTE POR COBRAR is usually tracked in USD. If you want it in Bs, remove it from isUSD check.
+            // But typically debt is pegged to USD. The user complained about PENDIENTE showing as Bs earlier.
+            // The screenshot showed PENDIENTE POR COBRAR 6,95 Bs ($ 0.02). This means it was treated as Bs but with USD value.
+            // If PENDIENTE POR COBRAR is USD based debt, let's keep it as USD.
+
+            const amountVal = parseFloat(row.total);
+            const rate = parseFloat(row.tasa_dia) || 1;
 
             if (isUSD) {
-                historyByDay[dateKey].totalUSD += parseFloat(row.total);
+                historyByDay[dateKey].totalUSD += amountVal;
+                historyByDay[dateKey].breakdown.push({
+                    method: row.metodo,
+                    amount: amountVal,
+                    currency: 'USD'
+                });
             } else {
-                historyByDay[dateKey].totalBS += parseFloat(row.total);
+                // Convert back to Bs
+                const amountInBs = amountVal * rate;
+                historyByDay[dateKey].totalBS += amountInBs;
+                historyByDay[dateKey].breakdown.push({
+                    method: row.metodo,
+                    amount: amountInBs,
+                    currency: 'BS'
+                });
             }
-
-            // Add to breakdown
-            historyByDay[dateKey].breakdown.push({
-                method: row.metodo,
-                amount: parseFloat(row.total),
-                currency: isUSD ? 'USD' : 'BS'
-            });
         });
 
         const sortedHistory = Object.values(historyByDay).sort((a, b) => new Date(b.date) - new Date(a.date));

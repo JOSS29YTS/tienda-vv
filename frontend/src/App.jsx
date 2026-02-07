@@ -31,41 +31,43 @@ const PlaceholderComponent = ({ title }) => (
 );
 
 import { AuthProvider } from './context/AuthContext';
+import { RateProvider } from './context/RateContext';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <RateProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* Protected Dashboard Routes */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<DashboardHome />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route path="inventory" element={<InventoryPage />} />
-            <Route path="sales" element={<SalesPage />} />
-            <Route path="purchases" element={<PurchasesPage />} />
-            <Route path="clients" element={<ClientsPage />} />
-            <Route path="clients" element={<ClientsPage />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="history" element={<HistoryPage />} />
-          </Route>
+            {/* Protected Dashboard Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<DashboardHome />} />
+              <Route path="products" element={<ProductsPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
+              <Route path="sales" element={<SalesPage />} />
+              <Route path="purchases" element={<PurchasesPage />} />
+              <Route path="clients" element={<ClientsPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="history" element={<HistoryPage />} />
+            </Route>
 
 
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes >
-      </BrowserRouter >
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes >
+        </BrowserRouter >
+      </RateProvider>
     </AuthProvider >
   );
 }

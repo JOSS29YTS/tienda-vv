@@ -13,8 +13,11 @@ const SidebarItem = ({ to, icon: Icon, label, active }) => {
     );
 };
 
+import { useRate } from '../../context/RateContext';
+
 const DashboardLayout = () => {
     const { user, logout } = useAuth();
+    const { rate, setRate } = useRate();
     const location = useLocation();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -40,19 +43,22 @@ const DashboardLayout = () => {
         if (role === 'vendedor') {
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
-        } else {
-            // Administrador & Gerente
+        } else if (role === 'gerente') {
+            // Gerente sees everything EXCEPT History and Users
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
-
-            // Only Admin sees Users and History
-            if (role === 'administrador') {
-                navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
-                navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuarios" });
-            }
+        } else if (role === 'administrador') {
+            // Admin sees EVERYTHING
+            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
+            navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
+            navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
+            navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
+            navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
+            navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
+            navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuarios" });
         }
     }
 
@@ -135,6 +141,18 @@ const DashboardLayout = () => {
                     </div>
 
                     <div className="flex items-center gap-6">
+                        {/* Global Rate Input */}
+                        <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                            <span className="text-xs font-bold text-emerald-600 uppercase">Tasa: BS</span>
+                            <input
+                                type="number"
+                                value={rate}
+                                onChange={(e) => setRate(e.target.value)}
+                                className="w-20 bg-transparent border-none focus:ring-0 text-right font-black text-emerald-700 p-0 text-lg"
+                                step="0.01"
+                            />
+                        </div>
+
                         <div className="flex items-center gap-3 pl-2 pr-2 py-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
                             <div className="text-right hidden sm:block">
                                 <div className="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">

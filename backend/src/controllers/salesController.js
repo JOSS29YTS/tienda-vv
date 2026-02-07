@@ -35,8 +35,8 @@ exports.closeSales = async (req, res) => {
         if (isNaN(safeRate)) throw new Error('Tasa de cambio inválida.');
 
         // Validate Role
-        if (req.user.rol !== 'contador') {
-            return res.status(403).json({ message: 'Solo el contador puede cerrar la venta.' });
+        if (req.user.rol !== 'Administrador') {
+            return res.status(403).json({ message: 'Solo el Administrador puede cerrar la venta.' });
         }
 
         // 1. Create Daily Batch Sale (One Venta for all rows)
@@ -84,16 +84,13 @@ exports.closeSales = async (req, res) => {
             let totalPaidUSD = 0;
             let paymentMethodId = null;
 
-            if (row.paymentMethod && row.paymentMethod !== 'MIXTO' && row.paymentMethod !== 'PENDIENTE POR COBRAR') {
+            if (row.paymentMethod && row.paymentMethod !== 'MIXTO') {
                 const [methods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [row.paymentMethod]);
                 if (methods.length > 0) paymentMethodId = methods[0].id_metodo_pago;
             }
 
-            // If "PENDIENTE POR COBRAR", totalPaidUSD remains 0.
-
             if (row.paymentMethod === 'MIXTO') {
                 if (row.paymentDetails && row.paymentDetails.length > 0) {
-
                     // Create Pago Record linked to Detalle
                     const [pagoResult] = await connection.query(
                         'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
@@ -104,7 +101,7 @@ exports.closeSales = async (req, res) => {
                     for (const pay of row.paymentDetails) {
                         const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
                         const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
-                        const amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
+                        const amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.')); // amount in USD
 
                         if (subMethodId) {
                             await connection.query(
@@ -112,11 +109,15 @@ exports.closeSales = async (req, res) => {
                                 [pagoId, subMethodId, amountToStore]
                             );
                         }
-                        totalPaidUSD += amountToStore;
+
+                        // Only count as "Paid" if it's NOT a debt registration (Pending)
+                        if (pay.method !== 'PENDIENTE POR COBRAR') {
+                            totalPaidUSD += amountToStore;
+                        }
                     }
                 }
             } else if (paymentMethodId) {
-                // Direct single payment
+                // Direct single payment (Cash, Zelle, or even 100% Pending)
                 const [pagoResult] = await connection.query(
                     'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
                     [detailId, safeRate]
@@ -127,7 +128,11 @@ exports.closeSales = async (req, res) => {
                     'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
                     [pagoId, paymentMethodId, totalSaleUSD]
                 );
-                totalPaidUSD = totalSaleUSD;
+
+                // If the method is NOT Pending, we consider it fully paid.
+                if (row.paymentMethod !== 'PENDIENTE POR COBRAR') {
+                    totalPaidUSD = totalSaleUSD;
+                }
             }
 
             // 6. Register Debt (Linked to Detalle Venta)

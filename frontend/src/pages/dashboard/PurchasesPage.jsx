@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 
+import { useRate } from '../../context/RateContext';
+
 const PurchasesPage = () => {
     // Load initial state from localStorage if available
-    const [date, setDate] = useState(() => localStorage.getItem('purchaseDate') || new Date().toISOString().split('T')[0]);
-    const [rate, setRate] = useState(() => localStorage.getItem('purchaseRate') || 329.02);
+    const { rate, setRate } = useRate();
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
     const [rows, setRows] = useState(() => {
         const savedRows = localStorage.getItem('purchaseRows');
         return savedRows ? JSON.parse(savedRows) : [
@@ -22,16 +25,27 @@ const PurchasesPage = () => {
         fetchProducts();
     }, []);
 
+    // Persist state changes (excluding rate)
     useEffect(() => {
-        fetchProducts();
-    }, []);
-
-    // Persist state changes
-    useEffect(() => {
-        localStorage.setItem('purchaseDate', date);
-        localStorage.setItem('purchaseRate', rate);
+        // localStorage.setItem('purchaseDate', date); // User wanted date to not update daily? No, "en compra la fecha no se actualiza diario". 
+        // This implies they want the DEFAULT to be today, but if they change it, maybe remember it? 
+        // Or "no se actualiza diario" means it gets stuck on an old date?
+        // If I init with `new Date()...` it will always be today on reload.
+        // If I persist it, it stays on the old date.
+        // So REMOVING persistence fixes "no se actualiza diario" (it will always reset to today on effective reload).
         localStorage.setItem('purchaseRows', JSON.stringify(rows));
-    }, [date, rate, rows]);
+    }, [rows]);
+
+    // Update BS rows when Global Rate changes
+    useEffect(() => {
+        setRows(prevRows => prevRows.map(row => {
+            if (row.currency === 'BS') {
+                const finalCostBultoUsd = parseFloat(row.costBultoBs || 0) / parseFloat(rate || 1);
+                return { ...row, costBultoUsd: finalCostBultoUsd > 0 ? finalCostBultoUsd.toFixed(2) : '' };
+            }
+            return row;
+        }));
+    }, [rate]);
 
     const fetchProducts = async () => {
         try {
@@ -68,20 +82,12 @@ const PurchasesPage = () => {
                 const updated = { ...row, [field]: value };
 
                 // Auto-calc logic
-                // If ID matches, we work on 'updated'.
-                // If currency changes, we might reset some fields? user didn't ask, let's keep it simple.
-
-                // Calculate Cost Bulto USD
                 let finalCostBultoUsd = 0;
                 if (updated.currency === 'BS') {
-                    // Update calculated USD if BS or Rate changes
                     const bsVal = field === 'costBultoBs' ? value : updated.costBultoBs;
-                    const r = field === 'rate' ? value : rate; // Rate is global, passed separately?
                     finalCostBultoUsd = parseFloat(bsVal || 0) / parseFloat(rate || 1);
                     updated.costBultoUsd = finalCostBultoUsd > 0 ? finalCostBultoUsd.toFixed(2) : '';
                 } else {
-                    // If currency is USD, user inputs costBultoUsd directly
-                    // So we don't overwrite it unless they typed it
                     if (field === 'currency' && value === 'USD') updated.costBultoBs = '';
                     finalCostBultoUsd = parseFloat(updated.costBultoUsd || 0);
                 }
@@ -92,16 +98,10 @@ const PurchasesPage = () => {
         }));
     };
 
-    // Global Rate Change Handler (updates all BS rows)
+    // Global Rate Change Handler
     const handleRateChange = (newRate) => {
         setRate(newRate);
-        setRows(rows.map(row => {
-            if (row.currency === 'BS') {
-                const finalCostBultoUsd = parseFloat(row.costBultoBs || 0) / parseFloat(newRate || 1);
-                return { ...row, costBultoUsd: finalCostBultoUsd > 0 ? finalCostBultoUsd.toFixed(2) : '' };
-            }
-            return row;
-        }));
+        // Effect will handle row updates
     };
 
     const calculateDerived = (row) => {
@@ -234,7 +234,7 @@ const PurchasesPage = () => {
                             <th className="p-3 text-right">Costo Bulto $</th>
                             <th className="p-3 text-right">Costo $ Unid</th>
                             <th className="p-3 text-right">Precio $ Unid</th>
-                            <th className="p-3 text-right w-32">PVP (Fijar)</th>
+                            <th className="p-3 text-center w-32">PVP (Fijar)</th>
                             <th className="p-3 w-10"></th>
                         </tr>
                     </thead>
@@ -259,7 +259,7 @@ const PurchasesPage = () => {
                                         <input type="number" value={row.profitPercent} onChange={e => updateRow(row.id, 'profitPercent', e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded p-1 font-bold" />
                                     </td>
                                     <td className="p-2">
-                                        <input type="number" value={row.quantity} onChange={e => updateRow(row.id, 'quantity', e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded p-1 font-bold" />
+                                        <input type="number" value={row.quantity} onChange={e => updateRow(row.id, 'quantity', e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded p-1 font-bold show-spinner" />
                                     </td>
                                     <td className="p-2">
                                         <select
@@ -296,7 +296,7 @@ const PurchasesPage = () => {
                                         {derived.priceUnitUsd.toFixed(2)}
                                     </td>
                                     <td className="p-2">
-                                        <input type="number" value={row.pvp} onChange={e => updateRow(row.id, 'pvp', e.target.value)} className="w-full text-right bg-indigo-50 border border-indigo-200 text-indigo-700 rounded p-1 font-black text-lg" placeholder="PVP" />
+                                        <input type="number" value={row.pvp} onChange={e => updateRow(row.id, 'pvp', e.target.value)} className="w-full text-center bg-indigo-50 border border-indigo-200 text-indigo-700 rounded p-1 font-black text-lg" placeholder="PVP" />
                                     </td>
                                     <td className="p-2 text-center">
                                         <button onClick={() => removeRow(row.id)} className="text-slate-300 hover:text-red-500"><FaTrash /></button>

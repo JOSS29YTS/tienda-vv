@@ -1,26 +1,49 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=Outfit:wght@100..900&family=League+Spartan:wght@100..900&display=swap');
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
-@theme {
-    --font-primary: "Outfit", sans-serif;
-    --font-heading: "DM Sans", sans-serif;
-    --color-venalta-primary: #059669; /* emerald-600 */
-    --color-venalta-dark: #064e3b; /* emerald-900 */
-    --color-venalta-light: #34d399; /* emerald-400 */
-}
-
 @layer base {
-  body {
-    font-family: var(--font-primary);
-    background-color: #f8fafc; /* slate-50 */
-    color: #1e293b; /* slate-800 */
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-heading);
-  }
+    body {
+        font-family: 'Outfit', sans-serif;
+        background-color: #f8fafc;
+        /* slate-50 */
+        color: #1e293b;
+        /* slate-800 */
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    /* Remove number input arrows globally */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        appearance: none;
+        margin: 0;
+    }
+
+    input[type=number] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
+    /* Exception: Re-enable spinners for inputs with .show-spinner class */
+    input[type=number].show-spinner::-webkit-inner-spin-button,
+    input[type=number].show-spinner::-webkit-outer-spin-button {
+        -webkit-appearance: auto;
+        appearance: auto;
+        margin: 0;
+    }
+
+    input[type=number].show-spinner {
+        -moz-appearance: auto;
+        appearance: auto;
+    }
 }
 
 /* Utility Classes for WOW factor */
@@ -40,6 +63,7 @@
 .venalta-gradient-text {
     background: linear-gradient(to right, #059669, #34d399);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -51,8 +75,15 @@
 
 /* Animations */
 @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-15px); }
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-15px);
+    }
 }
 
 .animate-float {
@@ -65,8 +96,15 @@
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .animate-slide-up {
