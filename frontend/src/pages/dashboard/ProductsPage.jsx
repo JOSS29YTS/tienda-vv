@@ -7,6 +7,8 @@ const ProductsPage = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedStatus, setSelectedStatus] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Form State
@@ -26,6 +28,21 @@ const ProductsPage = () => {
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [productToDelete, setProductToDelete] = useState(null);
+
+    const filteredProducts = products
+        .filter(product => {
+            const matchesSearch = product.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = selectedCategory ? product.id_categoria == selectedCategory : true;
+            const matchesStatus = selectedStatus ? product.estado === selectedStatus : true;
+            return matchesSearch && matchesCategory && matchesStatus;
+        })
+        .sort((a, b) => {
+            if (sortOrder === 'asc') {
+                return a.nombre.localeCompare(b.nombre);
+            } else {
+                return b.nombre.localeCompare(a.nombre);
+            }
+        });
 
     const handleEditPriceClick = (product) => {
         setEditingProduct(product.id_producto);
@@ -188,18 +205,6 @@ const ProductsPage = () => {
         }
     };
 
-    const filteredProducts = products
-        .filter(product =>
-            product.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-        .sort((a, b) => {
-            if (sortOrder === 'asc') {
-                return a.nombre.localeCompare(b.nombre);
-            } else {
-                return b.nombre.localeCompare(a.nombre);
-            }
-        });
-
     const getCategoryColor = (categoryName) => {
         if (!categoryName) return 'bg-slate-100 text-slate-600 border-slate-200';
 
@@ -235,6 +240,39 @@ const ProductsPage = () => {
                 </div>
 
                 <div className="flex gap-3 w-full md:w-auto">
+                    <div className="relative">
+                        <select
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                            className="h-full pl-4 pr-8 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all shadow-sm bg-white text-slate-600 font-medium appearance-none cursor-pointer"
+                        >
+                            <option value="">Todos los Estados</option>
+                            <option value="activo">Activo</option>
+                            <option value="inactivo">Inactivo</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <FaCheckCircle size={12} />
+                        </div>
+                    </div>
+
+                    <div className="relative">
+                        <select
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="h-full pl-4 pr-8 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all shadow-sm bg-white text-slate-600 font-medium appearance-none cursor-pointer"
+                        >
+                            <option value="">Todas las Categorías</option>
+                            {categories.map(cat => (
+                                <option key={cat.id_categoria} value={cat.id_categoria}>
+                                    {cat.nb_categoria}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <FaTag size={12} />
+                        </div>
+                    </div>
+
                     <div className="relative flex-1 md:w-64">
                         <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input

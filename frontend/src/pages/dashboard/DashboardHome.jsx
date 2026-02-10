@@ -206,12 +206,12 @@ const DashboardHome = () => {
                     gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
                 />
                 <StatCard
-                    title="Transacciones"
-                    value={stats?.orders?.value || 0}
+                    title="Facturas Pendientes"
+                    value={stats?.pendingInvoices?.value || 0}
                     icon={FaReceipt}
-                    trend={stats?.orders?.trend >= 0 ? 'up' : 'down'}
-                    trendValue={`${Math.abs(stats?.orders?.trend || 0).toFixed(1)}%`}
-                    gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
+                    trend="down"
+                    trendValue={`0`}
+                    gradient="bg-gradient-to-br from-red-500 to-rose-600"
                 />
                 <StatCard
                     title="Productos Activos"

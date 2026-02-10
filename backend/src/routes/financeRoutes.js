@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const invoiceController = require('../controllers/invoiceController');
 const financeController = require('../controllers/financeController');
 const { verifyToken, isAdminOrManager } = require('../middleware/authMiddleware');
-
 
 router.get('/summary', verifyToken, isAdminOrManager, financeController.getFinanceSummary);
 router.get('/transactions', verifyToken, isAdminOrManager, financeController.getRecentTransactions);
@@ -10,5 +10,9 @@ router.get('/fixed-payment-types', verifyToken, isAdminOrManager, financeControl
 router.get('/payment-methods', verifyToken, isAdminOrManager, financeController.getPaymentMethods);
 router.post('/fixed-payments', verifyToken, isAdminOrManager, financeController.createFixedPayment);
 router.post('/transfers', verifyToken, isAdminOrManager, financeController.createTraspaso);
+
+// Supplier Invoices
+router.get('/invoices/pending', verifyToken, isAdminOrManager, invoiceController.getPendingInvoices);
+router.post('/invoices/pay', verifyToken, isAdminOrManager, invoiceController.payInvoice);
 
 module.exports = router;

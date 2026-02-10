@@ -17,10 +17,14 @@ exports.createPurchase = async (req, res) => {
             // Time is already "now" from new Date()
         }
 
-        // 1. Create Purchase Header (No total_usd)
+        // 1. Determine Purchase Status
+        const purchaseStatus = req.body.invoiceData ? 'PENDIENTE' : 'PAGADA';
+
+        // 1. Create Purchase Header (with Status)
         const [compraResult] = await connection.query(
-            'INSERT INTO compra (id_usuario, tasa_dia, fecha_compra) VALUES (?, ?, ?)',
-            [userId, rate, finalDate]
+            `INSERT INTO compra (id_usuario, tasa_dia, fecha_compra, id_estado_compra) 
+             VALUES (?, ?, ?, (SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = ? LIMIT 1))`,
+            [userId, rate, finalDate, purchaseStatus]
         );
         const compraId = compraResult.insertId;
 
@@ -80,6 +84,35 @@ exports.createPurchase = async (req, res) => {
             'UPDATE compra SET total_compra = ? WHERE id_compra = ?',
             [totalPurchaseCost, compraId]
         );
+
+        // Handle Invoice Creation (Factura Proveedor)
+        if (req.body.invoiceData) {
+            const { providerId, isNew, dueDate, providerName } = req.body.invoiceData;
+            let finalProviderId = providerId;
+
+            if (isNew && providerName) {
+                const [provResult] = await connection.query(
+                    'INSERT INTO proveedor (nb_proveedor) VALUES (?)',
+                    [providerName]
+                );
+                finalProviderId = provResult.insertId;
+            }
+
+            if (finalProviderId && dueDate) {
+                await connection.query(
+                    `INSERT INTO factura_proveedor 
+                    (id_proveedor, id_compra, monto_deuda, tasa_dia, fecha_finalizacion)
+                    VALUES (?, ?, ?, ?, ?)`,
+                    [
+                        finalProviderId,
+                        compraId,
+                        totalPurchaseCost,
+                        rate,
+                        dueDate
+                    ]
+                );
+            }
+        }
 
         await connection.commit();
         res.json({ message: 'Compra registrada exitosamente', purchaseId: compraId });

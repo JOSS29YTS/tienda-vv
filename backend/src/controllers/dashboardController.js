@@ -32,20 +32,22 @@ exports.getDashboardStats = async (req, res) => {
         const prevSales = await getTotalSales(prevMonth, prevMonthYear);
         const salesTrend = prevSales === 0 ? 100 : ((currentSales - prevSales) / prevSales) * 100;
 
-        // 2. Transacciones (Count of Sales/Invoices)
-        const getOrderCount = async (month, year) => {
+        // 2. Facturas Pendientes (Pending Invoices Count)
+        const getPendingInvoicesCount = async () => {
             const query = `
                 SELECT COUNT(*) as count 
-                FROM venta v
-                WHERE MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+                FROM factura_proveedor fp
+                JOIN compra c ON fp.id_compra = c.id_compra
+                JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
+                WHERE ec.nb_estado_compra = 'PENDIENTE'
             `;
-            const [rows] = await pool.query(query, [month, year]);
+            const [rows] = await pool.query(query);
             return rows[0].count;
         };
 
-        const currentOrders = await getOrderCount(currentMonth, currentYear);
-        const prevOrders = await getOrderCount(prevMonth, prevMonthYear);
-        const ordersTrend = prevOrders === 0 ? 100 : ((currentOrders - prevOrders) / prevOrders) * 100;
+        const pendingInvoicesCount = await getPendingInvoicesCount();
+        // Trend is not really applicable for a snapshot of "Currently Pending", so we can set it to 0 or calculate change from yesterday if we had history. 
+        // For now, let's just show the current count.
 
         // 3. Total Products (Assuming all products are "active" for now or check status if exists)
         // We'll just count all for now.
@@ -95,7 +97,7 @@ exports.getDashboardStats = async (req, res) => {
         res.json({
             stats: {
                 sales: { value: currentSales, trend: salesTrend },
-                orders: { value: currentOrders, trend: ordersTrend },
+                pendingInvoices: { value: pendingInvoicesCount, trend: 0 },
                 products: { value: totalProducts, trend: 0 }, // Static for now
                 clients: { value: totalClients, trend: 0 }    // Static for now
             },

@@ -14,9 +14,10 @@ import ClientsPage from './pages/dashboard/ClientsPage';
 import PurchasesPage from './pages/dashboard/PurchasesPage';
 import InventoryPage from './pages/dashboard/InventoryPage';
 import HistoryPage from './pages/dashboard/HistoryPage';
+import InvoicesPage from './pages/dashboard/InvoicesPage';
 import FinancesPage from './pages/dashboard/FinancesPage';
 
-// Placeholder components
+
 const PlaceholderComponent = ({ title }) => (
   <div className="p-8 bg-white rounded-2xl shadow-sm border border-slate-100 min-h-[400px] flex flex-col items-center justify-center text-center">
     <div className="bg-slate-50 p-6 rounded-full mb-4">
@@ -59,7 +60,16 @@ function App() {
               <Route path="sales" element={<SalesPage />} />
               <Route path="purchases" element={<PurchasesPage />} />
               <Route path="clients" element={<ClientsPage />} />
-              <Route path="finances" element={<FinancesPage />} />
+              <Route path="invoices" element={
+                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                  <InvoicesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="finances" element={
+                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                  <FinancesPage />
+                </ProtectedRoute>
+              } />
               <Route path="users" element={<UsersPage />} />
               <Route path="history" element={<HistoryPage />} />
             </Route>

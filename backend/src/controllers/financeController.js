@@ -191,7 +191,50 @@ exports.getFinanceSummary = async (req, res) => {
             else if (dest.includes('TRANSFERENCIA')) totalTransferenciaBs += amount;
         }
 
-        // Apply Deductions from Fixed Payments
+        // 7. Supplier Invoices Stats
+        const [pendingInvoices] = await pool.query(`
+            SELECT 
+                COUNT(*) as count,
+                SUM(monto_deuda - (SELECT COALESCE(SUM(monto), 0) FROM pago_factura_proveedor WHERE id_factura_proveedor = fp.id_factura_proveedor)) as total_debt
+            FROM factura_proveedor fp
+            JOIN compra c ON fp.id_compra = c.id_compra
+            JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
+            WHERE ec.nb_estado_compra = 'PENDIENTE'
+        `);
+
+        const pendingInvoiceCount = pendingInvoices[0].count || 0;
+        const pendingInvoiceTotal = parseFloat(pendingInvoices[0].total_debt || 0);
+
+        // Deduct Supplier Invoice Payments from Method Totals
+        const [invoicePayments] = await pool.query(`
+            SELECT 
+                pfp.monto, pfp.tasa_dia, mp.nb_metodo_pago
+            FROM pago_factura_proveedor pfp
+            JOIN metodo_pago mp ON pfp.id_metodo_pago = mp.id_metodo_pago
+        `);
+
+        for (const payment of invoicePayments) {
+            const monto = parseFloat(payment.monto);
+            const rate = parseFloat(payment.tasa_dia);
+            const method = payment.nb_metodo_pago.toUpperCase();
+
+            // Check if method is USD-based
+            if (method.includes('DIVISA') || method.includes('ZELLE') || method.includes('USD') || method.includes('BINANCE')) {
+                // USD payments do not subtract from Bs method totals
+                continue;
+            }
+
+            // It's Bs. Monto is in USD, so convert to Bs
+            const deductionBs = monto * rate;
+
+            if (method.includes('EFECTIVO')) deductions.efectivo += deductionBs;
+            else if (method.includes('PUNTO')) deductions.punto += deductionBs;
+            else if (method.includes('MOVIL') || method.includes('MÓVIL')) deductions.pagoMovil += deductionBs;
+            else if (method.includes('BIOPAGO')) deductions.biopago += deductionBs;
+            else if (method.includes('TRANSFERENCIA')) deductions.transferencia += deductionBs;
+        }
+
+        // Apply Deductions from Fixed Payments AND Invoice Payments (Accumulated in deductions object)
         totalEfectivoBs -= deductions.efectivo;
         totalPuntoBs -= deductions.punto;
         totalPagoMovilBs -= deductions.pagoMovil;
@@ -209,6 +252,9 @@ exports.getFinanceSummary = async (req, res) => {
                 receivables: parseFloat(currentReceivables.toFixed(2)),
                 incomeBs: parseFloat(incomeBs.toFixed(2)),
                 incomeUSD: parseFloat(incomeUSD_Only.toFixed(2)),
+                // Pending Invoices
+                pendingInvoiceCount,
+                pendingInvoiceTotal: parseFloat(pendingInvoiceTotal.toFixed(2)),
                 // Specific methods (in Bs)
                 totalEfectivoBs: parseFloat(totalEfectivoBs.toFixed(2)),
                 totalPunto: parseFloat(totalPuntoBs.toFixed(2)),
@@ -258,9 +304,10 @@ exports.getRecentTransactions = async (req, res) => {
                 c.total_compra as amount,
                 u.nombre as user,
                 'Egreso' as category,
-                'N/A' as payment_method
+                COALESCE(ec.nb_estado_compra, 'PAGADA') as payment_method
             FROM compra c
             JOIN usuario u ON c.id_usuario = u.id_usuario
+            LEFT JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
 
             UNION ALL
 

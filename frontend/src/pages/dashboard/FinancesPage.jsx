@@ -21,7 +21,9 @@ const FinancesPage = () => {
         totalPunto: 0,
         totalPagoMovil: 0,
         totalBiopago: 0,
-        totalTransferencia: 0
+        totalTransferencia: 0,
+        pendingInvoiceCount: 0,
+        pendingInvoiceTotal: 0
     });
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -85,7 +87,9 @@ const FinancesPage = () => {
                     totalPunto: parseFloat(summaryData.stats.totalPunto || 0),
                     totalPagoMovil: parseFloat(summaryData.stats.totalPagoMovil || 0),
                     totalBiopago: parseFloat(summaryData.stats.totalBiopago || 0),
-                    totalTransferencia: parseFloat(summaryData.stats.totalTransferencia || 0)
+                    totalTransferencia: parseFloat(summaryData.stats.totalTransferencia || 0),
+                    pendingInvoiceCount: parseInt(summaryData.stats.pendingInvoiceCount || 0),
+                    pendingInvoiceTotal: parseFloat(summaryData.stats.pendingInvoiceTotal || 0)
                 });
                 setTransactions(transactionsData);
             } else {
@@ -339,7 +343,7 @@ const FinancesPage = () => {
         const primaryColor = [16, 185, 129]; // Emerald 500
 
         // Header
-        doc.setFillColor(...secondaryColor);
+        doc.setFillColor(...primaryColor);
         doc.rect(0, 0, 210, 40, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
@@ -440,7 +444,16 @@ const FinancesPage = () => {
         doc.text('Reporte generado automáticamente por Venalta System.', 105, footerY, { align: 'center' });
 
         doc.save(`Reporte_Financiero_${date.replace(/\//g, '-')}.pdf`);
-        toast.success('Reporte financiero descargado');
+        toast.success('Reporte financiero descargado', {
+            style: {
+                background: '#10B981',
+                color: '#fff',
+            },
+            iconTheme: {
+                primary: '#fff',
+                secondary: '#10B981',
+            },
+        });
     };
 
     const StatCard = ({ title, value, icon: Icon, gradient, trend, isBs = false }) => (
@@ -539,6 +552,12 @@ const FinancesPage = () => {
                     icon={FaReceipt}
                     gradient="bg-gradient-to-br from-amber-500 to-orange-600"
                 />
+                <StatCard
+                    title={`Facturas Pendientes (${stats.pendingInvoiceCount})`}
+                    value={stats.pendingInvoiceTotal}
+                    icon={FaFileInvoiceDollar}
+                    gradient="bg-gradient-to-br from-red-600 to-rose-700"
+                />
 
                 {/* Currency Totals */}
                 <StatCard
@@ -635,7 +654,16 @@ const FinancesPage = () => {
                                         </td>
                                         <td className="p-4 font-mono text-slate-600 text-xs">#{tx.id}</td>
                                         <td className="p-4 text-slate-700 font-medium text-xs break-words max-w-[200px]">
-                                            {tx.payment_method || '-'}
+                                            {tx.type === 'Compra' && (tx.payment_method === 'PAGADA' || tx.payment_method === 'PENDIENTE') ? (
+                                                <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold tracking-wider ${tx.payment_method === 'PAGADA'
+                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                    : 'bg-orange-50 text-orange-600 border-orange-100'
+                                                    }`}>
+                                                    {tx.payment_method}
+                                                </span>
+                                            ) : (
+                                                tx.payment_method || '-'
+                                            )}
                                         </td>
                                         <td className="p-4 text-slate-700 text-sm">{tx.user}</td>
                                         <td className="p-4 text-slate-500 text-xs">{formatDate(tx.date)}</td>
