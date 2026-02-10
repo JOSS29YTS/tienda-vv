@@ -27,9 +27,12 @@ exports.getAllProducts = async (req, res) => {
                 p.nb_producto as nombre, 
                 p.precio, 
                 e.nb_estado as estado,
-                p.id_estado
+                p.id_estado,
+                c.nb_categoria as categoria,
+                p.id_categoria
             FROM producto p
             JOIN estado e ON p.id_estado = e.id_estado
+            LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
             ORDER BY p.nb_producto ASC
         `;
 
@@ -38,7 +41,8 @@ exports.getAllProducts = async (req, res) => {
         // Normalize status to lowercase for frontend compatibility
         const formattedProducts = products.map(p => ({
             ...p,
-            estado: (p.estado || '').trim().toLowerCase()
+            estado: (p.estado || '').trim().toLowerCase(),
+            categoria: p.categoria || 'Sin Categoría'
         }));
 
         res.json(formattedProducts);
@@ -48,12 +52,22 @@ exports.getAllProducts = async (req, res) => {
     }
 };
 
+exports.getCategories = async (req, res) => {
+    try {
+        const [categories] = await pool.query('SELECT * FROM categoria ORDER BY id_categoria ASC');
+        res.json(categories);
+    } catch (error) {
+        console.error('Error getting categories:', error);
+        res.status(500).json({ message: 'Error al obtener categorías' });
+    }
+};
+
 exports.createProduct = async (req, res) => {
     try {
-        const { nombre, precio, estado } = req.body;
+        const { nombre, precio, estado, id_categoria } = req.body;
 
-        if (!nombre || !precio) {
-            return res.status(400).json({ message: 'Nombre y precio son requeridos' });
+        if (!nombre || !precio || !id_categoria) {
+            return res.status(400).json({ message: 'Nombre, precio y categoría son requeridos' });
         }
 
         // Force name to uppercase
@@ -74,8 +88,8 @@ exports.createProduct = async (req, res) => {
         const id_estado = statusRows[0].id_estado;
 
         const [result] = await pool.query(
-            'INSERT INTO producto (nb_producto, precio, id_estado) VALUES (?, ?, ?)',
-            [nombreUpperCase, precio, id_estado]
+            'INSERT INTO producto (nb_producto, precio, id_estado, id_categoria) VALUES (?, ?, ?, ?)',
+            [nombreUpperCase, precio, id_estado, id_categoria]
         );
 
         res.status(201).json({
@@ -84,7 +98,8 @@ exports.createProduct = async (req, res) => {
                 id_producto: result.insertId,
                 nombre,
                 precio,
-                estado: estado || 'activo'
+                estado: estado || 'activo',
+                id_categoria
             }
         });
 
@@ -147,6 +162,28 @@ exports.updateProductPrice = async (req, res) => {
     } catch (error) {
         console.error('Error updating product price:', error);
         res.status(500).json({ message: 'Error al actualizar precio' });
+    }
+};
+
+exports.updateProductCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { id_categoria } = req.body;
+
+        if (!id_categoria) {
+            return res.status(400).json({ message: 'Categoría requerida' });
+        }
+
+        const [result] = await pool.query('UPDATE producto SET id_categoria = ? WHERE id_producto = ?', [id_categoria, id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Producto no encontrado' });
+        }
+
+        res.json({ message: 'Categoría actualizada exitosamente' });
+    } catch (error) {
+        console.error('Error updating product category:', error);
+        res.status(500).json({ message: 'Error al actualizar categoría' });
     }
 };
 

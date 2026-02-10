@@ -7,5 +7,6 @@ router.get('/', authMiddleware.verifyToken, clientController.getAllClients);
 router.get('/debtors', authMiddleware.verifyToken, clientController.getDebtors);
 router.post('/pay', authMiddleware.verifyToken, clientController.payDebt);
 router.get('/:id/history', authMiddleware.verifyToken, clientController.getPaymentHistory);
+router.get('/:id/purchases', authMiddleware.verifyToken, clientController.getPurchases);
 
 module.exports = router;

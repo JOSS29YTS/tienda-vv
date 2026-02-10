@@ -4,6 +4,7 @@ import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, Fa
 
 const ProductsPage = () => {
     const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,12 +13,19 @@ const ProductsPage = () => {
     const [formData, setFormData] = useState({
         nombre: '',
         precio: '',
-        estado: 'activo'
+        estado: 'activo',
+        id_categoria: ''
     });
 
     const [editingProduct, setEditingProduct] = useState(null);
     const [editPriceValue, setEditPriceValue] = useState('');
+    const [editingCategoryProduct, setEditingCategoryProduct] = useState(null);
+    const [editCategoryValue, setEditCategoryValue] = useState('');
     const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+
+    // Delete Modal State
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [productToDelete, setProductToDelete] = useState(null);
 
     const handleEditPriceClick = (product) => {
         setEditingProduct(product.id_producto);
@@ -44,13 +52,56 @@ const ProductsPage = () => {
         }
     };
 
+    const handleEditCategoryClick = (product) => {
+        setEditingCategoryProduct(product.id_producto);
+        setEditCategoryValue(product.id_categoria);
+    };
+
+    const handleSaveCategory = async (productId) => {
+        const originalProducts = [...products];
+        const newCategoryName = categories.find(c => c.id_categoria == editCategoryValue)?.nb_categoria || 'Sin Categoría';
+
+        setProducts(products.map(p => p.id_producto === productId ? { ...p, categoria: newCategoryName, id_categoria: editCategoryValue } : p));
+        setEditingCategoryProduct(null);
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/products/${productId}/category`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_categoria: editCategoryValue })
+            });
+
+            if (!response.ok) throw new Error('Error al actualizar categoría');
+
+        } catch (err) {
+            setProducts(originalProducts);
+            alert('Error al actualizar la categoría: ' + err.message);
+        }
+    };
+
     const toggleSortOrder = () => {
         setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     };
 
     useEffect(() => {
         fetchProducts();
+        fetchCategories();
     }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch('http://localhost:3000/api/products/categories');
+            if (response.ok) {
+                const data = await response.json();
+                setCategories(data);
+                if (data.length > 0) {
+                    setFormData(prev => ({ ...prev, id_categoria: data[0].id_categoria }));
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching categories:", err);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -68,6 +119,11 @@ const ProductsPage = () => {
     const handleCreateProduct = async (e) => {
         e.preventDefault();
         try {
+            if (!formData.id_categoria) {
+                alert("Por favor seleccione una categoría");
+                return;
+            }
+
             const response = await fetch('http://localhost:3000/api/products', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -78,7 +134,7 @@ const ProductsPage = () => {
 
             fetchProducts();
             setIsModalOpen(false);
-            setFormData({ nombre: '', precio: '', estado: 'activo' });
+            setFormData({ nombre: '', precio: '', estado: 'activo', id_categoria: categories.length > 0 ? categories[0].id_categoria : '' });
 
         } catch (err) {
             alert('Error: ' + err.message);
@@ -106,11 +162,16 @@ const ProductsPage = () => {
         }
     };
 
-    const handleDeleteProduct = async (productId) => {
-        if (!window.confirm('¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.')) return;
+    const handleDeleteProduct = (product) => {
+        setProductToDelete(product);
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!productToDelete) return;
 
         try {
-            const response = await fetch(`http://localhost:3000/api/products/${productId}`, {
+            const response = await fetch(`http://localhost:3000/api/products/${productToDelete.id_producto}`, {
                 method: 'DELETE'
             });
 
@@ -118,8 +179,9 @@ const ProductsPage = () => {
 
             if (!response.ok) throw new Error(data.message || 'Error al eliminar');
 
-            setProducts(products.filter(p => p.id_producto !== productId));
-            alert('Producto eliminado exitosamente.');
+            setProducts(products.filter(p => p.id_producto !== productToDelete.id_producto));
+            setDeleteModalOpen(false);
+            setProductToDelete(null);
 
         } catch (err) {
             alert('Error: ' + err.message);
@@ -137,6 +199,32 @@ const ProductsPage = () => {
                 return b.nombre.localeCompare(a.nombre);
             }
         });
+
+    const getCategoryColor = (categoryName) => {
+        if (!categoryName) return 'bg-slate-100 text-slate-600 border-slate-200';
+
+        // Manual Overrides
+        const name = categoryName.toLowerCase();
+        if (name === 'comida') return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        if (name === 'limpieza') return 'bg-pink-100 text-pink-700 border-pink-200';
+
+        const colors = [
+            'bg-blue-100 text-blue-700 border-blue-200',
+            'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'bg-amber-100 text-amber-700 border-amber-200',
+            'bg-purple-100 text-purple-700 border-purple-200',
+            'bg-rose-100 text-rose-700 border-rose-200',
+            'bg-indigo-100 text-indigo-700 border-indigo-200'
+        ];
+
+        let hash = 0;
+        for (let i = 0; i < categoryName.length; i++) {
+            hash = categoryName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        const index = Math.abs(hash) % colors.length;
+        return colors[index];
+    };
 
     return (
         <div className="space-y-6">
@@ -210,6 +298,7 @@ const ProductsPage = () => {
                                         </div>
                                     </div>
                                 </th>
+                                <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Categoría</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Precio</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Estado</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider text-right">Acciones</th>
@@ -217,7 +306,7 @@ const ProductsPage = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {loading ? (
-                                <tr><td colSpan="4" className="p-8 text-center text-slate-400">Cargando productos...</td></tr>
+                                <tr><td colSpan="5" className="p-8 text-center text-slate-400">Cargando productos...</td></tr>
                             ) : filteredProducts.length > 0 ? (
                                 filteredProducts.map(product => (
                                     <tr key={product.id_producto} className="hover:bg-slate-50 transition-colors group">
@@ -228,6 +317,44 @@ const ProductsPage = () => {
                                                 </div>
                                                 <div className="font-bold text-slate-800">{product.nombre}</div>
                                             </div>
+                                        </td>
+                                        <td className="p-4 text-slate-600 text-sm font-medium">
+                                            {editingCategoryProduct === product.id_producto ? (
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={editCategoryValue}
+                                                        onChange={(e) => setEditCategoryValue(e.target.value)}
+                                                        className="w-32 px-2 py-1 rounded border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-xs font-bold uppercase"
+                                                        autoFocus
+                                                        onBlur={() => { /* Optional: auto-save or close on blur */ }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveCategory(product.id_producto);
+                                                            if (e.key === 'Escape') setEditingCategoryProduct(null);
+                                                        }}
+                                                    >
+                                                        {categories.map(cat => (
+                                                            <option key={cat.id_categoria} value={cat.id_categoria}>
+                                                                {cat.nb_categoria}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <button onClick={() => handleSaveCategory(product.id_producto)} className="text-emerald-600 hover:text-emerald-700"><FaCheckCircle /></button>
+                                                    <button onClick={() => setEditingCategoryProduct(null)} className="text-red-400 hover:text-red-500"><FaTimesCircle /></button>
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    className="group/category cursor-pointer flex items-center gap-2"
+                                                    onClick={() => handleEditCategoryClick(product)}
+                                                    title="Click para editar categoría"
+                                                >
+                                                    <span className={`px-2.5 py-1 rounded-lg border text-xs font-bold uppercase tracking-wider ${getCategoryColor(product.categoria)}`}>
+                                                        {product.categoria}
+                                                    </span>
+                                                    <span className="opacity-0 group-hover/category:opacity-100 transition-all duration-200 text-emerald-500 bg-emerald-50 p-1.5 rounded-md">
+                                                        <FaPen size={12} />
+                                                    </span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-4 text-slate-800 font-bold font-mono text-lg">
                                             {editingProduct === product.id_producto ? (
@@ -250,7 +377,7 @@ const ProductsPage = () => {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-3 group/price cursor-pointer p-1 -ml-1 rounded-lg hover:bg-slate-50 transition-colors" onClick={() => handleEditPriceClick(product)}>
-                                                    <span>$ {parseFloat(product.precio).toFixed(2)}</span>
+                                                    <span className="font-black text-slate-900">$ {parseFloat(product.precio).toFixed(2)}</span>
                                                     <span className="opacity-0 group-hover/price:opacity-100 transition-all duration-200 text-emerald-500 bg-emerald-50 p-1.5 rounded-md">
                                                         <FaPen size={12} />
                                                     </span>
@@ -274,7 +401,7 @@ const ProductsPage = () => {
                                                     <option value="inactivo">Inactivo</option>
                                                 </select>
                                                 <button
-                                                    onClick={() => handleDeleteProduct(product.id_producto)}
+                                                    onClick={() => handleDeleteProduct(product)}
                                                     className="text-slate-400 hover:text-red-500 transition-colors p-1"
                                                     title="Eliminar Producto"
                                                 >
@@ -286,7 +413,7 @@ const ProductsPage = () => {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="4" className="p-12 text-center text-slate-400">
+                                    <td colSpan="5" className="p-12 text-center text-slate-400">
                                         <div className="flex flex-col items-center gap-2">
                                             <FaBox className="text-4xl text-slate-200" />
                                             <p>No se encontraron productos.</p>
@@ -338,6 +465,25 @@ const ProductsPage = () => {
                                     </div>
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Categoría</label>
+                                    <div className="relative">
+                                        <FaBox className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <select
+                                            required
+                                            value={formData.id_categoria}
+                                            onChange={e => setFormData({ ...formData, id_categoria: e.target.value })}
+                                            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all appearance-none"
+                                        >
+                                            <option value="">Seleccione Categoría...</option>
+                                            {categories.map(cat => (
+                                                <option key={cat.id_categoria} value={cat.id_categoria}>
+                                                    {cat.nb_categoria}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Precio ($)</label>
                                     <div className="relative">
                                         <FaDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -379,6 +525,50 @@ const ProductsPage = () => {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {deleteModalOpen && productToDelete && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+                        onClick={() => setDeleteModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-6 text-center">
+                                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                                    <FaTrash size={28} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">¿Eliminar Producto?</h3>
+                                <p className="text-slate-500 text-sm mb-6">
+                                    Estás a punto de eliminar <span className="font-bold text-slate-700">{productToDelete.nombre}</span>.
+                                    Esta acción no se puede deshacer.
+                                </p>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setDeleteModalOpen(false)}
+                                        className="flex-1 py-2.5 rounded-xl border-2 border-slate-100 text-slate-600 font-bold hover:bg-slate-50 transition-all text-sm"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all text-sm"
+                                    >
+                                        Sí, Eliminar
+                                    </button>
+                                </div>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

@@ -46,7 +46,36 @@ exports.closeSales = async (req, res) => {
         );
         const ventaId = ventaResult.insertId;
 
-        for (const row of rows) {
+        // Pre-calculate Mixed Payment totals and identify mixed rows
+        const mixedRowsIndices = [];
+        let totalMixedCost = 0;
+        
+        // Use a standard for loop to get indices correct in context of rows array
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].paymentMethod === 'MIXTO') {
+                mixedRowsIndices.push(i);
+                const p = parseFloat(rows[i].unitPrice) || 0;
+                const q = parseInt(rows[i].quantity) || 1;
+                totalMixedCost += p * q;
+            }
+        }
+
+        // Tracker for distributed amounts to ensure exact sum matches
+        const mixedPaymentTrackers = {};
+        if (mixedRowsIndices.length > 0) {
+            const firstMixed = rows[mixedRowsIndices[0]];
+            if (firstMixed.paymentDetails) {
+                firstMixed.paymentDetails.forEach(pd => {
+                    mixedPaymentTrackers[pd.method] = {
+                        total: parseFloat(String(pd.amountInUSD).replace(',', '.')),
+                        distributed: 0
+                    };
+                });
+            }
+        }
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
             console.log('Processing Row:', row);
 
             // 2. Resolve Client
@@ -98,10 +127,32 @@ exports.closeSales = async (req, res) => {
                     );
                     const pagoId = pagoResult.insertId;
 
+                    // Calculate Proportion for this row
+                    const isLastMixed = (i === mixedRowsIndices[mixedRowsIndices.length - 1]);
+                    
                     for (const pay of row.paymentDetails) {
                         const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
                         const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
-                        const amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.')); // amount in USD
+                        
+                        // Distribute amount
+                        const tracker = mixedPaymentTrackers[pay.method];
+                        let amountToStore = 0;
+
+                        if (tracker) {
+                             if (isLastMixed) {
+                                // Give the remainder
+                                amountToStore = tracker.total - tracker.distributed;
+                            } else {
+                                // Proportional share
+                                const fraction = totalMixedCost > 0 ? (totalSaleUSD / totalMixedCost) : 0;
+                                amountToStore = tracker.total * fraction;
+                            }
+                            // Update distributed amount
+                            tracker.distributed += amountToStore;
+                        } else {
+                            // Fallback if tracker missing (shouldn't happen)
+                            amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
+                        }
 
                         if (subMethodId) {
                             await connection.query(
@@ -136,23 +187,10 @@ exports.closeSales = async (req, res) => {
             }
 
             // 6. Register Debt (Linked to Detalle Venta)
-            if (totalSaleUSD - totalPaidUSD > 0.01) {
+            // Use a small epsilon for float comparison logic
+            if (totalSaleUSD - totalPaidUSD > 0.005) {
                 // Insert into deuda linked to detail ID
                 const [deudaResult] = await connection.query('INSERT INTO deuda (id_detalle_venta) VALUES (?)', [detailId]);
-
-                // If there was a partial payment, update its debt reference?
-                // The logical flow: Pago -> Linked to Detalle. Deuda -> Linked to Detalle.
-                // If we need Pago to link to Deuda, we'd need Deuda ID first.
-                // But usually Payment comes first or simultaneously.
-                // In this schema, Pago has 'id_deuda'. 
-                // If it's a partial payment, it 'created' the debt remainder? No, the debt is the container of the remainder.
-                // If we pay partial, we have a Pago. We have a Deuda.
-                // Should Pago link to Deuda? 
-                // Current schema: Pago(id_detalle_venta, id_deuda).
-                // If we pay NOW (at closure), we are paying the Sale, not the Debt (yet).
-                // So id_deuda can be null for the initial payment.
-                // Future payments will link to this id_deuda.
-                // Correct.
             }
         }
 

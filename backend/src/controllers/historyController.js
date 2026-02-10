@@ -36,17 +36,18 @@ exports.getHistory = async (req, res) => {
 
             // Aggregate Totals
             // DIVISAS is USD. Everything else is treated as BS (converted from stored USD).
-            const isUSD = row.metodo.toUpperCase() === 'DIVISAS' || row.metodo.toUpperCase() === 'PENDIENTE POR COBRAR';
-            // Note: PENDIENTE POR COBRAR is usually tracked in USD. If you want it in Bs, remove it from isUSD check.
-            // But typically debt is pegged to USD. The user complained about PENDIENTE showing as Bs earlier.
-            // The screenshot showed PENDIENTE POR COBRAR 6,95 Bs ($ 0.02). This means it was treated as Bs but with USD value.
-            // If PENDIENTE POR COBRAR is USD based debt, let's keep it as USD.
+            const isPending = row.metodo.toUpperCase() === 'PENDIENTE POR COBRAR';
+            const isUSD = row.metodo.toUpperCase() === 'DIVISAS' || isPending;
 
             const amountVal = parseFloat(row.total);
             const rate = parseFloat(row.tasa_dia) || 1;
 
             if (isUSD) {
-                historyByDay[dateKey].totalUSD += amountVal;
+                // Exclude Pending/Debt from Total Cash/Income USD
+                if (!isPending) {
+                    historyByDay[dateKey].totalUSD += amountVal;
+                }
+
                 historyByDay[dateKey].breakdown.push({
                     method: row.metodo,
                     amount: amountVal,

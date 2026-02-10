@@ -11,12 +11,18 @@ exports.getDashboardStats = async (req, res) => {
 
         // 1. Total Sales (Current Month vs Prev Month)
         // Helper to get total sales for a specific month/year
+        // MODIFIED: Sum actual payments excluding "PENDIENTE POR COBRAR"
         const getTotalSales = async (month, year) => {
             const query = `
-                SELECT COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) as total
+                SELECT COALESCE(SUM(dp.monto), 0) as total
                 FROM venta v
                 JOIN detalle_venta dv ON v.id_venta = dv.id_venta
-                WHERE MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+                JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+                JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                WHERE MONTH(v.fecha_venta) = ? 
+                AND YEAR(v.fecha_venta) = ?
+                AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             `;
             const [rows] = await pool.query(query, [month, year]);
             return parseFloat(rows[0].total);
@@ -26,12 +32,11 @@ exports.getDashboardStats = async (req, res) => {
         const prevSales = await getTotalSales(prevMonth, prevMonthYear);
         const salesTrend = prevSales === 0 ? 100 : ((currentSales - prevSales) / prevSales) * 100;
 
-        // 2. New Orders (Count of Transactions/Items Sold)
+        // 2. Transacciones (Count of Sales/Invoices)
         const getOrderCount = async (month, year) => {
             const query = `
                 SELECT COUNT(*) as count 
-                FROM detalle_venta dv
-                JOIN venta v ON dv.id_venta = v.id_venta
+                FROM venta v
                 WHERE MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
             `;
             const [rows] = await pool.query(query, [month, year]);
@@ -52,15 +57,20 @@ exports.getDashboardStats = async (req, res) => {
         const totalClients = clientRows[0].count;
 
         // 5. Sales Chart (Last 12 Months)
+        // MODIFIED: Sum actual payments excluding "PENDIENTE POR COBRAR"
         const chartQuery = `
             SELECT 
                 DATE_FORMAT(MIN(v.fecha_venta), '%b') as month_name,
                 MONTH(v.fecha_venta) as month_num,
                 YEAR(v.fecha_venta) as year_num,
-                COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) as total
+                COALESCE(SUM(dp.monto), 0) as total
             FROM venta v
             JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
             WHERE v.fecha_venta >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             GROUP BY YEAR(v.fecha_venta), MONTH(v.fecha_venta)
             ORDER BY YEAR(v.fecha_venta), MONTH(v.fecha_venta)
         `;
@@ -71,10 +81,11 @@ exports.getDashboardStats = async (req, res) => {
         const topProductsQuery = `
             SELECT 
                 p.nb_producto as name, 
-                'General' as category,
+                COALESCE(c.nb_categoria, 'Sin Categoría') as category,
                 SUM(dv.cantidad) as sold
             FROM detalle_venta dv
             JOIN producto p ON dv.id_producto = p.id_producto
+            LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
             GROUP BY p.id_producto
             ORDER BY sold DESC
             LIMIT 5

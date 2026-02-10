@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes } from 'react-icons/fa';
+import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 
@@ -45,20 +45,22 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
         } else if (role === 'gerente') {
             // Gerente sees everything EXCEPT History and Users
-            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
+            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
+            navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
         } else if (role === 'administrador') {
             // Admin sees EVERYTHING
-            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
+            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
+            navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
-            navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuarios" });
+            navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuario" });
         }
     }
 

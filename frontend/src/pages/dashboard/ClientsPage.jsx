@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRate } from '../../context/RateContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaUser, FaSearch, FaMoneyBillWave, FaHandHoldingUsd, FaFileInvoiceDollar, FaTimes, FaCheckCircle, FaExclamationCircle, FaHistory } from 'react-icons/fa';
+import { FaUser, FaSearch, FaMoneyBillWave, FaHandHoldingUsd, FaFileInvoiceDollar, FaTimes, FaCheckCircle, FaExclamationCircle, FaHistory, FaShoppingBag } from 'react-icons/fa';
 
 const ClientsPage = () => {
     const [clients, setClients] = useState([]);
@@ -17,12 +17,16 @@ const ClientsPage = () => {
         const saved = localStorage.getItem('clientSelectedClient');
         return saved ? JSON.parse(saved) : null;
     });
-    const [paymentAmount, setPaymentAmount] = useState(''); // This was derived from selectedClient usually, maybe not needed to persist separately if we re-set it from selectedClient? Or just persist it.
+    const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethods, setPaymentMethods] = useState([]);
 
     // History Modal State
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState([]);
+
+    // Purchase History Modal State
+    const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+    const [purchaseHistory, setPurchaseHistory] = useState([]);
 
     // Payment Logic State (Mixed) - Persisted
     const [payments, setPayments] = useState(() => {
@@ -79,7 +83,6 @@ const ClientsPage = () => {
     // Persist State
     useEffect(() => {
         localStorage.setItem('clientSearchTerm', searchTerm);
-        // Global rate used
         localStorage.setItem('clientIsPaymentModalOpen', isPaymentModalOpen);
         localStorage.setItem('clientSelectedClient', JSON.stringify(selectedClient));
         localStorage.setItem('clientPayments', JSON.stringify(payments));
@@ -87,8 +90,8 @@ const ClientsPage = () => {
 
     const handleOpenPaymentModal = (client) => {
         setSelectedClient(client);
-        setPaymentAmount(client.deuda_actual); // Default to full debt
-        setPayments([{ method: 'DIVISAS', amount: '', amountInUSD: 0, currency: 'USD' }]); // Reset payments
+        setPaymentAmount(client.deuda_actual);
+        setPayments([{ method: 'DIVISAS', amount: '', amountInUSD: 0, currency: 'USD' }]);
         setIsPaymentModalOpen(true);
     };
 
@@ -125,6 +128,23 @@ const ClientsPage = () => {
         }
         setPayments(newPayments);
     };
+    const handleOpenPurchaseModal = async (client) => {
+        setSelectedClient(client);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`http://localhost:3000/api/clients/${client.id_cliente}/purchases`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Error al cargar historial de compras');
+            const data = await response.json();
+            setPurchaseHistory(data);
+            setIsPurchaseModalOpen(true);
+        } catch (err) {
+            setErrorMessage('Error al cargar historial: ' + err.message);
+        }
+    };
+
+
 
     const addPaymentMethod = () => {
         setPayments([...payments, { method: 'DIVISAS', amount: '', amountInUSD: 0, currency: 'USD' }]);
@@ -331,6 +351,13 @@ const ClientsPage = () => {
                                             title="Ver Historial"
                                         >
                                             <FaHistory size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenPurchaseModal(client)}
+                                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                            title="Ver Mercancía"
+                                        >
+                                            <FaShoppingBag size={18} />
                                         </button>
                                     </div>
                                 </td>
@@ -546,6 +573,78 @@ const ClientsPage = () => {
                                                     </td>
                                                     <td className="px-6 py-3 text-sm text-slate-600 font-bold">
                                                         {pay.detalles_pago}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+            {/* Purchase History Modal */}
+            <AnimatePresence>
+                {isPurchaseModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            onClick={() => setIsPurchaseModalOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden relative z-10"
+                        >
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                        <FaShoppingBag className="text-purple-500" />
+                                        Historial de Compras
+                                    </h3>
+                                    <p className="text-slate-500 font-bold">{selectedClient?.nb_cliente}</p>
+                                </div>
+                                <button onClick={() => setIsPurchaseModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                    <FaTimes size={20} />
+                                </button>
+                            </div>
+
+                            <div className="p-0 overflow-y-auto max-h-[60vh]">
+                                <table className="w-full">
+                                    <thead className="bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Fecha</th>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Producto</th>
+                                            <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase">Cant.</th>
+                                            <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">Total ($)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {purchaseHistory.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="4" className="px-6 py-8 text-center text-slate-400">
+                                                    No hay compras registradas.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            purchaseHistory.map((item, idx) => (
+                                                <tr key={idx} className="hover:bg-slate-50">
+                                                    <td className="px-6 py-3 text-sm text-slate-600 font-medium">
+                                                        {new Date(item.fecha_venta).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-sm text-slate-700 font-bold">
+                                                        {item.nb_producto}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-center text-sm text-slate-600 font-medium">
+                                                        {item.cantidad}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-right text-sm font-black text-slate-700 font-mono">
+                                                        $ {parseFloat(item.total).toFixed(2)}
                                                     </td>
                                                 </tr>
                                             ))

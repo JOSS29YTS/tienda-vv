@@ -25,6 +25,8 @@ exports.createPurchase = async (req, res) => {
         const compraId = compraResult.insertId;
 
         // 2. Process Rows
+        let totalPurchaseCost = 0;
+
         for (const row of rows) {
             const {
                 productId,
@@ -36,7 +38,7 @@ exports.createPurchase = async (req, res) => {
                 pvp
             } = row;
 
-            // Determine final USD Cost for storage
+            // Determine final USD Cost for storage (This is the Total Bulto/Line Cost)
             let finalCostBultoUsd = parseFloat(costBultoUsd);
 
             // Recalculate if calculating from Bs provided
@@ -44,8 +46,14 @@ exports.createPurchase = async (req, res) => {
                 finalCostBultoUsd = parseFloat(costBultoBs) / parseFloat(rate);
             }
 
+            // Accumulate Total Purchase Cost
+            totalPurchaseCost += finalCostBultoUsd;
+
+            // Calculate Unit Cost (Costo Unitario)
+            // stored 'costo' column in detalle_compra is Unit Cost
+            const unitCost = quantity > 0 ? finalCostBultoUsd / quantity : 0;
+
             // Insert Detail
-            // User requested: cant -> cantidad, costo -> Costo Bulto $, ganancia -> % Gan, precio_venta -> PVP
             await connection.query(
                 `INSERT INTO detalle_compra 
                 (id_compra, id_producto, cantidad, costo, ganancia, precio_venta)
@@ -54,7 +62,7 @@ exports.createPurchase = async (req, res) => {
                     compraId,
                     productId,
                     quantity,
-                    finalCostBultoUsd,
+                    unitCost,
                     profitPercent,
                     pvp
                 ]
@@ -67,7 +75,11 @@ exports.createPurchase = async (req, res) => {
             );
         }
 
-        // We removed total_usd update logic as requested by user.
+        // Update Total Purchase Amount in Header
+        await connection.query(
+            'UPDATE compra SET total_compra = ? WHERE id_compra = ?',
+            [totalPurchaseCost, compraId]
+        );
 
         await connection.commit();
         res.json({ message: 'Compra registrada exitosamente', purchaseId: compraId });

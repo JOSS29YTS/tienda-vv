@@ -14,6 +14,7 @@ import ClientsPage from './pages/dashboard/ClientsPage';
 import PurchasesPage from './pages/dashboard/PurchasesPage';
 import InventoryPage from './pages/dashboard/InventoryPage';
 import HistoryPage from './pages/dashboard/HistoryPage';
+import FinancesPage from './pages/dashboard/FinancesPage';
 
 // Placeholder components
 const PlaceholderComponent = ({ title }) => (
@@ -58,6 +59,7 @@ function App() {
               <Route path="sales" element={<SalesPage />} />
               <Route path="purchases" element={<PurchasesPage />} />
               <Route path="clients" element={<ClientsPage />} />
+              <Route path="finances" element={<FinancesPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="history" element={<HistoryPage />} />
             </Route>

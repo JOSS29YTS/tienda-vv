@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FaUserCog, FaSearch, FaCheckCircle, FaExclamationCircle, FaTrash } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,6 +8,10 @@ const UsersPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const { user: currentUser } = useAuth();
+
+    // Delete Modal State
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState(null);
 
     useEffect(() => {
         fetchUsers();
@@ -47,22 +51,27 @@ const UsersPage = () => {
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if (!window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
+    const handleDeleteUser = (user) => {
+        setUserToDelete(user);
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!userToDelete) return;
 
         try {
-            const response = await fetch(`http://localhost:3000/api/users/${userId}`, {
+            const response = await fetch(`http://localhost:3000/api/users/${userToDelete.id_usuario}`, {
                 method: 'DELETE'
             });
 
             if (!response.ok) throw new Error('Error al eliminar usuario');
 
-            setUsers(users.filter(u => u.id_usuario !== userId));
+            setUsers(users.filter(u => u.id_usuario !== userToDelete.id_usuario));
+            setDeleteModalOpen(false);
+            setUserToDelete(null);
         } catch (err) {
             console.error(err);
-            // Ideally use a toast here instead of alert, but keeping it simple as per previous pattern or lack thereof
-            // If the user hates alerts, I should probably console log or show a UI message. 
-            // I'll stick to console for now to avoid "alert" popup which they dislike.
+            alert('Error: ' + err.message);
         }
     };
 
@@ -159,7 +168,7 @@ const UsersPage = () => {
                                     </td>
                                     <td className="p-4 text-center">
                                         <button
-                                            onClick={() => handleDeleteUser(user.id_usuario)}
+                                            onClick={() => handleDeleteUser(user)}
                                             disabled={currentUser && user.id_usuario === currentUser.id_usuario}
                                             className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30 disabled:hover:text-slate-400"
                                             title="Eliminar Usuario"
@@ -179,6 +188,53 @@ const UsersPage = () => {
                     </table>
                 </div>
             </motion.div>
+
+            {/* Delete Modal */}
+            <AnimatePresence>
+                {deleteModalOpen && userToDelete && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+                        onClick={() => setDeleteModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-6 text-center">
+                                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                                    <FaTrash size={28} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">¿Eliminar Usuario?</h3>
+                                <p className="text-slate-500 text-sm mb-6">
+                                    Estás a punto de eliminar al usuario <span className="font-bold text-slate-700">{userToDelete.nombre} {userToDelete.apellido}</span>.
+                                    Esta acción no se puede deshacer.
+                                </p>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setDeleteModalOpen(false)}
+                                        className="flex-1 py-2.5 rounded-xl border-2 border-slate-100 text-slate-600 font-bold hover:bg-slate-50 transition-all text-sm"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all text-sm"
+                                    >
+                                        Sí, Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

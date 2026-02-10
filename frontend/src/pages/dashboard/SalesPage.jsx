@@ -494,22 +494,22 @@ const SalesPage = () => {
 
                                         {/* Unit Price USD */}
                                         <td className="p-2 text-right font-mono text-sm font-bold text-slate-900">
-                                            {row.unitPrice > 0 ? `$ ${row.unitPrice.toFixed(2)}` : '-'}
+                                            {row.unitPrice > 0 ? `$ ${row.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                         </td>
 
                                         {/* Total USD */}
                                         <td className="p-2 text-right font-mono text-sm font-black text-slate-900 bg-slate-50/50">
-                                            {rowTotalUSD > 0 ? `$ ${rowTotalUSD.toFixed(2)}` : '-'}
+                                            {rowTotalUSD > 0 ? `$ ${rowTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                         </td>
 
                                         {/* Unit Price BS */}
                                         <td className="p-2 text-right font-mono text-sm font-bold text-slate-900">
-                                            {unitBS > 0 ? `Bs ${unitBS.toFixed(2)}` : '-'}
+                                            {unitBS > 0 ? `Bs ${unitBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                         </td>
 
                                         {/* Total BS */}
                                         <td className="p-2 text-right font-mono text-sm font-black text-slate-900 bg-slate-50/50">
-                                            {rowTotalBS > 0 ? `Bs ${rowTotalBS.toFixed(2)}` : '-'}
+                                            {rowTotalBS > 0 ? `Bs ${rowTotalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                         </td>
 
                                         {/* Payment Method */}
@@ -807,16 +807,16 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                             <div className="flex items-center gap-4">
                                 <div className="text-right">
                                     <div className="font-mono font-bold text-slate-800">
-                                        {p.currency === 'USD' ? '$' : 'Bs.'} {p.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        {p.currency === 'USD' ? '$' : 'Bs.'} {p.currency === 'USD' ? p.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : p.amount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                     </div>
                                     {p.currency === 'BS' && (
                                         <div className="text-xs text-slate-400 font-mono">
-                                            = $ {p.amountInUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            $ {p.amountInUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                         </div>
                                     )}
                                     {p.currency === 'USD' && (
                                         <div className="text-xs text-slate-400 font-mono">
-                                            = Bs. {(p.amount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                            Bs. {(p.amount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                         </div>
                                     )}
                                 </div>
@@ -840,9 +840,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         <div className="font-mono text-2xl font-bold">
                             $ {Math.max(0, remainingUSD).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </div>
-                        <div className="font-mono text-sm font-bold opacity-75">
-                            Bs. {Math.max(0, remainingBS).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                        </div>
+                        Bs. {Math.max(0, remainingBS).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                     </div>
                 </div>
 

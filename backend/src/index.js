@@ -26,6 +26,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/history', require('./routes/historyRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/finances', require('./routes/financeRoutes'));
 
 app.get('/', (req, res) => {
     res.json({ message: 'Bienvenido al API de Venalta Bodega' });

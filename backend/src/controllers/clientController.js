@@ -36,8 +36,10 @@ exports.getDebtors = async (req, res) => {
                         SUM(dp.monto) as total_paid_day
                     FROM pago p
                     JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                    JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
                     JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
                     WHERE DATE(p.fecha_pago) = ?
+                    AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
                     GROUP BY dv.id_cliente
                 ) date_payments ON c.id_cliente = date_payments.id_cliente
                 ORDER BY c.nb_cliente ASC
@@ -58,7 +60,14 @@ exports.getDebtors = async (req, res) => {
                         dv.id_cliente,
                         dv.id_detalle_venta,
                         (dv.cantidad * dv.precio_unitario) as total_sale,
-                        (SELECT COALESCE(SUM(dp.monto), 0) FROM pago p JOIN detalle_pago dp ON p.id_pago = dp.id_pago WHERE p.id_detalle_venta = dv.id_detalle_venta) as total_paid
+                        (
+                            SELECT COALESCE(SUM(dp.monto), 0) 
+                            FROM pago p 
+                            JOIN detalle_pago dp ON p.id_pago = dp.id_pago 
+                            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                            WHERE p.id_detalle_venta = dv.id_detalle_venta
+                            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                        ) as total_paid
                     FROM detalle_venta dv
                 ) totals ON c.id_cliente = totals.id_cliente
                 WHERE c.id_cliente IN (
@@ -94,7 +103,14 @@ exports.payDebt = async (req, res) => {
             SELECT 
                 dv.id_detalle_venta,
                 (dv.cantidad * dv.precio_unitario) as total_sale,
-                (SELECT COALESCE(SUM(dp.monto), 0) FROM pago p JOIN detalle_pago dp ON p.id_pago = dp.id_pago WHERE p.id_detalle_venta = dv.id_detalle_venta) as total_paid
+                (
+                    SELECT COALESCE(SUM(dp.monto), 0) 
+                    FROM pago p 
+                    JOIN detalle_pago dp ON p.id_pago = dp.id_pago 
+                    JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                    WHERE p.id_detalle_venta = dv.id_detalle_venta
+                    AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                ) as total_paid
             FROM detalle_venta dv
             JOIN venta v ON dv.id_venta = v.id_venta
             WHERE dv.id_cliente = ?
@@ -165,37 +181,163 @@ exports.payDebt = async (req, res) => {
 exports.getPaymentHistory = async (req, res) => {
     try {
         const { id } = req.params;
+        // Group by timestamp (fecha_pago) to consolidate payments made at the exact same time (single transaction)
         const query = `
             SELECT 
-                p.id_pago,
+                MAX(p.id_pago) as id_pago, -- Use representative ID
                 p.fecha_pago,
-                p.tasa_dia,
-                dv.id_venta,
-                dv.id_detalle_venta,
-                (SELECT COALESCE(SUM(dp.monto), 0) FROM detalle_pago dp WHERE dp.id_pago = p.id_pago) as total_abono,
+                MAX(p.tasa_dia) as tasa_dia, -- Assume same rate for same transaction
+                (
+                    SELECT COALESCE(SUM(dp.monto), 0)
+                    FROM detalle_pago dp
+                    JOIN pago p2 ON dp.id_pago = p2.id_pago
+                    JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                    JOIN detalle_venta dv2 ON p2.id_detalle_venta = dv2.id_detalle_venta
+                    WHERE dv2.id_cliente = ? 
+                    AND p2.fecha_pago = p.fecha_pago
+                    AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                ) as total_abono,
                 (
                     SELECT CONCAT(
-                        GROUP_CONCAT(CONCAT(mp.nb_metodo_pago, ': $', CAST(dp.monto AS DECIMAL(10,2))) SEPARATOR ', '),
-                        ' (Tasa: ', CAST(p.tasa_dia AS DECIMAL(10,2)), ' Bs/$)'
+                        GROUP_CONCAT(CONCAT(mp.nb_metodo_pago, ': $', CAST(SUM(dp.monto) AS DECIMAL(10,2))) SEPARATOR ', '),
+                        ' (Tasa: ', CAST(MAX(p.tasa_dia) AS DECIMAL(10,2)), ' Bs/$)'
                     )
                     FROM detalle_pago dp
+                    JOIN pago p2 ON dp.id_pago = p2.id_pago
                     JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                    WHERE dp.id_pago = p.id_pago
+                    JOIN detalle_venta dv2 ON p2.id_detalle_venta = dv2.id_detalle_venta
+                    WHERE dv2.id_cliente = ?
+                    AND p2.fecha_pago = p.fecha_pago
+                    AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                    GROUP BY mp.nb_metodo_pago
+                    LIMIT 1 -- To avoid subquery limit issues if simple grouping isn't enough, but GROUP_CONCAT handles it
                 ) as detalles_pago
             FROM pago p
             JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
             WHERE dv.id_cliente = ?
+            GROUP BY p.fecha_pago
+            HAVING total_abono > 0
             ORDER BY p.fecha_pago DESC
         `;
 
-        const [rows] = await pool.query(query, [id]);
-        res.json(rows);
+        // We need to construct the details string properly. The subquery above might be complex.
+        // Simplified approach: Select all payments, then we can group in JS if SQL is too complex or slow.
+        // But let's try a better SQL aggregation.
+
+        // Refined Query:
+        // 1. Find all payments for the client.
+        // 2. Group by date/time.
+        // 3. Sum amounts.
+
+        const refinedQuery = `
+            SELECT 
+                p.fecha_pago,
+                MAX(p.tasa_dia) as tasa_dia,
+                SUM(dp.monto) as total_abono,
+                GROUP_CONCAT(DISTINCT CONCAT(mp.nb_metodo_pago, ': $', dp.monto) SEPARATOR ', ') as raw_details -- This is tricky because we need to sum by method first
+            FROM pago p
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
+            WHERE dv.id_cliente = ? 
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            GROUP BY p.fecha_pago
+            ORDER BY p.fecha_pago DESC
+        `;
+
+        // The SQL GROUP_CONCAT with SUM inside isn't straightforward.
+        // Let's settle for JS processing which is safer for this logic.
+
+        const rawQuery = `
+            SELECT 
+                p.id_pago,
+                p.fecha_pago,
+                p.tasa_dia,
+                mp.nb_metodo_pago,
+                dp.monto
+            FROM pago p
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
+            WHERE dv.id_cliente = ?
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            ORDER BY p.fecha_pago DESC
+        `;
+
+        const [rawRows] = await pool.query(rawQuery, [id]);
+
+        // Process in JS to group by timestamp
+        const grouped = rawRows.reduce((acc, row) => {
+            const dateKey = new Date(row.fecha_pago).toISOString(); // Group by exact timestamp
+            if (!acc[dateKey]) {
+                acc[dateKey] = {
+                    id_pago: row.id_pago, // specific ID doesn't matter much for grouped
+                    fecha_pago: row.fecha_pago,
+                    tasa_dia: row.tasa_dia,
+                    total_abono: 0,
+                    methods: {}
+                };
+            }
+
+            acc[dateKey].total_abono += parseFloat(row.monto);
+
+            if (!acc[dateKey].methods[row.nb_metodo_pago]) {
+                acc[dateKey].methods[row.nb_metodo_pago] = 0;
+            }
+            acc[dateKey].methods[row.nb_metodo_pago] += parseFloat(row.monto);
+
+            return acc;
+        }, {});
+
+        const result = Object.values(grouped).map(group => {
+            const methodDetails = Object.entries(group.methods)
+                .map(([method, amount]) => `${method}: $${amount.toFixed(2)}`)
+                .join(', ');
+
+            return {
+                id_pago: group.id_pago,
+                fecha_pago: group.fecha_pago,
+                tasa_dia: group.tasa_dia,
+                total_abono: group.total_abono,
+                detalles_pago: `${methodDetails} (Tasa: ${parseFloat(group.tasa_dia).toFixed(2)} Bs/$)`
+            };
+        });
+
+        // Sort again because Object.values might not preserve order perfectly (though likely okay)
+        result.sort((a, b) => new Date(b.fecha_pago) - new Date(a.fecha_pago));
+
+        res.json(result);
 
     } catch (error) {
         console.error('Error getting payment history:', error);
         res.status(500).json({ message: 'Error al obtener historial de pagos' });
     }
 };
+
+exports.getPurchases = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT 
+                v.fecha_venta,
+                p.nb_producto,
+                dv.cantidad,
+                dv.precio_unitario,
+                (dv.cantidad * dv.precio_unitario) as total
+            FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
+            JOIN producto p ON dv.id_producto = p.id_producto
+            WHERE dv.id_cliente = ?
+            ORDER BY v.fecha_venta DESC
+        `;
+        const [rows] = await pool.query(query, [id]);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error getting purchases:', error);
+        res.status(500).json({ message: 'Error al obtener historial de compras' });
+    }
+};
+
 exports.getAllClients = async (req, res) => {
     try {
         const query = `SELECT id_cliente, nb_cliente FROM cliente ORDER BY nb_cliente ASC`;
