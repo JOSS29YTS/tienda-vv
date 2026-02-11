@@ -23,6 +23,7 @@ exports.getInventory = async (req, res) => {
                 FROM detalle_venta
                 GROUP BY id_producto
             ) sold ON p.id_producto = sold.id_producto
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             ORDER BY p.nb_producto ASC
         `;
 

@@ -7,14 +7,25 @@ import { useRate } from '../../context/RateContext';
 const PurchasesPage = () => {
     // Load initial state from localStorage if available
     const { rate, setRate } = useRate();
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(() => {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    });
 
     const [rows, setRows] = useState(() => {
         const savedRows = localStorage.getItem('purchaseRows');
         return savedRows ? JSON.parse(savedRows) : [
-            { id: 1, productId: '', profitPercent: 30, quantity: 1, currency: 'BS', costBultoBs: '', costBultoUsd: '', pvp: '' }
+            { id: 1, productId: '', profitPercent: 30, quantity: 1, currency: 'USD', costBultoBs: '', costBultoUsd: '', pvp: '' }
         ];
     });
+    const [paymentMethods, setPaymentMethods] = useState([]);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [payments, setPayments] = useState([{ methodId: '', amount: '' }]);
+
+    // Restore missing state
     const [providers, setProviders] = useState([]);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [invoiceForm, setInvoiceForm] = useState({
@@ -23,12 +34,91 @@ const PurchasesPage = () => {
         isNew: false,
         dueDate: ''
     });
+    const [products, setProducts] = useState([]);
+    const [success, setSuccess] = useState('');
+    const [error, setError] = useState('');
+
+    // Buy Currency State
+    const [isBuyCurrencyModalOpen, setIsBuyCurrencyModalOpen] = useState(false);
+    const [buyCurrencyData, setBuyCurrencyData] = useState({ amountUSD: '', amountBs: '', methodId: '' });
+
+    const handleBuyCurrencySubmit = async () => {
+        if (!buyCurrencyData.amountUSD || !buyCurrencyData.amountBs || !buyCurrencyData.methodId) {
+            setError('Complete todos los campos para la compra de divisas');
+            setTimeout(() => setError(''), 3000);
+            return;
+        }
+
+        const amountBs = parseFloat(buyCurrencyData.amountBs) || 0;
+        const amountUSD = parseFloat(buyCurrencyData.amountUSD) || 0;
+        const effectiveRate = amountUSD > 0 ? (amountBs / amountUSD) : rate;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:3000/api/finances/buy-currency', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    amountUSD: buyCurrencyData.amountUSD,
+                    methodId: buyCurrencyData.methodId,
+                    rate: effectiveRate, // Use calculated rate
+                    date: date
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            setSuccess(data.message);
+            setIsBuyCurrencyModalOpen(false);
+            setBuyCurrencyData({ amountUSD: '', amountBs: '', methodId: '' });
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            setError(err.message);
+            setTimeout(() => setError(''), 5000);
+        }
+    };
 
     useEffect(() => {
         fetchProducts();
+        fetchPaymentMethods();
     }, []);
 
-    // Fetch providers when modal opens
+    // Save state to localStorage
+    useEffect(() => {
+        localStorage.setItem('purchaseRows', JSON.stringify(rows));
+    }, [rows]);
+
+    useEffect(() => {
+        localStorage.setItem('purchaseDate', date);
+    }, [date]);
+
+    useEffect(() => {
+        if (rate) localStorage.setItem('purchaseRate', rate);
+    }, [rate]);
+
+
+    const fetchPaymentMethods = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:3000/api/finances/payment-methods', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setPaymentMethods(data.filter(m => {
+                    const name = m.nb_metodo_pago.toUpperCase();
+                    return !name.includes('PENDIENTE') && !name.includes('MIXTO') && !name.includes('BIOPAGO');
+                }));
+            }
+        } catch (err) {
+            console.error("Error fetching payment methods:", err);
+        }
+    };
+
     const fetchProviders = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -43,23 +133,6 @@ const PurchasesPage = () => {
             console.error(err);
         }
     };
-
-    // Save state to localStorage whenever rows change
-    useEffect(() => {
-        localStorage.setItem('purchaseRows', JSON.stringify(rows));
-    }, [rows]);
-
-    useEffect(() => {
-        localStorage.setItem('purchaseDate', date);
-    }, [date]);
-
-    useEffect(() => {
-        if (rate) localStorage.setItem('purchaseRate', rate);
-    }, [rate]);
-
-    const [products, setProducts] = useState([]);
-    const [success, setSuccess] = useState('');
-    const [error, setError] = useState('');
 
     const fetchProducts = async () => {
         try {
@@ -82,7 +155,7 @@ const PurchasesPage = () => {
             productId: '',
             profitPercent: 30,
             quantity: 1,
-            currency: 'BS',
+            currency: 'USD',
             costBultoBs: '',
             costBultoUsd: '',
             pvp: ''
@@ -119,8 +192,29 @@ const PurchasesPage = () => {
         return acc + parseFloat(row.costBultoUsd || 0);
     }, 0);
 
-    const handleSave = async (invoiceData = null) => {
+    const addPaymentRow = () => {
+        setPayments([...payments, { methodId: '', amount: '' }]);
+    };
+
+    const removePaymentRow = (index) => {
+        setPayments(payments.filter((_, i) => i !== index));
+    };
+
+    const updatePaymentRow = (index, field, value) => {
+        const newPayments = [...payments];
+        newPayments[index][field] = value;
+        setPayments(newPayments);
+    };
+
+    const handleSave = async (invoiceData = null, paymentsList = null) => {
         try {
+            // Validation: Immediate purchase must have payments
+            if (!invoiceData && (!paymentsList || paymentsList.length === 0)) {
+                setError('Debe registrar el pago para finalizar la compra instantánea.');
+                setTimeout(() => setError(''), 3000);
+                return;
+            }
+
             const token = localStorage.getItem('token');
             const dataToSave = {
                 date,
@@ -134,7 +228,8 @@ const PurchasesPage = () => {
                     costBultoUsd: r.currency === 'BS' ? (parseFloat(r.costBultoBs) / rate) : r.costBultoUsd,
                     pvp: r.pvp
                 })),
-                invoiceData // Add invoice data if present
+                invoiceData,
+                payments: paymentsList
             };
 
             const response = await fetch('http://localhost:3000/api/purchases', {
@@ -158,9 +253,11 @@ const PurchasesPage = () => {
             localStorage.removeItem('purchaseRate');
             localStorage.removeItem('purchaseRows');
 
-            setRows([{ id: Date.now(), productId: '', profitPercent: 30, quantity: 1, currency: 'BS', costBultoBs: '', costBultoUsd: '', pvp: '' }]);
+            setRows([{ id: Date.now(), productId: '', profitPercent: 30, quantity: 1, currency: 'USD', costBultoBs: '', costBultoUsd: '', pvp: '' }]);
             setInvoiceForm({ providerId: '', providerName: '', isNew: false, dueDate: '' });
             setIsInvoiceModalOpen(false);
+            setIsPaymentModalOpen(false);
+            setPayments([{ methodId: '', amount: '' }]);
 
             setTimeout(() => setSuccess(''), 3000);
 
@@ -173,6 +270,45 @@ const PurchasesPage = () => {
     const handleInvoiceClick = async () => {
         await fetchProviders();
         setIsInvoiceModalOpen(true);
+    };
+
+    const handleFinalizeClick = async () => {
+        await fetchPaymentMethods();
+        // Initialize with one row covering total? Or empty?
+        // Let's initialize with empty amount so user enters it.
+        setPayments([{ methodId: '', amount: '' }]);
+        setIsPaymentModalOpen(true);
+    };
+
+    const handlePaymentSubmit = () => {
+        // Calculate Total Paid in USD
+        let totalPaidUsd = 0;
+        const finalPayments = [];
+
+        for (const p of payments) {
+            if (!p.methodId || !p.amount) continue;
+
+            const method = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
+            const isUsd = method && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => method.nb_metodo_pago.toUpperCase().includes(k));
+
+            let amountUsd = parseFloat(p.amount);
+            if (!isUsd) {
+                amountUsd = amountUsd / parseFloat(rate);
+            }
+
+            totalPaidUsd += amountUsd;
+            finalPayments.push({ methodId: p.methodId, amount: amountUsd });
+        }
+
+        // Validate Total
+        // Allow small tolerance
+        if (Math.abs(totalPaidUsd - totalCompasUsd) > 0.1) {
+            setError(`El monto total pagado ($${totalPaidUsd.toFixed(2)}) no coincide con el total de la compra ($${totalCompasUsd.toFixed(2)}). Diferencia: $${(totalPaidUsd - totalCompasUsd).toFixed(2)}`);
+            setTimeout(() => setError(''), 5000);
+            return;
+        }
+
+        handleSave(null, finalPayments);
     };
 
     const handleInvoiceSubmit = () => {
@@ -192,7 +328,7 @@ const PurchasesPage = () => {
             return;
         }
 
-        handleSave(invoiceForm);
+        handleSave(invoiceForm, null); // Invoice purchase doesn't need immediate payment method usually
     };
 
     return (
@@ -269,8 +405,8 @@ const PurchasesPage = () => {
                             <th className="p-4 w-20 text-center">% Gan.</th>
                             <th className="p-4 w-20 text-center">Cant.</th>
                             <th className="p-4 w-24">Moneda</th>
-                            <th className="p-4 w-32">Costo Bulto (Bs)</th>
                             <th className="p-4 w-32">Costo Bulto ($)</th>
+                            <th className="p-4 w-32">Costo Bulto (Bs)</th>
                             <th className="p-4 w-32">Costo $ Unid.</th>
                             <th className="p-4 w-32">Precio $ Unid.</th>
                             <th className="p-4 w-32 text-center">PVP</th>
@@ -329,19 +465,9 @@ const PurchasesPage = () => {
                                             onChange={e => updateRow(row.id, 'currency', e.target.value)}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-sm"
                                         >
-                                            <option value="BS">Bs</option>
                                             <option value="USD">USD</option>
+                                            <option value="BS">Bs</option>
                                         </select>
-                                    </td>
-                                    <td className="p-4">
-                                        <input
-                                            type="text"
-                                            value={row.currency === 'USD' ? parseFloat(row.costBultoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : row.costBultoBs}
-                                            readOnly={row.currency === 'USD'}
-                                            onChange={e => updateRow(row.id, 'costBultoBs', e.target.value)}
-                                            className={`w-full border border-slate-200 rounded-lg p-2 font-mono font-black text-right ${row.currency === 'USD' ? 'bg-slate-100 text-slate-700 cursor-not-allowed' : 'bg-slate-50 text-slate-900'}`}
-                                            placeholder="0,00"
-                                        />
                                     </td>
                                     <td className="p-4">
                                         <input
@@ -351,6 +477,16 @@ const PurchasesPage = () => {
                                             onChange={e => updateRow(row.id, 'costBultoUsd', e.target.value)}
                                             className={`w-full border border-slate-200 rounded-lg p-2 font-mono font-black text-right ${row.currency === 'BS' ? 'bg-slate-100 text-slate-700 cursor-not-allowed' : 'bg-slate-50 text-slate-900'}`}
                                             placeholder="0.00"
+                                        />
+                                    </td>
+                                    <td className="p-4">
+                                        <input
+                                            type="text"
+                                            value={row.currency === 'USD' ? parseFloat(row.costBultoBs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : row.costBultoBs}
+                                            readOnly={row.currency === 'USD'}
+                                            onChange={e => updateRow(row.id, 'costBultoBs', e.target.value)}
+                                            className={`w-full border border-slate-200 rounded-lg p-2 font-mono font-black text-right ${row.currency === 'USD' ? 'bg-slate-100 text-slate-700 cursor-not-allowed' : 'bg-slate-50 text-slate-900'}`}
+                                            placeholder="0,00"
                                         />
                                     </td>
                                     <td className="p-4">
@@ -390,10 +526,13 @@ const PurchasesPage = () => {
                 </button>
 
                 <div className="flex gap-4">
+                    <button onClick={() => setIsBuyCurrencyModalOpen(true)} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-cyan-200 flex items-center gap-2">
+                        <span className="font-mono">$</span> Compra de Divisas
+                    </button>
                     <button onClick={handleInvoiceClick} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 flex items-center gap-2">
                         <FaExclamationCircle /> Se debe factura
                     </button>
-                    <button onClick={() => handleSave(null)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 flex items-center gap-2">
+                    <button onClick={handleFinalizeClick} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 flex items-center gap-2">
                         <FaSave /> Finalizar Compra
                     </button>
                 </div>
@@ -402,7 +541,7 @@ const PurchasesPage = () => {
             {/* Invoice Modal */}
             <AnimatePresence>
                 {isInvoiceModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -435,7 +574,7 @@ const PurchasesPage = () => {
                                         <input
                                             type="text"
                                             value={invoiceForm.providerName}
-                                            onChange={e => setInvoiceForm(prev => ({ ...prev, providerName: e.target.value }))}
+                                            onChange={e => setInvoiceForm(prev => ({ ...prev, providerName: e.target.value.toUpperCase() }))}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold"
                                             placeholder="Ej. Distribuidora Polar"
                                             autoFocus
@@ -479,6 +618,170 @@ const PurchasesPage = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Payment Method Modal (Updated for Multiple Methods) */}
+            <AnimatePresence>
+                {isPaymentModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                        >
+                            <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-lg">Métodos de Pago</h3>
+                                    <p className="text-white text-lg font-black">Total a Pagar: $ {totalCompasUsd.toFixed(2)} <span className="text-base font-bold opacity-90">(Bs {(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })})</span></p>
+                                </div>
+                                <button onClick={() => setIsPaymentModalOpen(false)} className="text-emerald-200 hover:text-white"><FaTimes /></button>
+                            </div>
+
+                            <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+                                {payments.map((p, idx) => {
+                                    const selectedMethod = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
+                                    const isUsd = selectedMethod && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => selectedMethod.nb_metodo_pago.toUpperCase().includes(k));
+
+                                    return (
+                                        <div key={idx} className="flex gap-3 items-end">
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método</label>
+                                                <select
+                                                    value={p.methodId}
+                                                    onChange={e => updatePaymentRow(idx, 'methodId', e.target.value)}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                                                >
+                                                    <option value="">Seleccionar...</option>
+                                                    {paymentMethods.map(m => (
+                                                        <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nb_metodo_pago}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="w-40">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monto ({isUsd ? '$ USD' : 'Bs'})</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={p.amount}
+                                                        onChange={e => updatePaymentRow(idx, 'amount', e.target.value)}
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-mono font-bold text-sm text-right outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700"
+                                                        placeholder="0.00"
+                                                    />
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                                        {isUsd ? '$' : 'Bs'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {idx > 0 && (
+                                                <button onClick={() => removePaymentRow(idx)} className="p-2.5 mb-[1px] text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors">
+                                                    <FaTimes />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                <button onClick={addPaymentRow} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors">
+                                    <FaPlus size={12} /> Agregar otro método
+                                </button>
+                            </div>
+
+                            <div className="p-6 border-t border-slate-100 flex gap-4">
+                                <button onClick={() => setIsPaymentModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button>
+                                <button onClick={handlePaymentSubmit} className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/20">
+                                    Confirmar Pago Total
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Buy Currency Modal */}
+            <AnimatePresence>
+                {isBuyCurrencyModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+                        >
+                            <div className="bg-cyan-600 text-white p-4 flex justify-between items-center">
+                                <h3 className="font-bold text-lg">Compra de Divisas</h3>
+                                <button onClick={() => setIsBuyCurrencyModalOpen(false)} className="text-cyan-100 hover:text-white"><FaTimes /></button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monto a Comprar ($ USD)</label>
+                                    <input
+                                        type="number"
+                                        value={buyCurrencyData.amountUSD}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            const bsVal = val ? (parseFloat(val) * parseFloat(rate)).toFixed(2) : '';
+                                            setBuyCurrencyData({ ...buyCurrencyData, amountUSD: val, amountBs: bsVal });
+                                        }}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold text-2xl text-center text-cyan-600"
+                                        placeholder="0.00"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método de Pago (Origen Bs)</label>
+                                    <select
+                                        value={buyCurrencyData.methodId}
+                                        onChange={e => setBuyCurrencyData({ ...buyCurrencyData, methodId: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold"
+                                    >
+                                        <option value="">-- Seleccionar --</option>
+                                        {paymentMethods
+                                            .filter(m => {
+                                                const name = m.nb_metodo_pago.toUpperCase();
+                                                return !name.includes('MIXTO') && !name.includes('PENDIENTE') && !name.includes('DIVISA') && !name.includes('USD') && !name.includes('ZELLE') && !name.includes('BINANCE');
+                                            })
+                                            .map(m => (
+                                                <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nb_metodo_pago}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
+                                <div className="bg-slate-50 p-3 rounded-lg text-sm space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500 font-bold">Fecha:</span>
+                                        <span className="font-mono font-bold">{date.split('-').reverse().join('/')}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500 font-bold">Tasa Referencia:</span>
+                                        <span className="font-mono font-bold">Bs. {rate}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-slate-200 pt-2 mt-2 items-center">
+                                        <span className="text-slate-500 font-bold text-base">Total a Pagar (Bs):</span>
+                                        <input
+                                            type="number"
+                                            value={buyCurrencyData.amountBs}
+                                            onChange={e => setBuyCurrencyData({ ...buyCurrencyData, amountBs: e.target.value })}
+                                            className="w-40 bg-white border border-slate-300 rounded px-2 py-1 font-mono font-black text-right text-lg text-cyan-700 focus:ring-2 focus:ring-cyan-500 outline-none"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleBuyCurrencySubmit}
+                                    disabled={!buyCurrencyData.amountUSD || !buyCurrencyData.methodId || !buyCurrencyData.amountBs}
+                                    className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl shadow-lg shadow-cyan-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Confirmar Compra
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 };

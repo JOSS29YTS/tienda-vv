@@ -51,7 +51,7 @@ CREATE TABLE cliente (
 CREATE TABLE producto (
     id_producto INT AUTO_INCREMENT PRIMARY KEY,
     nb_producto VARCHAR(150) NOT NULL,
-    precio DECIMAL(10, 2) NOT NULL,
+    precio DECIMAL(14, 4) NOT NULL,
     id_estado INT NOT NULL,
     FOREIGN KEY (id_estado) REFERENCES estado(id_estado)
 );
@@ -70,9 +70,9 @@ CREATE TABLE detalle_compra (
     id_compra INT NOT NULL,
     id_producto INT NOT NULL,
     cantidad INT NOT NULL,
-    costo DECIMAL(10, 2) NOT NULL,
-    ganancia DECIMAL(10, 2) NOT NULL,
-    precio_venta DECIMAL(10, 2) NOT NULL,
+    costo DECIMAL(14, 4) NOT NULL,
+    ganancia DECIMAL(14, 4) NOT NULL,
+    precio_venta DECIMAL(14, 4) NOT NULL,
     FOREIGN KEY (id_compra) REFERENCES compra(id_compra) ON DELETE CASCADE,
     FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
 );
@@ -86,7 +86,7 @@ CREATE TABLE venta (
     id_cliente INT NOT NULL,  -- ¿A quién le vendimos?
     id_usuario INT NOT NULL,  -- ¿Quién hizo la venta? (CORREGIDO)
     fecha_venta DATETIME DEFAULT CURRENT_TIMESTAMP,
-    tasa_dia DECIMAL(10, 2) NOT NULL,
+    tasa_dia DECIMAL(14, 4) NOT NULL,
     FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente),
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
 );
@@ -96,7 +96,7 @@ CREATE TABLE detalle_venta (
     id_venta INT NOT NULL,
     id_producto INT NOT NULL,
     cantidad INT NOT NULL,
-    precio_unitario DECIMAL(10, 2) NOT NULL,
+    precio_unitario DECIMAL(14, 4) NOT NULL,
     FOREIGN KEY (id_venta) REFERENCES venta(id_venta) ON DELETE CASCADE,
     FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
 );
@@ -115,7 +115,7 @@ CREATE TABLE pago (
     id_pago INT AUTO_INCREMENT PRIMARY KEY,
     id_venta INT NULL,
     id_deuda INT NULL,
-    tasa_dia DECIMAL(10, 2) NOT NULL,
+    tasa_dia DECIMAL(14, 4) NOT NULL,
     fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_venta) REFERENCES venta(id_venta),
     FOREIGN KEY (id_deuda) REFERENCES deuda(id_deuda)
@@ -125,7 +125,7 @@ CREATE TABLE detalle_pago (
     id_detalle_pago INT AUTO_INCREMENT PRIMARY KEY,
     id_pago INT NOT NULL,
     id_metodo_pago INT NOT NULL,
-    monto DECIMAL(10, 2) NOT NULL,
+    monto DECIMAL(14, 4) NOT NULL,
     FOREIGN KEY (id_pago) REFERENCES pago(id_pago) ON DELETE CASCADE,
     FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
 );

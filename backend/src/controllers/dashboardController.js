@@ -29,8 +29,25 @@ exports.getDashboardStats = async (req, res) => {
         };
 
         const currentSales = await getTotalSales(currentMonth, currentYear);
+
+        // Get Expenses for Current Month to match "Net Flow" User Preference (History Page)
+        const getMonthlyExpenses = async (month, year) => {
+            const query = `
+                SELECT COALESCE(SUM(monto), 0) as total
+                FROM pago_fijo
+                WHERE MONTH(fecha_pago_fijo) = ? AND YEAR(fecha_pago_fijo) = ?
+            `;
+            const [rows] = await pool.query(query, [month, year]);
+            return parseFloat(rows[0].total);
+        };
+        const currentExpenses = await getMonthlyExpenses(currentMonth, currentYear);
+        const netSales = currentSales - currentExpenses; // $27.63 - $0.52 = $27.11
+
         const prevSales = await getTotalSales(prevMonth, prevMonthYear);
-        const salesTrend = prevSales === 0 ? 100 : ((currentSales - prevSales) / prevSales) * 100;
+        const prevExpenses = await getMonthlyExpenses(prevMonth, prevMonthYear);
+        const prevNetSales = prevSales - prevExpenses;
+
+        const salesTrend = prevNetSales === 0 ? 100 : ((netSales - prevNetSales) / prevNetSales) * 100;
 
         // 2. Facturas Pendientes (Pending Invoices Count)
         const getPendingInvoicesCount = async () => {
@@ -96,7 +113,7 @@ exports.getDashboardStats = async (req, res) => {
 
         res.json({
             stats: {
-                sales: { value: currentSales, trend: salesTrend },
+                sales: { value: netSales, trend: salesTrend },
                 pendingInvoices: { value: pendingInvoicesCount, trend: 0 },
                 products: { value: totalProducts, trend: 0 }, // Static for now
                 clients: { value: totalClients, trend: 0 }    // Static for now

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaChartLine, FaMoneyBillWave, FaArrowUp, FaArrowDown, FaFileInvoiceDollar, FaWallet, FaReceipt, FaShoppingCart, FaPlus, FaTimes, FaDollarSign, FaMobileAlt, FaCreditCard, FaFingerprint, FaExchangeAlt, FaMoneyBill } from 'react-icons/fa';
+import { FaChartLine, FaMoneyBillWave, FaArrowUp, FaArrowDown, FaFileInvoiceDollar, FaWallet, FaReceipt, FaShoppingCart, FaPlus, FaTimes, FaDollarSign, FaMobileAlt, FaCreditCard, FaFingerprint, FaExchangeAlt, FaMoneyBill, FaHandHoldingUsd } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -29,6 +29,7 @@ const FinancesPage = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false); // New state for loan modal
     const [fixedPaymentTypes, setFixedPaymentTypes] = useState([]);
     const [paymentMethods, setPaymentMethods] = useState([]);
     const [formData, setFormData] = useState({
@@ -39,6 +40,12 @@ const FinancesPage = () => {
         tasa_dia: rate,
         fecha: new Date().toISOString().split('T')[0]
     });
+    const getLocalISOString = () => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    };
+
     const [transferFormData, setTransferFormData] = useState({
         id_metodo_origen: '',
         id_metodo_destino: '',
@@ -46,6 +53,118 @@ const FinancesPage = () => {
         tasa_dia: rate,
         fecha_traspaso: new Date().toISOString().split('T')[0]
     });
+
+    const [loanForm, setLoanForm] = useState({ // New loan form state
+        methodId: '',
+        amount: '',
+        date: getLocalISOString()
+    });
+    const [success, setSuccess] = useState('');
+    const [error, setError] = useState('');
+
+    // All Transactions Modal State
+    const [isAllTransactionsModalOpen, setIsAllTransactionsModalOpen] = useState(false);
+    const [allTransactions, setAllTransactions] = useState([]);
+    const [loadingAllTransactions, setLoadingAllTransactions] = useState(false);
+
+    const handleViewAllTransactions = async () => {
+        setIsAllTransactionsModalOpen(true);
+        setLoadingAllTransactions(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:3000/api/finances/transactions?limit=1000', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAllTransactions(data);
+            }
+        } catch (error) {
+            console.error('Error fetching all transactions:', error);
+            toast.error('Error al cargar historial completo');
+        } finally {
+            setLoadingAllTransactions(false);
+        }
+    };
+
+    const handleTransferClick = () => {
+        setTransferFormData({
+            id_metodo_origen: '',
+            id_metodo_destino: '',
+            monto: '',
+            tasa_dia: rate,
+            fecha_traspaso: new Date().toISOString().split('T')[0]
+        });
+        setIsTransferModalOpen(true);
+    };
+
+    const handleLoanClick = () => {
+        setLoanForm({
+            methodId: '',
+            amount: '',
+            date: getLocalISOString()
+        });
+        setIsLoanModalOpen(true);
+    };
+
+    const handleLoanSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('http://localhost:3000/api/finances/loans', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    ...loanForm,
+                    rate: parseFloat(rate),
+                    date: loanForm.date
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                toast.success(data.message || 'Préstamo registrado exitosamente', {
+                    style: {
+                        background: '#10B981',
+                        color: '#fff',
+                    },
+                    iconTheme: {
+                        primary: '#fff',
+                        secondary: '#10B981',
+                    },
+                });
+                setIsLoanModalOpen(false);
+                fetchFinanceData(); // Refresh summary
+                setLoanForm({ methodId: '', amount: '', date: getLocalISOString() }); // Reset form
+            } else {
+                toast.error(data.message || 'Error al registrar préstamo', {
+                    style: {
+                        background: '#EF4444',
+                        color: '#fff',
+                    },
+                    iconTheme: {
+                        primary: '#fff',
+                        secondary: '#EF4444',
+                    },
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error de conexión', {
+                style: {
+                    background: '#EF4444',
+                    color: '#fff',
+                },
+                iconTheme: {
+                    primary: '#fff',
+                    secondary: '#EF4444',
+                },
+            });
+        }
+    };
 
     useEffect(() => {
         fetchFinanceData();
@@ -265,7 +384,16 @@ const FinancesPage = () => {
     const handleTransferSubmit = async (e) => {
         e.preventDefault();
         if (transferFormData.id_metodo_origen === transferFormData.id_metodo_destino) {
-            toast.error('El origen y destino no pueden ser el mismo');
+            toast.error('El origen y destino no pueden ser el mismo', {
+                style: {
+                    background: '#EF4444',
+                    color: '#fff',
+                },
+                iconTheme: {
+                    primary: '#fff',
+                    secondary: '#EF4444',
+                },
+            });
             return;
         }
         try {
@@ -315,11 +443,29 @@ const FinancesPage = () => {
                 });
             } else {
                 const errorData = await res.json();
-                toast.error(errorData.message || 'Error al realizar traspaso');
+                toast.error(errorData.message || 'Error al realizar traspaso', {
+                    style: {
+                        background: '#EF4444',
+                        color: '#fff',
+                    },
+                    iconTheme: {
+                        primary: '#fff',
+                        secondary: '#EF4444',
+                    },
+                });
             }
         } catch (error) {
             console.error(error);
-            toast.error('Error de conexión');
+            toast.error('Error de conexión', {
+                style: {
+                    background: '#EF4444',
+                    color: '#fff',
+                },
+                iconTheme: {
+                    primary: '#fff',
+                    secondary: '#EF4444',
+                },
+            });
         }
     };
 
@@ -376,7 +522,7 @@ const FinancesPage = () => {
             ['Balance Neto', `$ ${stats.balance.toFixed(2)}`],
             ['Cuentas por Cobrar', `$ ${stats.receivables.toFixed(2)}`],
             ['Total Entrado en Bs', `Bs. ${stats.incomeBs.toFixed(2)}`],
-            ['Total Entrado en USD', `$ ${stats.incomeUSD.toFixed(2)}`]
+            ['DIVISAS USD', `$ ${stats.incomeUSD.toFixed(2)}`]
         ];
 
         autoTable(doc, {
@@ -510,6 +656,13 @@ const FinancesPage = () => {
                         Generar Reporte
                     </button>
                     <button
+                        onClick={handleLoanClick}
+                        className="flex items-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/30"
+                    >
+                        <FaHandHoldingUsd />
+                        Préstamo
+                    </button>
+                    <button
                         onClick={() => setIsTransferModalOpen(true)}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30"
                     >
@@ -568,7 +721,7 @@ const FinancesPage = () => {
                     isBs={true}
                 />
                 <StatCard
-                    title="Total Entrado en USD"
+                    title="DIVISAS USD"
                     value={stats.incomeUSD}
                     icon={FaDollarSign}
                     gradient="bg-gradient-to-br from-cyan-500 to-blue-500"
@@ -621,7 +774,7 @@ const FinancesPage = () => {
             >
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-bold text-slate-800 text-lg">Transacciones Recientes</h3>
-                    <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Ver Todo</button>
+                    <button onClick={handleViewAllTransactions} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Ver Todo</button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -671,9 +824,26 @@ const FinancesPage = () => {
                                             tx.category === 'Egreso' ? 'text-slate-700' :
                                                 'text-indigo-600'
                                             }`}>
-                                            {tx.category === 'Egreso' ? '-' :
-                                                tx.category === 'Ingreso' ? '+' : ''}
-                                            {tx.category === 'Traspaso' ? `Bs. ${parseFloat(tx.amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}` : formatCurrency(tx.amount)}
+                                            {(tx.category === 'Traspaso' || tx.type === 'Préstamo' || tx.type === 'Pago Préstamo') ? (
+                                                (tx.payment_method.includes('DIVISA') || tx.payment_method.includes('USD') || tx.payment_method.includes('EFECTIVO ($)') || tx.payment_method.includes('ZELLE') || tx.payment_method.includes('BINANCE'))
+                                                    ? (
+                                                        <div className="flex flex-col items-end">
+                                                            <span>
+                                                                {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
+                                                            </span>
+                                                            {tx.exchange_rate && parseFloat(tx.exchange_rate) > 1 && (
+                                                                <span className="text-[10px] text-slate-500 font-bold">
+                                                                    (Bs. {(parseFloat(tx.amount) * parseFloat(tx.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                    : `${tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} Bs. ${parseFloat(tx.amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                            ) : (
+                                                <>
+                                                    {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -692,6 +862,125 @@ const FinancesPage = () => {
                 </div>
             </motion.div>
 
+            {/* Loan Modal */}
+            <AnimatePresence>
+                {isLoanModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        >
+                            <div className="bg-amber-500 text-white p-6 flex justify-between items-center relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-10">
+                                    <FaHandHoldingUsd size={80} />
+                                </div>
+                                <div className="relative z-10 w-full">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-black text-2xl tracking-tight">Registrar Préstamo</h3>
+                                        <button onClick={() => setIsLoanModalOpen(false)} className="text-white/80 hover:text-white transition-colors bg-white/10 p-1.5 rounded-lg hover:bg-white/20">
+                                            <FaTimes size={18} />
+                                        </button>
+                                    </div>
+                                    <p className="text-amber-100/90 text-sm font-medium">Ingreso de dinero a la bodega en calidad de préstamo.</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleLoanSubmit} className="p-6 space-y-6">
+                                <div className="space-y-4">
+                                    {/* Method Selection */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cuenta Destino</label>
+                                        <select
+                                            value={loanForm.methodId}
+                                            onChange={e => setLoanForm({ ...loanForm, methodId: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block p-3 font-bold transition-all outline-none"
+                                        >
+                                            <option value="">Seleccione cuenta...</option>
+                                            {paymentMethods.filter(m =>
+                                                ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL', 'PAGO MOVIL', 'TRANSFERENCIA', 'EFECTIVO'].some(k => m.nb_metodo_pago.toUpperCase().includes(k)) &&
+                                                !m.nb_metodo_pago.toUpperCase().includes('PENDIENTE')
+                                            ).map((method) => (
+                                                <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
+                                                    {method.nb_metodo_pago}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Amount Input */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                            Monto del Préstamo
+                                            {loanForm.methodId && (() => {
+                                                const m = paymentMethods.find(pm => pm.id_metodo_pago == loanForm.methodId);
+                                                const isUsd = m && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => m.nb_metodo_pago.toUpperCase().includes(k));
+                                                return isUsd ? ' ($ USD)' : ' (Bs)';
+                                            })()}
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span className="text-slate-400 font-bold">
+                                                    {loanForm.methodId && (() => {
+                                                        const m = paymentMethods.find(pm => pm.id_metodo_pago == loanForm.methodId);
+                                                        const isUsd = m && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => m.nb_metodo_pago.toUpperCase().includes(k));
+                                                        return isUsd ? '$' : 'Bs';
+                                                    })()}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                value={loanForm.amount}
+                                                onChange={e => setLoanForm({ ...loanForm, amount: e.target.value })}
+                                                className="bg-slate-50 border border-slate-200 text-slate-900 text-lg rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full pl-10 p-3 font-black text-right outline-none transition-all"
+                                                placeholder="0.00"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Date and Rate */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fecha</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={loanForm.date}
+                                                onChange={e => setLoanForm({ ...loanForm, date: e.target.value })}
+                                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-3 font-bold outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tasa del Día</label>
+                                            <div className="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-xl block w-full p-3 font-bold text-right cursor-not-allowed">
+                                                Bs {parseFloat(rate).toFixed(2)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLoanModalOpen(false)}
+                                        className="flex-1 text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl px-5 py-3 transition-colors text-sm"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 text-white bg-amber-500 hover:bg-amber-600 font-bold rounded-xl px-5 py-3 shadow-lg shadow-amber-500/20 transition-all text-sm flex items-center justify-center gap-2"
+                                    >
+                                        Confirmar Préstamo
+                                        <FaHandHoldingUsd />
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
             {/* Modal */}
             <AnimatePresence>
                 {isModalOpen && (
@@ -741,7 +1030,7 @@ const FinancesPage = () => {
                                     >
                                         <option value="">Seleccione método...</option>
                                         {paymentMethods
-                                            .filter(m => !['PENDIENTE POR COBRAR', 'MIXTO'].includes(m.nb_metodo_pago.toUpperCase()))
+                                            .filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO'].includes(m.nb_metodo_pago.toUpperCase()))
                                             .map(method => (
                                                 <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
                                                     {method.nb_metodo_pago}
@@ -858,7 +1147,7 @@ const FinancesPage = () => {
                                         required
                                     >
                                         <option value="">Seleccione cuenta...</option>
-                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
+                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS', 'BIOPAGO'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
                                             <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
                                                 {method.nb_metodo_pago}
                                             </option>
@@ -882,7 +1171,7 @@ const FinancesPage = () => {
                                         required
                                     >
                                         <option value="">Seleccione cuenta...</option>
-                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
+                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS', 'BIOPAGO'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
                                             <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
                                                 {method.nb_metodo_pago}
                                             </option>
@@ -949,7 +1238,112 @@ const FinancesPage = () => {
                     </div>
                 )}
             </AnimatePresence>
+            {/* All Transactions Modal */}
+            <AnimatePresence>
+                {isAllTransactionsModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden"
+                        >
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                <div>
+                                    <h3 className="font-bold text-xl text-slate-800">Historial de Transacciones</h3>
+                                    <p className="text-sm text-slate-500">Mostrando las últimas 1000 operaciones</p>
+                                </div>
+                                <button onClick={() => setIsAllTransactionsModalOpen(false)} className="bg-white p-2 rounded-full shadow-sm hover:bg-slate-100 transition-colors text-slate-500 hover:text-red-500">
+                                    <FaTimes size={20} />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold tracking-wider sticky top-0 z-10 shadow-sm">
+                                        <tr>
+                                            <th className="p-4 bg-slate-50">Tipo</th>
+                                            <th className="p-4 bg-slate-50">ID</th>
+                                            <th className="p-4 bg-slate-50">Método / Detalle</th>
+                                            <th className="p-4 bg-slate-50">Usuario</th>
+                                            <th className="p-4 bg-slate-50">Fecha</th>
+                                            <th className="p-4 text-right bg-slate-50">Monto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {loadingAllTransactions ? (
+                                            <tr><td colSpan="6" className="p-8 text-center text-slate-400">Cargando datos...</td></tr>
+                                        ) : allTransactions.length > 0 ? (
+                                            allTransactions.map((tx, idx) => (
+                                                <tr key={`${tx.type}-${tx.id}-${idx}-modal`} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-4">
+                                                        <span className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold ${tx.category === 'Ingreso' ? 'bg-emerald-100 text-emerald-700' :
+                                                            tx.category === 'Egreso' ? 'bg-red-100 text-red-700' :
+                                                                'bg-indigo-100 text-indigo-700'
+                                                            }`}>
+                                                            {tx.category === 'Ingreso' ? <FaArrowUp size={10} /> :
+                                                                tx.category === 'Egreso' ? <FaArrowDown size={10} /> :
+                                                                    <FaExchangeAlt size={10} />}
+                                                            {tx.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 font-mono text-slate-600 text-xs text-center">#{tx.id}</td>
+                                                    <td className="p-4 text-slate-700 font-medium text-xs break-words max-w-[200px]">
+                                                        {tx.type === 'Compra' && (tx.payment_method === 'PAGADA' || tx.payment_method === 'PENDIENTE') ? (
+                                                            <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold tracking-wider ${tx.payment_method === 'PAGADA' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'
+                                                                }`}>
+                                                                {tx.payment_method}
+                                                            </span>
+                                                        ) : (
+                                                            tx.payment_method || '-'
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 text-slate-700 text-sm">{tx.user}</td>
+                                                    <td className="p-4 text-slate-500 text-xs">{formatDate(tx.date)}</td>
+                                                    <td className={`p-4 text-right font-bold font-mono ${tx.category === 'Ingreso' ? 'text-emerald-600' :
+                                                        tx.category === 'Egreso' ? 'text-slate-700' :
+                                                            'text-indigo-600'
+                                                        }`}>
+                                                        {(tx.category === 'Traspaso' || tx.type === 'Préstamo') ? (
+                                                            (tx.payment_method && (tx.payment_method.includes('DIVISA') || tx.payment_method.includes('USD') || tx.payment_method.includes('EFECTIVO ($)') || tx.payment_method.includes('ZELLE') || tx.payment_method.includes('BINANCE')))
+                                                                ? (
+                                                                    <div className="flex flex-col items-end">
+                                                                        <span>
+                                                                            {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
+                                                                        </span>
+                                                                        {tx.exchange_rate && parseFloat(tx.exchange_rate) > 1 && (
+                                                                            <span className="text-[10px] text-slate-500 font-bold">
+                                                                                (Bs. {(parseFloat(tx.amount) * parseFloat(tx.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )
+                                                                : `${tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} Bs. ${parseFloat(tx.amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                        ) : (
+                                                            <>
+                                                                {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
+                                                            </>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="6" className="p-12 text-center text-slate-400">
+                                                    No hay transacciones registradas.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 };
+
 export default FinancesPage;

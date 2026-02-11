@@ -10,6 +10,11 @@ router.get('/fixed-payment-types', verifyToken, isAdminOrManager, financeControl
 router.get('/payment-methods', verifyToken, isAdminOrManager, financeController.getPaymentMethods);
 router.post('/fixed-payments', verifyToken, isAdminOrManager, financeController.createFixedPayment);
 router.post('/transfers', verifyToken, isAdminOrManager, financeController.createTraspaso);
+console.log('Adding loan routes');
+router.post('/loans', verifyToken, isAdminOrManager, financeController.createLoan);
+router.get('/loans/pending', verifyToken, isAdminOrManager, financeController.getPendingLoans);
+router.post('/loans/pay', verifyToken, isAdminOrManager, financeController.payLoan);
+router.post('/buy-currency', verifyToken, isAdminOrManager, financeController.buyCurrency);
 
 // Supplier Invoices
 router.get('/invoices/pending', verifyToken, isAdminOrManager, invoiceController.getPendingInvoices);

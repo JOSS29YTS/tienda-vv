@@ -199,7 +199,7 @@ const DashboardHome = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                 <StatCard
                     title="Ventas del Mes"
-                    value={`$ ${stats?.sales?.value?.toLocaleString() || '0'}`}
+                    value={`$ ${stats?.sales?.value?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
                     icon={FaMoneyBillWave}
                     trend={stats?.sales?.trend >= 0 ? 'up' : 'down'}
                     trendValue={`${Math.abs(stats?.sales?.trend || 0).toFixed(1)}%`}
@@ -262,7 +262,7 @@ const DashboardHome = () => {
                                         const heightPercent = maxVal > 0 ? (parseFloat(data.total) / maxVal) * 100 : 0;
 
                                         return (
-                                            <div key={i} className="w-full bg-slate-50 rounded-t-xl relative group transition-all hover:bg-slate-100 h-full flex items-end tooltip" data-tip={`$${parseFloat(data.total).toLocaleString()}`}>
+                                            <div key={i} className="w-full bg-slate-50 rounded-t-xl relative group transition-all hover:bg-slate-100 h-full flex items-end tooltip" data-tip={`$${parseFloat(data.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}>
                                                 <motion.div
                                                     initial={{ height: 0 }}
                                                     animate={{ height: `${heightPercent}%` }}

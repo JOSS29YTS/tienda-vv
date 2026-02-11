@@ -33,6 +33,7 @@ exports.getAllProducts = async (req, res) => {
             FROM producto p
             JOIN estado e ON p.id_estado = e.id_estado
             LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             ORDER BY p.nb_producto ASC
         `;
 
@@ -54,7 +55,7 @@ exports.getAllProducts = async (req, res) => {
 
 exports.getCategories = async (req, res) => {
     try {
-        const [categories] = await pool.query('SELECT * FROM categoria ORDER BY id_categoria ASC');
+        const [categories] = await pool.query("SELECT * FROM categoria WHERE nb_categoria != 'SERVICIOS' ORDER BY id_categoria ASC");
         res.json(categories);
     } catch (error) {
         console.error('Error getting categories:', error);

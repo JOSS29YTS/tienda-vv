@@ -124,6 +124,14 @@ exports.payDebt = async (req, res) => {
             throw new Error('El cliente no tiene deudas pendientes.');
         }
 
+        // VALIDATION: Check if payment exceeds total debt
+        const totalDebt = sales.reduce((acc, sale) => acc + (sale.total_sale - sale.total_paid), 0);
+
+        // Allow a small tolerance for floating point errors
+        if (amount > totalDebt + 0.01) {
+            throw new Error(`El monto del pago ($${amount.toFixed(2)}) excede la deuda total del cliente ($${totalDebt.toFixed(2)})`);
+        }
+
         for (const sale of sales) {
             if (remainingAmount <= 0.00) break;
 

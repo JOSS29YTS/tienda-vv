@@ -42,6 +42,7 @@ const SalesPage = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+    const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
 
     // Auto-clear notifications
     useEffect(() => {
@@ -467,18 +468,25 @@ const SalesPage = () => {
 
                                         {/* Product Select */}
                                         <td className="p-1">
-                                            <select
-                                                value={row.productId}
-                                                onChange={(e) => updateRow(row.id, 'productId', e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700"
-                                            >
-                                                <option value="">Seleccionar Producto...</option>
-                                                {products.map(p => (
-                                                    <option key={p.id_producto} value={p.id_producto}>
-                                                        {p.nombre}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            {row.isAdvance ? (
+                                                <div className="w-full bg-purple-50 border border-purple-200 rounded px-2 py-1.5 text-sm font-black text-purple-700 uppercase tracking-wide flex items-center justify-between">
+                                                    <span>AVANCE EFECTIVO</span>
+                                                    <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold">20%</span>
+                                                </div>
+                                            ) : (
+                                                <select
+                                                    value={row.productId}
+                                                    onChange={(e) => updateRow(row.id, 'productId', e.target.value)}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700"
+                                                >
+                                                    <option value="">Seleccionar Producto...</option>
+                                                    {products.map(p => (
+                                                        <option key={p.id_producto} value={p.id_producto}>
+                                                            {p.nombre}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </td>
 
                                         {/* Quantity */}
@@ -488,7 +496,8 @@ const SalesPage = () => {
                                                 min="1"
                                                 value={row.quantity}
                                                 onChange={(e) => updateRow(row.id, 'quantity', parseFloat(e.target.value))}
-                                                className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold text-slate-900 focus:border-emerald-500 outline-none show-spinner"
+                                                className={`w-full border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold focus:border-emerald-500 outline-none show-spinner ${row.isAdvance ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-900'}`}
+                                                readOnly={row.isAdvance}
                                             />
                                         </td>
 
@@ -608,15 +617,54 @@ const SalesPage = () => {
 
                 {/* Footer Actions */}
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-                    <button
-                        onClick={addRow}
-                        className="px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 hover:text-emerald-600 font-bold transition-all shadow-sm text-sm flex items-center gap-2"
-                    >
-                        <span className="text-xl leading-none">+</span> Agregar Fila
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={addRow}
+                            className="px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-100 hover:text-emerald-600 font-bold transition-all shadow-sm text-sm flex items-center gap-2"
+                        >
+                            <span className="text-xl leading-none">+</span> Agregar Fila
+                        </button>
+                        <button
+                            onClick={() => setIsAdvanceModalOpen(true)}
+                            className="px-4 py-2 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 font-bold transition-all shadow-sm text-sm flex items-center gap-2"
+                        >
+                            <FaMoneyBillWave /> Agregar Avance
+                        </button>
+                    </div>
 
                 </div>
             </motion.div>
+
+            {/* Advance Modal */}
+            <AnimatePresence>
+                {isAdvanceModalOpen && (
+                    <AdvanceModal
+                        rate={rate}
+                        paymentMethods={paymentMethods}
+                        onClose={() => setIsAdvanceModalOpen(false)}
+                        onConfirm={(data) => {
+                            const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
+                            const totalBs = parseFloat(data.amount) * 1.20; // 20% commission
+                            const priceUsd = totalBs / parseFloat(rate);
+
+                            setRows([...rows, {
+                                id: newId,
+                                isAdvance: true,
+                                productId: 'AVANCE', // Placeholder
+                                quantity: 1,
+                                unitPrice: priceUsd,
+                                paymentMethod: data.method,
+                                client: data.client || 'CLIENTE',
+                                isNewClient: false,
+                                advanceAmountBs: parseFloat(data.amount), // Cost to deduct from Cash
+                                advanceCommissionBs: parseFloat(data.amount) * 0.20
+                            }]);
+                            setIsAdvanceModalOpen(false);
+                            setSuccessMessage('Avance registrado correctamente');
+                        }}
+                    />
+                )}
+            </AnimatePresence>
 
             {/* Floating Selection Summary */}
             <motion.div
@@ -877,3 +925,99 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
 };
 
 export default SalesPage;
+const AdvanceModal = ({ rate, paymentMethods, onClose, onConfirm }) => {
+    const [amount, setAmount] = useState('');
+    const [method, setMethod] = useState('');
+    const [client, setClient] = useState('');
+
+    const commission = (parseFloat(amount) || 0) * 0.20;
+    const totalToCharge = (parseFloat(amount) || 0) + commission;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
+            >
+                <div className="bg-purple-600 text-white p-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                        <FaMoneyBillWave /> Nuevo Avance
+                    </h3>
+                    <p className="text-purple-200 text-sm">Entrega de efectivo con comisión</p>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monto a Entregar (Bs)</label>
+                        <input
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            className="w-full text-2xl font-black text-slate-800 border-b-2 border-purple-200 hover:border-purple-500 focus:border-purple-600 outline-none py-2 bg-transparent transition-colors"
+                            placeholder="0.00"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-slate-500 font-bold">Comisión (20%)</span>
+                            <span className="font-bold text-slate-600">Bs {commission.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
+                            <span className="text-purple-700 font-bold uppercase text-xs">Total a Cobrar</span>
+                            <span className="font-black text-xl text-purple-700">Bs {totalToCharge.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="text-right text-xs text-slate-400 font-bold">
+                            $ {(totalToCharge / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método de Cobro</label>
+                        <select
+                            value={method}
+                            onChange={(e) => setMethod(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 font-bold text-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
+                        >
+                            <option value="">Seleccionar...</option>
+                            {paymentMethods
+                                .filter(m => m.nb_metodo_pago !== 'EFECTIVO' && m.nb_metodo_pago !== 'MIXTO')
+                                .map(m => (
+                                    <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
+                                ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cliente (Opcional)</label>
+                        <input
+                            type="text"
+                            value={client}
+                            onChange={(e) => setClient(e.target.value.toUpperCase())}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 font-bold text-slate-700 focus:ring-2 focus:ring-purple-500 outline-none placeholder:font-normal"
+                            placeholder="Nombre del cliente..."
+                        />
+                    </div>
+
+                    <button
+                        onClick={() => onConfirm({ amount, method, client })}
+                        disabled={!amount || !method || parseFloat(amount) <= 0}
+                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                    >
+                        Procesar Avance
+                    </button>
+
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2 text-slate-400 hover:text-slate-600 font-bold text-sm"
+                    >
+                        Cancelar
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+

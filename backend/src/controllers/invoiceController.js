@@ -1,4 +1,5 @@
 const pool = require('../database/db');
+const balanceUtils = require('../utils/balanceUtils'); // Import Balance Utils
 
 exports.getPendingInvoices = async (req, res) => {
     try {
@@ -36,12 +37,32 @@ exports.payInvoice = async (req, res) => {
         const { id_factura_proveedor, id_metodo_pago, monto, tasa_dia, fecha_pago } = req.body;
         const userId = req.user.id;
 
+        // VALIDATION: Check Sufficient Funds
+        const amount = parseFloat(monto);
+        const rate = parseFloat(tasa_dia);
+        const methodId = parseInt(id_metodo_pago);
+
+        const balances = await balanceUtils.getMethodBalances();
+        const method = balances[methodId];
+
+        let requiredAmount = amount;
+        if (method && method.type === 'BS') {
+            requiredAmount = amount * rate;
+        }
+
+        const check = await balanceUtils.checkSufficientFunds(methodId, requiredAmount);
+        if (!check.ok) {
+            await connection.rollback();
+            return res.status(400).json({ message: check.message });
+        }
+
+
         // Insert Payment
         await connection.query(`
             INSERT INTO pago_factura_proveedor 
             (id_factura_proveedor, id_usuario, id_metodo_pago, monto, tasa_dia, fecha_pago)
             VALUES (?, ?, ?, ?, ?, ?)
-        `, [id_factura_proveedor, userId, id_metodo_pago, monto, tasa_dia, fecha_pago]);
+        `, [id_factura_proveedor, userId, methodId, amount, rate, fecha_pago]);
 
         // Check if fully paid
         const [invResult] = await connection.query('SELECT monto_deuda, id_compra FROM factura_proveedor WHERE id_factura_proveedor = ?', [id_factura_proveedor]);
@@ -55,14 +76,11 @@ exports.payInvoice = async (req, res) => {
         const totalPaid = parseFloat(payResult[0].total_paid || 0);
 
         if (totalPaid >= totalDebt - 0.01) {
-            // Update Purchase Status (Sync)
-            if (purchaseId) {
-                await connection.query(`
-                    UPDATE compra 
-                    SET id_estado_compra = (SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = 'PAGADA' LIMIT 1)
-                    WHERE id_compra = ?`,
-                    [purchaseId]
-                );
+            // Update Purchase Status (Sync) (Assume purchase becomes PAGADA if Invoice is fully paid)
+            // Find status ID
+            const [statusRes] = await connection.query("SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = 'PAGADA' LIMIT 1");
+            if (statusRes.length > 0 && purchaseId) {
+                await connection.query(`UPDATE compra SET id_estado_compra = ? WHERE id_compra = ?`, [statusRes[0].id_estado_compra, purchaseId]);
             }
         }
 
@@ -72,7 +90,7 @@ exports.payInvoice = async (req, res) => {
     } catch (error) {
         if (connection) await connection.rollback();
         console.error('Error paying invoice:', error);
-        res.status(500).json({ message: 'Error al registrar pago de factura' });
+        res.status(500).json({ message: 'Error al registrar pago de factura: ' + error.message });
     } finally {
         if (connection) connection.release();
     }

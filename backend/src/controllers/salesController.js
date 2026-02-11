@@ -49,7 +49,7 @@ exports.closeSales = async (req, res) => {
         // Pre-calculate Mixed Payment totals and identify mixed rows
         const mixedRowsIndices = [];
         let totalMixedCost = 0;
-        
+
         // Use a standard for loop to get indices correct in context of rows array
         for (let i = 0; i < rows.length; i++) {
             if (rows[i].paymentMethod === 'MIXTO') {
@@ -92,10 +92,36 @@ exports.closeSales = async (req, res) => {
             }
 
             // 3. Resolve Product & Validation
-            const productId = parseInt(row.productId);
-            const [prodCheck] = await connection.query('SELECT id_producto FROM producto WHERE id_producto = ?', [productId]);
-            if (prodCheck.length === 0) {
-                throw new Error(`Producto con ID ${productId} no encontrado.`);
+            let productId;
+            if (row.isAdvance) {
+                // Find or Create 'AVANCE DE EFECTIVO' product
+                const [advProd] = await connection.query("SELECT id_producto FROM producto WHERE nb_producto = 'AVANCE DE EFECTIVO'");
+                if (advProd.length > 0) {
+                    productId = advProd[0].id_producto;
+                } else {
+                    // Resolve Status
+                    const [statusRes] = await connection.query("SELECT id_estado FROM estado WHERE nb_estado = 'Activo'");
+                    const statusId = statusRes.length > 0 ? statusRes[0].id_estado : 1; // Fallback to 1
+
+                    // Resolve Category
+                    let catId;
+                    const [catRes] = await connection.query("SELECT id_categoria FROM categoria WHERE nb_categoria = 'SERVICIOS'");
+                    if (catRes.length > 0) {
+                        catId = catRes[0].id_categoria;
+                    } else {
+                        const [newCat] = await connection.query("INSERT INTO categoria (nb_categoria) VALUES ('SERVICIOS')");
+                        catId = newCat.insertId;
+                    }
+
+                    const [newAdv] = await connection.query("INSERT INTO producto (nb_producto, precio, id_estado, id_categoria) VALUES ('AVANCE DE EFECTIVO', 0, ?, ?)", [statusId, catId]);
+                    productId = newAdv.insertId;
+                }
+            } else {
+                productId = parseInt(row.productId);
+                const [prodCheck] = await connection.query('SELECT id_producto FROM producto WHERE id_producto = ?', [productId]);
+                if (prodCheck.length === 0) {
+                    throw new Error(`Producto con ID ${productId} no encontrado.`);
+                }
             }
 
             const unitPrice = parseFloat(row.unitPrice) || 0;
@@ -108,6 +134,32 @@ exports.closeSales = async (req, res) => {
                 [ventaId, clientId, productId, quantity, unitPrice]
             );
             const detailId = detailResult.insertId;
+
+            // 4.1 Handle Advance Expense (Cash Out)
+            if (row.isAdvance && row.advanceAmountBs) {
+                // Find EFECTIVO method ID
+                const [cashMethod] = await connection.query("SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = 'EFECTIVO'");
+
+                // Find or Create 'AVANCE DE EFECTIVO' Expense Type
+                let typeId;
+                const [typeRows] = await connection.query("SELECT id_tipo_pago_fijo FROM tipo_pago_fijo WHERE nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'");
+                if (typeRows.length > 0) {
+                    typeId = typeRows[0].id_tipo_pago_fijo;
+                } else {
+                    const [newType] = await connection.query("INSERT INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES ('AVANCE DE EFECTIVO')");
+                    typeId = newType.insertId;
+                }
+
+                if (cashMethod.length > 0) {
+                    const efectivoId = cashMethod[0].id_metodo_pago;
+                    const expenseAmountUSD = row.advanceAmountBs / safeRate;
+
+                    await connection.query(
+                        'INSERT INTO pago_fijo (id_usuario, id_tipo_pago_fijo, id_metodo_pago, monto, tasa_dia, fecha_pago_fijo) VALUES (?, ?, ?, ?, ?, NOW())',
+                        [userId, typeId, efectivoId, expenseAmountUSD, safeRate]
+                    );
+                }
+            }
 
             // 5. Handle Payments & Debt (Linked to Detalle Venta)
             let totalPaidUSD = 0;
@@ -129,17 +181,17 @@ exports.closeSales = async (req, res) => {
 
                     // Calculate Proportion for this row
                     const isLastMixed = (i === mixedRowsIndices[mixedRowsIndices.length - 1]);
-                    
+
                     for (const pay of row.paymentDetails) {
                         const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
                         const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
-                        
+
                         // Distribute amount
                         const tracker = mixedPaymentTrackers[pay.method];
                         let amountToStore = 0;
 
                         if (tracker) {
-                             if (isLastMixed) {
+                            if (isLastMixed) {
                                 // Give the remainder
                                 amountToStore = tracker.total - tracker.distributed;
                             } else {

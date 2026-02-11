@@ -100,13 +100,13 @@ const HistoryCard = ({ day, formatDate }) => {
                         <div className="flex justify-between items-center bg-blue-50 p-2 rounded-lg border border-blue-100">
                             <span className="text-xs text-blue-600 font-bold uppercase">Total (Bs)</span>
                             <span className="text-sm font-black text-blue-700">
-                                {(day.totalBS + (day.totalUSD * parseFloat(day.tasa))).toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs
+                                {(day.totalBS + (day.totalUSD * parseFloat(day.tasa))).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
                             </span>
                         </div>
                         <div className="flex justify-between items-center bg-emerald-50 p-2 rounded-lg border border-emerald-100">
                             <span className="text-xs text-emerald-600 font-bold uppercase">Total ($)</span>
                             <span className="text-sm font-black text-emerald-700">
-                                $ {(day.totalUSD + (day.totalBS / (parseFloat(day.tasa) || 1))).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                $ {(day.totalUSD + (day.totalBS / (parseFloat(day.tasa) || 1))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         </div>
                     </div>
@@ -134,7 +134,7 @@ const HistoryCard = ({ day, formatDate }) => {
                                         <span className="text-slate-500">{item.method}</span>
                                         <span className="font-bold text-slate-700">
                                             {item.currency === 'USD' ? '$ ' : ''}
-                                            {item.amount.toLocaleString(item.currency === 'USD' ? 'en-US' : 'es-VE', { minimumFractionDigits: 2 })}
+                                            {item.amount.toLocaleString(item.currency === 'USD' ? 'en-US' : 'es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             {item.currency === 'BS' ? ' Bs' : ''}
 
                                             {item.currency === 'BS' && day.tasa > 0 && (
