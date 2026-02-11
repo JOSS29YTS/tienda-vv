@@ -16,21 +16,30 @@ exports.getFinanceSummary = async (req, res) => {
         const totalGrossSales = parseFloat(salesResult[0].total_sales);
 
         // 2. Total Purchases (Recorded Expenses)
-        const [purchasesResult] = await pool.query('SELECT COALESCE(SUM(total_compra), 0) as total_purchases FROM compra');
-        const totalPurchases = parseFloat(purchasesResult[0].total_purchases);
+        // 2. Total Purchases (Recorded Expenses - Actual Cash Flow)
+        // Sum pago_compra (Immediate) + pago_factura_proveedor (Deferred)
+        const [purchasePaymentsResult] = await pool.query(`
+            SELECT 
+                (SELECT COALESCE(SUM(monto), 0) FROM pago_compra) + 
+                (SELECT COALESCE(SUM(monto), 0) FROM pago_factura_proveedor) as total_paid
+        `);
+        const totalPurchases = parseFloat(purchasePaymentsResult[0].total_paid);
 
         // 3. Fixed Payments (Recorded Expenses)
         const [fixedResult] = await pool.query(`
-            SELECT pf.monto, pf.tasa_dia, mp.nb_metodo_pago
+            SELECT pf.monto, pf.tasa_dia, mp.nb_metodo_pago, tpf.nb_tipo_pago_fijo
             FROM pago_fijo pf
             LEFT JOIN metodo_pago mp ON pf.id_metodo_pago = mp.id_metodo_pago
+            LEFT JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
         `);
 
-        let totalFixedPayments = 0;
+        let totalFixedPayments = 0; // Visual Expenses (excludes Avance)
+        let totalFixedPaymentsForBalance = 0; // For Cash Balance (includes Avance)
         let deductions = { efectivo: 0, punto: 0, pagoMovil: 0, biopago: 0, transferencia: 0 };
 
         // Accumulators for Response
-        let collectedIncomeUSD = 0; // Logic for Gross Income
+        let collectedIncomeUSD = 0; // Logic for Gross Income (Revenue)
+        let totalLoansUSD = 0; // Logic for Loans (Capital)
         let incomeBs = 0;
         let incomeUSD_Only = 0; // Logic for Net USD Balance (Divisas)
 
@@ -38,7 +47,12 @@ exports.getFinanceSummary = async (req, res) => {
         for (const payment of fixedResult) {
             const monto = parseFloat(payment.monto);
             const rate = parseFloat(payment.tasa_dia);
-            totalFixedPayments += monto; // Always add to expenses
+            const isAvance = payment.nb_tipo_pago_fijo && payment.nb_tipo_pago_fijo.toUpperCase().includes('AVANCE');
+
+            if (!isAvance) {
+                totalFixedPayments += monto; // Only add to Visual Expenses if not Avance
+            }
+            totalFixedPaymentsForBalance += monto; // Always subtract from cash balance
 
             if (payment.nb_metodo_pago) {
                 const method = payment.nb_metodo_pago.toUpperCase();
@@ -56,6 +70,7 @@ exports.getFinanceSummary = async (req, res) => {
         }
 
         const totalExpenses = totalPurchases + totalFixedPayments;
+        const totalExpensesForBalance = totalPurchases + totalFixedPaymentsForBalance;
 
         // 4. Accounts Receivable
         const [initialDebtResult] = await pool.query(`
@@ -124,10 +139,10 @@ exports.getFinanceSummary = async (req, res) => {
             const rate = parseFloat(loan.tasa_dia) || 1;
 
             if (usdKeywords.some(k => method.includes(k))) {
-                collectedIncomeUSD += amount;
+                totalLoansUSD += amount; // Add to Loans Capital (Not Revenue)
                 incomeUSD_Only += amount;
             } else {
-                collectedIncomeUSD += (amount / rate);
+                totalLoansUSD += (amount / rate); // Add to Loans Capital (Not Revenue)
                 incomeBs += amount;
                 if (method.includes('EFECTIVO')) totalEfectivoBs += amount;
                 else if (method.includes('PUNTO')) totalPuntoBs += amount;
@@ -247,10 +262,15 @@ exports.getFinanceSummary = async (req, res) => {
         totalBiopagoBs -= deductions.biopago;
         totalTransferenciaBs -= deductions.transferencia;
 
-        const netBalance = collectedIncomeUSD - totalExpenses;
+        const netBalance = collectedIncomeUSD + totalLoansUSD - totalExpensesForBalance;
 
         // Apply Deductions to Display Totals (Net Income as per User Request)
-        const netIncomeUSD = collectedIncomeUSD - totalFixedPayments; // $527.63 - $0.52 = $527.11
+        // User wants: Sales ($30.11) + Loans ($300) = $330.11.
+        // collectedIncomeUSD includes Sales + Avance In ($30.64).
+        // totalAvance represents Avance Out ($0.53).
+        // By subtracting totalAvance, we strip the Avance In from the Income view.
+        const totalAvance = totalFixedPaymentsForBalance - totalFixedPayments;
+        const netIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD - totalFixedPayments;
         // incomeUSD_Only tracks DIVISAS transactions specifically.
         // We assume incomeUSD_Only should also reflect expenses paid in Divisas.
         // (Logic already subtracts expenses from incomeUSD_Only inside the loop).

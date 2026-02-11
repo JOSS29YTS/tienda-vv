@@ -425,9 +425,17 @@ const InvoicesPage = () => {
                                         <span className="text-sm font-bold text-slate-500">Deuda Restante</span>
                                         <div className="text-right">
                                             {paymentType === 'loan' ? (
-                                                <span className="block font-mono font-black text-xl text-slate-800">
-                                                    {selectedItem.is_usd ? '$' : 'Bs'} {parseFloat(selectedItem.monto_pendiente).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                </span>
+                                                <>
+                                                    <span className="block font-mono font-black text-xl text-slate-800">
+                                                        {selectedItem.is_usd ? '$' : 'Bs'} {parseFloat(selectedItem.monto_pendiente).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                    <span className="block text-xs font-bold text-slate-400">
+                                                        ≈ {selectedItem.is_usd
+                                                            ? `Bs ${(parseFloat(selectedItem.monto_pendiente) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                            : `$ ${(parseFloat(selectedItem.monto_pendiente) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                        }
+                                                    </span>
+                                                </>
                                             ) : (
                                                 <>
                                                     <span className="block font-mono font-black text-xl text-slate-800">$ {parseFloat(selectedItem.monto_restante).toFixed(2)}</span>
@@ -474,6 +482,14 @@ const InvoicesPage = () => {
                                                             {isUsd ? '$' : 'Bs'}
                                                         </span>
                                                     </div>
+                                                    {p.amount && (
+                                                        <p className="text-[10px] font-bold text-slate-400 text-right mt-1">
+                                                            ≈ {isUsd
+                                                                ? `Bs ${(parseFloat(p.amount) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                                : `$ ${(parseFloat(p.amount) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                            }
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 {idx > 0 && (
                                                     <button onClick={() => removePaymentRow(idx)} className="p-2.5 mb-[1px] text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors">

@@ -63,12 +63,10 @@ exports.createPurchase = async (req, res) => {
                 const method = balances[methodId];
                 // Allow tiny tolerance
                 if (method.balance < required - 0.01) {
-                    // STRICT CHECK DISABLED FOR TESTING/BODEGA USAGE
-                    // await connection.rollback();
-                    // return res.status(400).json({
-                    //     message: `Fondos insuficientes en ${method.name}. Disponible: ${method.balance.toLocaleString('es-VE')} ${method.type}, Requerido: ${required.toLocaleString('es-VE')} ${method.type}`
-                    // });
-                    console.warn(`[WARNING] Purchase allowed with insufficient funds: ${method.name}. Balance: ${method.balance}, Required: ${required}`);
+                    await connection.rollback();
+                    return res.status(400).json({
+                        message: `Fondos insuficientes en ${method.name}. Disponible: ${method.balance.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ${method.type}, Requerido: ${required.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ${method.type}`
+                    });
                 }
             }
         } else if (!invoiceData && (!payments || payments.length === 0)) {

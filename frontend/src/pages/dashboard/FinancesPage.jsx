@@ -827,16 +827,9 @@ const FinancesPage = () => {
                                             {(tx.category === 'Traspaso' || tx.type === 'Préstamo' || tx.type === 'Pago Préstamo') ? (
                                                 (tx.payment_method.includes('DIVISA') || tx.payment_method.includes('USD') || tx.payment_method.includes('EFECTIVO ($)') || tx.payment_method.includes('ZELLE') || tx.payment_method.includes('BINANCE'))
                                                     ? (
-                                                        <div className="flex flex-col items-end">
-                                                            <span>
-                                                                {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
-                                                            </span>
-                                                            {tx.exchange_rate && parseFloat(tx.exchange_rate) > 1 && (
-                                                                <span className="text-[10px] text-slate-500 font-bold">
-                                                                    (Bs. {(parseFloat(tx.amount) * parseFloat(tx.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                                                                </span>
-                                                            )}
-                                                        </div>
+                                                        <span>
+                                                            {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
+                                                        </span>
                                                     )
                                                     : `${tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} Bs. ${parseFloat(tx.amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                             ) : (
@@ -1307,16 +1300,9 @@ const FinancesPage = () => {
                                                         {(tx.category === 'Traspaso' || tx.type === 'Préstamo') ? (
                                                             (tx.payment_method && (tx.payment_method.includes('DIVISA') || tx.payment_method.includes('USD') || tx.payment_method.includes('EFECTIVO ($)') || tx.payment_method.includes('ZELLE') || tx.payment_method.includes('BINANCE')))
                                                                 ? (
-                                                                    <div className="flex flex-col items-end">
-                                                                        <span>
-                                                                            {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
-                                                                        </span>
-                                                                        {tx.exchange_rate && parseFloat(tx.exchange_rate) > 1 && (
-                                                                            <span className="text-[10px] text-slate-500 font-bold">
-                                                                                (Bs. {(parseFloat(tx.amount) * parseFloat(tx.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
+                                                                    <span>
+                                                                        {tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} {formatCurrency(tx.amount)}
+                                                                    </span>
                                                                 )
                                                                 : `${tx.category === 'Egreso' ? '-' : tx.category === 'Ingreso' ? '+' : ''} Bs. ${parseFloat(tx.amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                                         ) : (
