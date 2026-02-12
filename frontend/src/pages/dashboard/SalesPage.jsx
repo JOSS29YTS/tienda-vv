@@ -873,7 +873,8 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
 
                 {/* Add Payment Form */}
-                <div className="flex gap-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-200">
+                {/* Add Payment Form */}
+                <div className="flex gap-4 items-end bg-slate-50 p-4 pb-6 rounded-xl border border-slate-200">
                     <div className="flex-1">
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método</label>
                         <select
@@ -898,7 +899,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                                 ))}
                         </select>
                     </div>
-                    <div className="w-32">
+                    <div className="w-32 relative">
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monto</label>
                         <input
                             type="number"
@@ -907,6 +908,11 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-right font-mono font-bold"
                             placeholder="0.00"
                         />
+                        {currency === 'BS' && amount && !isNaN(parseFloat(amount)) && (
+                            <div className="absolute top-full right-0 mt-1 text-xs text-slate-500 font-bold whitespace-nowrap">
+                                $ {(parseFloat(amount) / parseFloat(rate)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                        )}
                     </div>
                     <div className="w-24">
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Moneda</label>
@@ -948,10 +954,11 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                                         {p.currency === 'USD' ? '$' : 'Bs.'} {p.currency === 'USD' ? p.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : p.amount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                     </div>
                                     {p.currency === 'BS' && (
-                                        <div className="text-xs text-slate-400 font-mono">
+                                        <div className="text-xs text-slate-500 font-bold font-mono">
                                             $ {p.amountInUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                         </div>
                                     )}
+
                                     {p.currency === 'USD' && (
                                         <div className="text-xs text-slate-400 font-mono">
                                             Bs. {(p.amount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}

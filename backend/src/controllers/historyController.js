@@ -23,7 +23,7 @@ exports.getHistory = async (req, res) => {
 
                 UNION ALL
 
-                -- 2. Fixed Payments (Expenses - Stored in USD)
+                -- 2. Fixed Payments (ONLY 'AVANCE DE EFECTIVO')
                 SELECT 
                     pf.fecha_pago_fijo as fecha, 
                     mp.nb_metodo_pago as metodo, 
@@ -32,7 +32,8 @@ exports.getHistory = async (req, res) => {
                     'EXPENSE' as type
                 FROM pago_fijo pf
                 JOIN metodo_pago mp ON pf.id_metodo_pago = mp.id_metodo_pago
-                
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
             ) AS daily_movements
             GROUP BY fecha, metodo, tasa_dia, type
             ORDER BY fecha DESC

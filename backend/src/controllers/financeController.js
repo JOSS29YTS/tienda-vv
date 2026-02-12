@@ -308,7 +308,7 @@ exports.getFinanceSummary = async (req, res) => {
         // totalAvance represents Avance Out ($0.53).
         // By subtracting totalAvance, we strip the Avance In from the Income view.
         const totalAvance = totalFixedPaymentsForBalance - totalFixedPayments;
-        const netIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD - totalFixedPayments;
+        const netIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD;
         // incomeUSD_Only tracks DIVISAS transactions specifically.
         // We assume incomeUSD_Only should also reflect expenses paid in Divisas.
         // (Logic already subtracts expenses from incomeUSD_Only inside the loop).
@@ -443,7 +443,7 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN usuario u ON p.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
             
-            ORDER BY date DESC
+            ORDER BY date DESC, id DESC
             LIMIT ?
         `;
 

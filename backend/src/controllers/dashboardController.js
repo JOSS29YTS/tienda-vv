@@ -30,24 +30,30 @@ exports.getDashboardStats = async (req, res) => {
 
         const currentSales = await getTotalSales(currentMonth, currentYear);
 
-        // Get Expenses for Current Month to match "Net Flow" User Preference (History Page)
-        const getMonthlyExpenses = async (month, year) => {
+        // Subtract 'AVANCE DE EFECTIVO' cost (Principal) from Sales to reflect real revenue for advances
+        // But IGNORE other expenses (like Internet)
+        const getAdvanceExpenses = async (month, year) => {
             const query = `
-                SELECT COALESCE(SUM(monto), 0) as total
-                FROM pago_fijo
-                WHERE MONTH(fecha_pago_fijo) = ? AND YEAR(fecha_pago_fijo) = ?
+                SELECT COALESCE(SUM(pf.monto), 0) as total
+                FROM pago_fijo pf
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE MONTH(pf.fecha_pago_fijo) = ? 
+                AND YEAR(pf.fecha_pago_fijo) = ?
+                AND tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
             `;
             const [rows] = await pool.query(query, [month, year]);
             return parseFloat(rows[0].total);
         };
-        const currentExpenses = await getMonthlyExpenses(currentMonth, currentYear);
-        const netSales = currentSales - currentExpenses; // $27.63 - $0.52 = $27.11
 
+        const currentAdvanceCost = await getAdvanceExpenses(currentMonth, currentYear);
+        const adjustedCurrentSales = currentSales - currentAdvanceCost;
+
+        // Previous Month Sales (Gross)
         const prevSales = await getTotalSales(prevMonth, prevMonthYear);
-        const prevExpenses = await getMonthlyExpenses(prevMonth, prevMonthYear);
-        const prevNetSales = prevSales - prevExpenses;
+        const prevAdvanceCost = await getAdvanceExpenses(prevMonth, prevMonthYear);
+        const adjustedPrevSales = prevSales - prevAdvanceCost;
 
-        const salesTrend = prevNetSales === 0 ? 100 : ((netSales - prevNetSales) / prevNetSales) * 100;
+        const salesTrend = adjustedPrevSales === 0 ? 100 : ((adjustedCurrentSales - adjustedPrevSales) / adjustedPrevSales) * 100;
 
         // 2. Facturas Pendientes (Pending Invoices Count)
         const getPendingInvoicesCount = async () => {
@@ -114,7 +120,7 @@ exports.getDashboardStats = async (req, res) => {
 
         res.json({
             stats: {
-                sales: { value: netSales, trend: salesTrend },
+                sales: { value: adjustedCurrentSales, trend: salesTrend },
                 pendingInvoices: { value: pendingInvoicesCount, trend: 0 },
                 products: { value: totalProducts, trend: 0 }, // Static for now
                 clients: { value: totalClients, trend: 0 }    // Static for now
