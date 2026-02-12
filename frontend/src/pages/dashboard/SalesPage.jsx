@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa';
+import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle, FaFilePdf } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { useRate } from '../../context/RateContext';
 
@@ -27,7 +29,7 @@ const SalesPage = () => {
         if (savedRows) {
             return JSON.parse(savedRows);
         }
-        return [{ id: 1, productId: '', quantity: 1, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false }];
+        return [{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false }];
     });
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -108,7 +110,7 @@ const SalesPage = () => {
     // Row Operations
     const addRow = () => {
         const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
-        setRows([...rows, { id: newId, productId: '', quantity: 1, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false }]);
+        setRows([...rows, { id: newId, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false }]);
     };
 
     const removeRow = (id) => {
@@ -262,7 +264,7 @@ const SalesPage = () => {
 
             // Success
             setSuccessMessage('¡Venta cerrada exitosamente! Se han guardado los registros.');
-            setRows([{ id: 1, productId: '', quantity: 1, unitPrice: 0, paymentMethod: '', client: '' }]);
+            setRows([{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '' }]);
             setSelectedRows([]);
             localStorage.removeItem('bodega_sales_rows');
             setShowConfirmationModal(false);
@@ -276,6 +278,83 @@ const SalesPage = () => {
 
 
 
+
+
+    const handleGenerateReport = () => {
+        const doc = new jsPDF();
+        const secondaryColor = [15, 23, 42]; // Slate 900
+        const primaryColor = [16, 185, 129]; // Emerald 500
+
+        // Header
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.text('VENALTA SYSTEM', 20, 20);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text('REPORTE DE VENTAS (HOJA DE CÁLCULO)', 20, 30);
+
+        // Metadata
+        const date = new Date().toLocaleDateString('es-VE');
+        const time = new Date().toLocaleTimeString('es-VE');
+        doc.setFontSize(10);
+        doc.text(`Fecha: ${date} ${time}`, 140, 20);
+        doc.text(`Generado por: ${user ? user.nombre + ' ' + user.apellido : 'Usuario'}`, 140, 28);
+        doc.text(`Tasa: Bs. ${rate}`, 140, 36);
+
+        // Table
+        const validRows = rows.filter(r => (r.productId && r.productId !== '') || r.isAdvance);
+
+        const tableBody = validRows.map(row => {
+            const productName = row.isAdvance ?
+                'AVANCE DE EFECTIVO' :
+                (products.find(p => p.id_producto == row.productId)?.nombre || 'Producto Desconocido');
+
+            const rowTotalUSD = (row.quantity || 0) * (row.unitPrice || 0);
+            const rowTotalBS = rowTotalUSD * parseFloat(rate);
+
+            return [
+                productName,
+                row.quantity,
+                `$ ${(row.unitPrice || 0).toFixed(2)}`,
+                `$ ${rowTotalUSD.toFixed(2)}`,
+                `Bs. ${rowTotalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                row.paymentMethod,
+                row.client || '-'
+            ];
+        });
+
+        autoTable(doc, {
+            startY: 50,
+            head: [['Producto', 'Cant', '$ Unit', 'Total $', 'Total Bs', 'Método', 'Cliente']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: { fillColor: secondaryColor, textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 9, cellPadding: 2 },
+            columnStyles: {
+                0: { fontStyle: 'bold' },
+                2: { halign: 'right' },
+                3: { halign: 'right', fontStyle: 'bold' },
+                4: { halign: 'right' }
+            }
+        });
+
+        // Totals
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.setTextColor(...secondaryColor);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('RESUMEN TOTAL:', 130, finalY);
+
+        doc.setFontSize(14);
+        doc.setTextColor(16, 185, 129); // Emerald
+        doc.text(`$ ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 130, finalY + 8);
+        doc.text(`Bs. ${totalBS.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 130, finalY + 16);
+
+        doc.save(`Ventas_${date.replace(/\//g, '-')}.pdf`);
+    };
 
     return (
         <div className="space-y-6 relative">
@@ -358,15 +437,26 @@ const SalesPage = () => {
                     <p className="text-slate-500">Registro diario de ventas tipo hoja de cálculo.</p>
                 </div>
                 {user && user.rol === 'Administrador' && (
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleCloseSales}
-                        className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 flex items-center gap-2 hover:bg-emerald-700 transition-colors"
-                    >
-                        <FaCheckCircle className="text-xl" />
-                        Cerrar Venta del Día
-                    </motion.button>
+                    <div className="flex gap-3">
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleGenerateReport}
+                            className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-slate-400/50 flex items-center gap-2 hover:bg-slate-700 transition-colors"
+                        >
+                            <FaFilePdf className="text-xl" />
+                            Generar Reporte
+                        </motion.button>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleCloseSales}
+                            className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 flex items-center gap-2 hover:bg-emerald-700 transition-colors"
+                        >
+                            <FaCheckCircle className="text-xl" />
+                            Cerrar Venta del Día
+                        </motion.button>
+                    </div>
                 )}
             </header>
 
@@ -493,7 +583,7 @@ const SalesPage = () => {
                                         <td className="p-1">
                                             <input
                                                 type="number"
-                                                min="1"
+                                                min="0"
                                                 value={row.quantity}
                                                 onChange={(e) => updateRow(row.id, 'quantity', parseFloat(e.target.value))}
                                                 className={`w-full border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold focus:border-emerald-500 outline-none show-spinner ${row.isAdvance ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-900'}`}

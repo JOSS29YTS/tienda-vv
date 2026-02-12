@@ -671,10 +671,10 @@ const FinancesPage = () => {
                     </button>
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30"
+                        className="flex-1 lg:flex-none flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 justify-center"
                     >
                         <FaPlus />
-                        Registrar Pago Fijo
+                        Registrar Gasto Fijo
                     </button>
                 </div>
             </header>
@@ -712,21 +712,6 @@ const FinancesPage = () => {
                     gradient="bg-gradient-to-br from-red-600 to-rose-700"
                 />
 
-                {/* Currency Totals */}
-                <StatCard
-                    title="Total Entrado en Bs"
-                    value={stats.incomeBs}
-                    icon={FaMoneyBillWave}
-                    gradient="bg-gradient-to-br from-purple-500 to-indigo-500"
-                    isBs={true}
-                />
-                <StatCard
-                    title="DIVISAS USD"
-                    value={stats.incomeUSD}
-                    icon={FaDollarSign}
-                    gradient="bg-gradient-to-br from-cyan-500 to-blue-500"
-                />
-
                 {/* Payment Methods Breakdown */}
                 <StatCard
                     title="Efectivo (Bs)"
@@ -761,6 +746,21 @@ const FinancesPage = () => {
                     value={stats.totalTransferencia}
                     icon={FaExchangeAlt}
                     gradient="bg-gradient-to-br from-gray-500 to-slate-600"
+                    isBs={true}
+                />
+
+                {/* Currency Totals - Moved to End */}
+                <StatCard
+                    title="DIVISAS USD"
+                    value={stats.incomeUSD}
+                    icon={FaDollarSign}
+                    gradient="bg-gradient-to-br from-cyan-500 to-blue-500"
+                />
+                <StatCard
+                    title="TOTAL GENERAL BS"
+                    value={stats.incomeBs}
+                    icon={FaMoneyBillWave}
+                    gradient="bg-gradient-to-br from-purple-500 to-indigo-500"
                     isBs={true}
                 />
             </div>
@@ -985,7 +985,7 @@ const FinancesPage = () => {
                             className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
                         >
                             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <h3 className="text-xl font-bold text-slate-800">Registrar Pago Fijo</h3>
+                                <h3 className="text-xl font-bold text-slate-800">Registrar Gasto Fijo</h3>
                                 <button
                                     onClick={() => setIsModalOpen(false)}
                                     className="text-slate-400 hover:text-slate-600 transition-colors"

@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle, FaTimes, FaCalendarAlt } from 'react-icons/fa';
+import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle, FaTimes, FaCalendarAlt, FaFilePdf } from 'react-icons/fa';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useAuth } from '../../context/AuthContext';
 
 import { useRate } from '../../context/RateContext';
 
 const PurchasesPage = () => {
     // Load initial state from localStorage if available
     const { rate, setRate } = useRate();
+    const { user } = useAuth();
     const [date, setDate] = useState(() => {
         const d = new Date();
         const yyyy = d.getFullYear();
@@ -331,6 +335,82 @@ const PurchasesPage = () => {
         handleSave(invoiceForm, null); // Invoice purchase doesn't need immediate payment method usually
     };
 
+    const handleGenerateReport = () => {
+        const doc = new jsPDF('l'); // Landscape due to width
+        const secondaryColor = [15, 23, 42]; // Slate 900
+        const primaryColor = [16, 185, 129]; // Emerald 500
+
+        // Header
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 297, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.text('VENALTA SYSTEM', 20, 20);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text('REPORTE DE COMPRAS (HOJA DE CÁLCULO)', 20, 30);
+
+        // Metadata
+        const dateStr = new Date().toLocaleDateString('es-VE');
+        const time = new Date().toLocaleTimeString('es-VE');
+        doc.setFontSize(10);
+        doc.text(`Fecha: ${dateStr} ${time}`, 220, 20);
+        doc.text(`Generado por: ${user ? user.nombre + ' ' + user.apellido : 'Usuario'}`, 220, 28);
+        doc.text(`Tasa: Bs. ${rate}`, 220, 36);
+
+        // Table
+        const validRows = rows.filter(r => r.productId && r.productId !== '');
+
+        const tableBody = validRows.map((row, index) => {
+            const productName = products.find(p => p.id_producto == row.productId)?.nombre || 'Desconocido';
+            const costBulto = parseFloat(row.costBultoUsd || 0);
+            const quantity = parseFloat(row.quantity) || 1;
+            const costUnit = costBulto / quantity;
+            const profit = parseFloat(row.profitPercent || 0);
+            const priceUnit = costUnit * (1 + profit / 100);
+
+            return [
+                index + 1,
+                productName,
+                `${profit}%`,
+                quantity,
+                row.currency,
+                `$ ${costBulto.toFixed(2)}`,
+                `Bs. ${(parseFloat(row.costBultoBs || 0)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+                `$ ${costUnit.toFixed(2)}`,
+                `$ ${priceUnit.toFixed(2)}`,
+                `$ ${parseFloat(row.pvp || 0).toFixed(2)}`
+            ];
+        });
+
+        autoTable(doc, {
+            startY: 50,
+            head: [['#', 'Producto', '% Gan', 'Cant', 'Moneda', 'Costo Bulto $', 'Costo Bulto Bs', 'Costo Unid $', 'Precio Unid $', 'PVP']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: { fillColor: secondaryColor, textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 9, cellPadding: 2 },
+            columnStyles: {
+                5: { halign: 'right' },
+                6: { halign: 'right' },
+                7: { halign: 'right' },
+                8: { halign: 'right' },
+                9: { halign: 'right', fontStyle: 'bold' }
+            }
+        });
+
+        // Totals
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.setTextColor(...secondaryColor);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`TOTAL COMPRA $: $ ${totalCompasUsd.toFixed(2)}`, 20, finalY);
+        doc.text(`TOTAL COMPRA BS: Bs ${(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 20, finalY + 8);
+
+        doc.save(`Compras_${date.replace(/-/g, '')}.pdf`);
+    };
+
     return (
         <div className="p-6 space-y-6 relative">
             {/* Notifications */}
@@ -526,6 +606,11 @@ const PurchasesPage = () => {
                 </button>
 
                 <div className="flex gap-4">
+                    {user && user.rol === 'Administrador' && (
+                        <button onClick={handleGenerateReport} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-slate-400/50 flex items-center gap-2">
+                            <FaFilePdf /> Reporte
+                        </button>
+                    )}
                     <button onClick={() => setIsBuyCurrencyModalOpen(true)} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-cyan-200 flex items-center gap-2">
                         <span className="font-mono">$</span> Compra de Divisas
                     </button>

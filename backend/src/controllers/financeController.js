@@ -69,8 +69,9 @@ exports.getFinanceSummary = async (req, res) => {
             }
         }
 
-        const totalExpenses = totalPurchases + totalFixedPayments;
-        const totalExpensesForBalance = totalPurchases + totalFixedPaymentsForBalance;
+        const totalExpensesCalculated = totalPurchases + totalFixedPayments;
+        // We will add Loan Repayments to this later
+
 
         // 4. Accounts Receivable
         const [initialDebtResult] = await pool.query(`
@@ -194,31 +195,68 @@ exports.getFinanceSummary = async (req, res) => {
             // USD -> USD: No change to Balance (Internal)
         }
 
-        // 8. Subtract USD Purchases (Immediate)
+        // 8. Subtract Purchases (Immediate) from Method Balances
         const [purchasePayments] = await pool.query(`
-            SELECT pc.monto, mp.nb_metodo_pago
+            SELECT pc.monto, pc.tasa_dia, mp.nb_metodo_pago
             FROM pago_compra pc
             JOIN metodo_pago mp ON pc.id_metodo_pago = mp.id_metodo_pago
         `);
         for (const pp of purchasePayments) {
             const method = pp.nb_metodo_pago.toUpperCase();
+            const amount = parseFloat(pp.monto);
+            const rate = parseFloat(pp.tasa_dia) || 1;
+
             if (usdKeywords.some(k => method.includes(k))) {
-                incomeUSD_Only -= parseFloat(pp.monto);
+                incomeUSD_Only -= amount;
+            } else {
+                const amountBs = amount * rate;
+                if (method.includes('EFECTIVO')) totalEfectivoBs -= amountBs;
+                else if (method.includes('PUNTO')) totalPuntoBs -= amountBs;
+                else if (method.includes('MOVIL') || method.includes('MÓVIL')) totalPagoMovilBs -= amountBs;
+                else if (method.includes('BIOPAGO')) totalBiopagoBs -= amountBs;
+                else if (method.includes('TRANSFERENCIA')) totalTransferenciaBs -= amountBs;
             }
         }
 
-        // 9. Subtract USD Loan Repayments
+        // 9. Subtract Loan Repayments from Method Balances AND Add to Total Expenses
         const [loanPayments] = await pool.query(`
-            SELECT pp.monto, mp.nb_metodo_pago
+            SELECT pp.monto, pp.tasa_dia, mp.nb_metodo_pago
             FROM pago_prestamo pp
             JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
         `);
+
+        let totalLoanRepayments = 0;
         for (const lp of loanPayments) {
             const method = lp.nb_metodo_pago.toUpperCase();
+            const amount = parseFloat(lp.monto);
+            const rate = parseFloat(lp.tasa_dia) || 1;
+
+            let amountUSD = 0;
+            let amountBs = 0;
+
             if (usdKeywords.some(k => method.includes(k))) {
-                incomeUSD_Only -= parseFloat(lp.monto);
+                // Payment in USD
+                amountUSD = amount;
+                amountBs = amount * rate;
+
+                incomeUSD_Only -= amountUSD;
+            } else {
+                // Payment in Bs
+                amountUSD = amount / rate;
+                amountBs = amount;
+
+                if (method.includes('EFECTIVO')) totalEfectivoBs -= amountBs;
+                else if (method.includes('PUNTO')) totalPuntoBs -= amountBs;
+                else if (method.includes('MOVIL') || method.includes('MÓVIL')) totalPagoMovilBs -= amountBs;
+                else if (method.includes('BIOPAGO')) totalBiopagoBs -= amountBs;
+                else if (method.includes('TRANSFERENCIA')) totalTransferenciaBs -= amountBs;
             }
+
+            totalLoanRepayments += amountUSD;
         }
+
+        const totalExpenses = totalExpensesCalculated + totalLoanRepayments;
+        const totalExpensesForBalance = totalPurchases + totalFixedPaymentsForBalance + totalLoanRepayments;
 
         // 10. Supplier Invoice Stats & Payments
         const [pendingInvoices] = await pool.query(`
