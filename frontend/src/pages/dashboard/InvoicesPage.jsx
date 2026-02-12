@@ -452,7 +452,7 @@ const InvoicesPage = () => {
                                         const isUsd = selectedMethod && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => selectedMethod.nb_metodo_pago.toUpperCase().includes(k));
 
                                         return (
-                                            <div key={idx} className="flex gap-3 items-end">
+                                            <div key={idx} className="flex gap-3 items-start">
                                                 <div className="flex-1">
                                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método de Pago</label>
                                                     <select
@@ -492,7 +492,7 @@ const InvoicesPage = () => {
                                                     )}
                                                 </div>
                                                 {idx > 0 && (
-                                                    <button onClick={() => removePaymentRow(idx)} className="p-2.5 mb-[1px] text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors">
+                                                    <button onClick={() => removePaymentRow(idx)} className="p-2.5 mt-[21px] text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors">
                                                         <FaTimes />
                                                     </button>
                                                 )}

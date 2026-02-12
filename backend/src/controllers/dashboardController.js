@@ -67,8 +67,8 @@ exports.getDashboardStats = async (req, res) => {
         // For now, let's just show the current count.
 
         // 3. Total Products (Assuming all products are "active" for now or check status if exists)
-        // We'll just count all for now.
-        const [prodRows] = await pool.query('SELECT COUNT(*) as count FROM producto');
+        // 3. Total Products (Active Only & Exclude Avance)
+        const [prodRows] = await pool.query("SELECT COUNT(*) as count FROM producto WHERE nb_producto != 'AVANCE DE EFECTIVO' AND id_estado = 1");
         const totalProducts = prodRows[0].count;
 
         // 4. Clients (Total count)
@@ -105,6 +105,7 @@ exports.getDashboardStats = async (req, res) => {
             FROM detalle_venta dv
             JOIN producto p ON dv.id_producto = p.id_producto
             LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             GROUP BY p.id_producto
             ORDER BY sold DESC
             LIMIT 5

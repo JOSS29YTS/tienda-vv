@@ -32,36 +32,6 @@ exports.getHistory = async (req, res) => {
                     'EXPENSE' as type
                 FROM pago_fijo pf
                 JOIN metodo_pago mp ON pf.id_metodo_pago = mp.id_metodo_pago
-
-                UNION ALL
-
-                -- 3. Transfers OUT (Monto in Method Currency -> Convert to USD if Bs)
-                SELECT 
-                    t.fecha_traspaso as fecha, 
-                    mp.nb_metodo_pago as metodo, 
-                    t.tasa_dia, 
-                    CASE 
-                        WHEN UPPER(mp.nb_metodo_pago) REGEXP 'DIVISA|ZELLE|BINANCE|PAYPAL|USD|DOLAR|[$]' THEN -t.monto
-                        ELSE -(t.monto / NULLIF(t.tasa_dia, 0))
-                    END as amount,
-                    'TRANSFER_OUT' as type
-                FROM traspaso t
-                JOIN metodo_pago mp ON t.id_metodo_origen = mp.id_metodo_pago
-
-                UNION ALL
-
-                -- 4. Transfers IN (Monto in Method Currency -> Convert to USD if Bs)
-                SELECT 
-                    t.fecha_traspaso as fecha, 
-                    mp.nb_metodo_pago as metodo, 
-                    t.tasa_dia, 
-                    CASE 
-                        WHEN UPPER(mp.nb_metodo_pago) REGEXP 'DIVISA|ZELLE|BINANCE|PAYPAL|USD|DOLAR|[$]' THEN t.monto
-                        ELSE (t.monto / NULLIF(t.tasa_dia, 0))
-                    END as amount,
-                    'TRANSFER_IN' as type
-                FROM traspaso t
-                JOIN metodo_pago mp ON t.id_metodo_destino = mp.id_metodo_pago
                 
             ) AS daily_movements
             GROUP BY fecha, metodo, tasa_dia, type
