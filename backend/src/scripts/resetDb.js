@@ -14,7 +14,8 @@ async function resetTables() {
             'metodo_pago',
             'rol',
             'tipo_pago_fijo',
-            'usuario'
+            'usuario',
+            'producto'
         ];
 
         // Get all tables

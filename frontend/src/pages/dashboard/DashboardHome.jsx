@@ -137,7 +137,7 @@ const DashboardHome = () => {
 
         const salesVal = `$ ${stats.sales?.value?.toLocaleString() || '0'}`;
         drawStatBox(20, 65, 'Ventas Totales', salesVal, primaryColor);
-        drawStatBox(65, 65, 'Transacciones', stats.orders?.value || 0, [59, 130, 246]);
+        drawStatBox(65, 65, 'Facturas Pendientes', stats.pendingInvoices?.value || 0, [59, 130, 246]);
         drawStatBox(110, 65, 'Productos Activos', stats.products?.value || 0, [245, 158, 11]);
         drawStatBox(155, 65, 'Clientes', stats.clients?.value || 0, [139, 92, 246]);
 

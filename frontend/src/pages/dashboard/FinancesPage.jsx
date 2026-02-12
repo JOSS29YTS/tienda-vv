@@ -521,7 +521,7 @@ const FinancesPage = () => {
             ['Egresos Totales', `$ ${stats.expenses.toFixed(2)}`],
             ['Balance Neto', `$ ${stats.balance.toFixed(2)}`],
             ['Cuentas por Cobrar', `$ ${stats.receivables.toFixed(2)}`],
-            ['Total Entrado en Bs', `Bs. ${stats.incomeBs.toFixed(2)}`],
+            ['Total General Bs', `Bs. ${stats.incomeBs.toFixed(2)}`],
             ['DIVISAS USD', `$ ${stats.incomeUSD.toFixed(2)}`]
         ];
 
