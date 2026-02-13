@@ -85,7 +85,7 @@ const DashboardLayout = () => {
                 animate={{ width: isSidebarOpen ? 280 : 0, opacity: isSidebarOpen ? 1 : 0 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
                 className={`bg-[#0f172a] h-full flex flex-col shadow-2xl z-30 overflow-hidden flex-shrink-0 relative`}
-                style={{ position: window.innerWidth < 1024 ? 'absolute' : 'relative' }}
+                style={{ position: window.innerWidth < 1024 ? 'fixed' : 'relative' }}
             >
                 <Link to="/" className="p-6 flex items-center gap-4 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
                     <div className="bg-gradient-to-br from-emerald-500 to-teal-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">

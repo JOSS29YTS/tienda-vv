@@ -46,33 +46,42 @@ exports.closeSales = async (req, res) => {
         );
         const ventaId = ventaResult.insertId;
 
-        // Pre-calculate Mixed Payment totals and identify mixed rows
-        const mixedRowsIndices = [];
-        let totalMixedCost = 0;
+        // --- NEW MIXED PAYMENT LOGIC ---
+        // Group mixed rows by batch ID to handle multiple independent mixed transactions correctly
+        const mixedGroups = {}; // key: batchId, value: { rows: [], totalCost: 0, paymentDetails: [], trackers: {} }
 
-        // Use a standard for loop to get indices correct in context of rows array
-        for (let i = 0; i < rows.length; i++) {
-            if (rows[i].paymentMethod === 'MIXTO') {
-                mixedRowsIndices.push(i);
-                const p = parseFloat(rows[i].unitPrice) || 0;
-                const q = parseInt(rows[i].quantity) || 1;
-                totalMixedCost += p * q;
-            }
-        }
+        rows.forEach((row, index) => {
+            if (row.paymentMethod === 'MIXTO') {
+                // Use provided batchId or fallback to unique ID per row if missing (legacy/independent)
+                const batchId = row.mixedBatchId || `legacy-${index}`;
 
-        // Tracker for distributed amounts to ensure exact sum matches
-        const mixedPaymentTrackers = {};
-        if (mixedRowsIndices.length > 0) {
-            const firstMixed = rows[mixedRowsIndices[0]];
-            if (firstMixed.paymentDetails) {
-                firstMixed.paymentDetails.forEach(pd => {
-                    mixedPaymentTrackers[pd.method] = {
-                        total: parseFloat(String(pd.amountInUSD).replace(',', '.')),
-                        distributed: 0
+                if (!mixedGroups[batchId]) {
+                    mixedGroups[batchId] = {
+                        rows: [],
+                        totalCost: 0,
+                        paymentDetails: row.paymentDetails || [],
+                        trackers: {}
                     };
-                });
+
+                    // Initialize trackers for this group from the FIRST row's details
+                    if (row.paymentDetails) {
+                        row.paymentDetails.forEach(pd => {
+                            mixedGroups[batchId].trackers[pd.method] = {
+                                total: parseFloat(String(pd.amountInUSD).replace(',', '.')),
+                                distributed: 0
+                            };
+                        });
+                    }
+                }
+
+                mixedGroups[batchId].rows.push(index); // Store index to reference back
+
+                const p = parseFloat(row.unitPrice) || 0;
+                const q = parseInt(row.quantity) || 1;
+                mixedGroups[batchId].totalCost += p * q;
             }
-        }
+        });
+        // -------------------------------
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
@@ -171,7 +180,10 @@ exports.closeSales = async (req, res) => {
             }
 
             if (row.paymentMethod === 'MIXTO') {
-                if (row.paymentDetails && row.paymentDetails.length > 0) {
+                const batchId = row.mixedBatchId || `legacy-${i}`;
+                const group = mixedGroups[batchId];
+
+                if (group && row.paymentDetails && row.paymentDetails.length > 0) {
                     // Create Pago Record linked to Detalle
                     const [pagoResult] = await connection.query(
                         'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
@@ -179,34 +191,35 @@ exports.closeSales = async (req, res) => {
                     );
                     const pagoId = pagoResult.insertId;
 
-                    // Calculate Proportion for this row
-                    const isLastMixed = (i === mixedRowsIndices[mixedRowsIndices.length - 1]);
+                    // Group Logic
+                    const isLastMixedInGroup = (i === group.rows[group.rows.length - 1]);
 
                     for (const pay of row.paymentDetails) {
                         const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
                         const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
 
-                        // Distribute amount
-                        const tracker = mixedPaymentTrackers[pay.method];
+                        // Distribute amount using Group Tracker
+                        const tracker = group.trackers[pay.method];
                         let amountToStore = 0;
 
                         if (tracker) {
-                            if (isLastMixed) {
+                            if (isLastMixedInGroup) {
                                 // Give the remainder
                                 amountToStore = tracker.total - tracker.distributed;
                             } else {
-                                // Proportional share
-                                const fraction = totalMixedCost > 0 ? (totalSaleUSD / totalMixedCost) : 0;
+                                // Proportional share based on Group Cost
+                                const fraction = group.totalCost > 0 ? (totalSaleUSD / group.totalCost) : 0;
                                 amountToStore = tracker.total * fraction;
                             }
                             // Update distributed amount
                             tracker.distributed += amountToStore;
                         } else {
-                            // Fallback if tracker missing (shouldn't happen)
+                            // Fallback (shouldn't happen if group logic is sound)
                             amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
                         }
 
-                        if (subMethodId) {
+                        // Only insert into detalle_pago if it's a REAL payment (not Pending/Debt marker)
+                        if (subMethodId && pay.method !== 'PENDIENTE POR COBRAR') {
                             await connection.query(
                                 'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
                                 [pagoId, subMethodId, amountToStore]
@@ -227,13 +240,12 @@ exports.closeSales = async (req, res) => {
                 );
                 const pagoId = pagoResult.insertId;
 
-                await connection.query(
-                    'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
-                    [pagoId, paymentMethodId, totalSaleUSD]
-                );
-
-                // If the method is NOT Pending, we consider it fully paid.
+                // Only insert if NOT Pending
                 if (row.paymentMethod !== 'PENDIENTE POR COBRAR') {
+                    await connection.query(
+                        'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
+                        [pagoId, paymentMethodId, totalSaleUSD]
+                    );
                     totalPaidUSD = totalSaleUSD;
                 }
             }

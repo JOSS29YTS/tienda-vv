@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle, FaFilePdf } from 'react-icons/fa';
+import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle, FaFilePdf, FaFileInvoice, FaPlus, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -45,6 +46,7 @@ const SalesPage = () => {
     const [successMessage, setSuccessMessage] = useState(null);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
     const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+    const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
 
     // Auto-clear notifications
     useEffect(() => {
@@ -242,6 +244,33 @@ const SalesPage = () => {
     const confirmCloseSales = async () => {
         const validRows = rows.filter(r => r.productId && r.quantity > 0 && r.paymentMethod);
 
+        // --- PREPARE ROWS ---
+        // Ensure all MIXTO rows have a mixedBatchId.
+        const processedRows = validRows.map((row, index) => {
+            if (row.paymentMethod === 'MIXTO') {
+                if (row.mixedBatchId) {
+                    return row; // Use existing batch ID (New Invoice or Manual Modal)
+                }
+
+                // Fallback for unexpected legacy state: Group by signature
+                const signature = row.paymentDetails
+                    ? row.paymentDetails.map(pd => `${pd.method}-${pd.amount}-${pd.currency}`).sort().join('|')
+                    : `empty-${index}`; // Add index to avoid colliding empty payments
+
+                // Simple hash replacement to avoid btoa issues with special chars
+                let hash = 0;
+                for (let i = 0; i < signature.length; i++) {
+                    const char = signature.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // Convert to 32bit integer
+                }
+                const batchId = `auto-patch-${Math.abs(hash)}`;
+                return { ...row, mixedBatchId: batchId };
+            }
+            return row;
+        });
+        // -----------------------------
+
         try {
             const token = localStorage.getItem('token');
             const response = await fetch('http://localhost:3000/api/sales/close', {
@@ -251,7 +280,7 @@ const SalesPage = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    rows: validRows,
+                    rows: processedRows,
                     rate: parseFloat(rate)
                 })
             });
@@ -385,51 +414,61 @@ const SalesPage = () => {
             </AnimatePresence>
 
             {/* Confirmation Modal */}
-            <AnimatePresence>
-                {showConfirmationModal && (
-                    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            {/* Confirmation Modal */}
+            {createPortal(
+                <AnimatePresence>
+                    {showConfirmationModal && (
                         <motion.div
+                            key="confirmation-modal"
+                            className="fixed inset-0 z-[200] flex items-center justify-center p-4"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-                            onClick={() => setShowConfirmationModal(false)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10 overflow-hidden border border-slate-100"
                         >
-                            <div className="text-center mb-8">
-                                <div className="mx-auto bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mb-6 ring-8 ring-green-50/50">
-                                    <FaMoneyBillWave className="text-4xl text-emerald-600" />
+                            {/* Backdrop */}
+                            <div
+                                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                                onClick={() => setShowConfirmationModal(false)}
+                            />
+
+                            {/* Modal Content */}
+                            <motion.div
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 20 }}
+                                className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10 overflow-hidden border border-slate-100"
+                            >
+                                <div className="text-center mb-8">
+                                    <div className="mx-auto bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mb-6 ring-8 ring-green-50/50">
+                                        <FaMoneyBillWave className="text-4xl text-emerald-600" />
+                                    </div>
+                                    <h3 className="text-2xl font-black text-slate-800 mb-3 font-heading tracking-tight">¿Cerrar Venta del Día?</h3>
+                                    <p className="text-slate-500 text-lg leading-relaxed">
+                                        Esta acción registrará todas las ventas actuales y limpiará la hoja de cálculo.
+                                        <br />
+                                        <span className="text-amber-600 font-bold block mt-2 text-sm bg-amber-50 py-1 px-3 rounded-full inline-block">⚠️ No podrás deshacer esta acción</span>
+                                    </p>
                                 </div>
-                                <h3 className="text-2xl font-black text-slate-800 mb-3 font-heading tracking-tight">¿Cerrar Venta del Día?</h3>
-                                <p className="text-slate-500 text-lg leading-relaxed">
-                                    Esta acción registrará todas las ventas actuales y limpiará la hoja de cálculo.
-                                    <br />
-                                    <span className="text-amber-600 font-bold block mt-2 text-sm bg-amber-50 py-1 px-3 rounded-full inline-block">⚠️ No podrás deshacer esta acción</span>
-                                </p>
-                            </div>
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => setShowConfirmationModal(false)}
-                                    className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors text-sm uppercase tracking-wide"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={confirmCloseSales}
-                                    className="flex-1 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 text-sm uppercase tracking-wide transform active:scale-95"
-                                >
-                                    Sí, Cerrar Venta
-                                </button>
-                            </div>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setShowConfirmationModal(false)}
+                                        className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors text-sm uppercase tracking-wide"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={confirmCloseSales}
+                                        className="flex-1 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 text-sm uppercase tracking-wide transform active:scale-95"
+                                    >
+                                        Sí, Cerrar Venta
+                                    </button>
+                                </div>
+                            </motion.div>
                         </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
                 <div>
@@ -720,6 +759,12 @@ const SalesPage = () => {
                         >
                             <FaMoneyBillWave /> Agregar Avance
                         </button>
+                        <button
+                            onClick={() => setIsNewInvoiceModalOpen(true)}
+                            className="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100 font-bold transition-all shadow-sm text-sm flex items-center gap-2"
+                        >
+                            <FaFileInvoice /> Nueva Factura
+                        </button>
                     </div>
 
                 </div>
@@ -751,6 +796,71 @@ const SalesPage = () => {
                             }]);
                             setIsAdvanceModalOpen(false);
                             setSuccessMessage('Avance registrado correctamente');
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* New Invoice Modal */}
+            <AnimatePresence>
+                {isNewInvoiceModalOpen && (
+                    <NewInvoiceModal
+                        products={products}
+                        clients={clients}
+                        paymentMethods={paymentMethods}
+                        rate={rate}
+                        onClose={() => setIsNewInvoiceModalOpen(false)}
+                        onConfirm={(invoiceData) => {
+                            // Process Invoice Data
+                            const { items, client, payment } = invoiceData;
+                            const newRows = [];
+                            let startId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
+
+                            // Deep copy of payments for waterfall distribution
+                            // Correctly generate batch ID ONCE per invoice
+                            const batchId = payment.type === 'MIXED' ? `batch-${Date.now()}` : null;
+
+                            items.forEach((item, index) => {
+                                let rowCostUSD = item.quantity * item.unitPrice;
+                                let rowPaymentMethod = '';
+                                let rowPaymentDetails = null;
+
+                                if (payment.type === 'SINGLE') {
+                                    rowPaymentMethod = payment.method;
+                                } else {
+                                    rowPaymentMethod = 'MIXTO';
+
+                                    // CLONE: Copy full payment details to every row but with new IDs just in case
+                                    rowPaymentDetails = payment.details.map(p => ({
+                                        ...p,
+                                        id: `${p.id}-${index}`,
+                                    }));
+                                }
+
+                                newRows.push({
+                                    id: startId + index,
+                                    productId: item.productId,
+                                    quantity: item.quantity,
+                                    unitPrice: item.unitPrice,
+                                    paymentMethod: rowPaymentMethod,
+                                    mixedBatchId: batchId,
+                                    paymentDetails: rowPaymentDetails,
+                                    client: client || 'CLIENTE',
+                                    isNewClient: client && !clients.some(c => c.nb_cliente === client) ? true : false
+                                });
+                            });
+
+                            // Determine if we append or replace based on if the current table is empty/clean
+                            // We typically append
+                            // But if the first row is empty dummy row, replace it
+                            if (rows.length === 1 && !rows[0].productId) {
+                                setRows(newRows);
+                            } else {
+                                setRows([...rows, ...newRows]);
+                            }
+
+                            setIsNewInvoiceModalOpen(false);
+                            setSuccessMessage('Factura agregada a la lista de ventas');
                         }}
                     />
                 )}
@@ -815,9 +925,17 @@ const SalesPage = () => {
                                 onClose={() => setMixedModalOpen(false)}
                                 onConfirm={(payments) => {
                                     // Update Rows
-                                    setRows(rows.map(r => {
+                                    // Generate ONE unique batch ID for this manual transaction
+                                    const batchId = `manual-batch-${Date.now()}`;
+
+                                    setRows(prevRows => prevRows.map(r => {
                                         if (mixedModalData.rowsToUpdate.includes(r.id)) {
-                                            return { ...r, paymentMethod: 'MIXTO', paymentDetails: payments };
+                                            return {
+                                                ...r,
+                                                paymentMethod: 'MIXTO',
+                                                paymentDetails: payments, // All rows in this batch share the same payment details
+                                                mixedBatchId: batchId     // And the same Batch ID
+                                            };
                                         }
                                         return r;
                                     }));
@@ -1022,6 +1140,446 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
 };
 
 export default SalesPage;
+const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onConfirm }) => {
+    const [client, setClient] = useState('');
+    const [items, setItems] = useState([]);
+
+    // Item Input State
+    const [selectedProductId, setSelectedProductId] = useState('');
+    const [quantity, setQuantity] = useState(1);
+
+    // Payment State
+    const [paymentType, setPaymentType] = useState('SINGLE'); // SINGLE, MIXED
+    const [singleMethod, setSingleMethod] = useState('');
+
+    // Mixed Payment State (Simplified version of MixedPaymentContent logic)
+    const [mixedPayments, setMixedPayments] = useState([]);
+    const [mixedMethodInput, setMixedMethodInput] = useState('');
+    const [mixedAmountInput, setMixedAmountInput] = useState('');
+    const [mixedCurrencyInput, setMixedCurrencyInput] = useState('USD');
+
+    // Editing State
+    const [editingItemId, setEditingItemId] = useState(null);
+    const [editQuantity, setEditQuantity] = useState('');
+
+    const handleEditItem = (item) => {
+        setEditingItemId(item.id);
+        setEditQuantity(item.quantity);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingItemId(null);
+        setEditQuantity('');
+    };
+
+    const handleSaveEdit = (id) => {
+        if (!editQuantity || parseFloat(editQuantity) <= 0) return;
+
+        setItems(items.map(item => {
+            if (item.id === id) {
+                return { ...item, quantity: parseFloat(editQuantity) };
+            }
+            return item;
+        }));
+        setEditingItemId(null);
+        setEditQuantity('');
+    };
+
+    // Derived
+    const currentProduct = products.find(p => p.id_producto == selectedProductId);
+    const invoiceTotalUSD = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const invoiceTotalBS = invoiceTotalUSD * rate;
+
+    const addItem = () => {
+        if (!currentProduct || quantity <= 0) return;
+
+        const existingItemIndex = items.findIndex(item => item.productId === currentProduct.id_producto);
+
+        if (existingItemIndex > -1) {
+            // Update existing item quantity
+            const newItems = [...items];
+            newItems[existingItemIndex].quantity += parseFloat(quantity);
+            setItems(newItems);
+        } else {
+            // Add new item
+            setItems([...items, {
+                id: Date.now(),
+                productId: currentProduct.id_producto,
+                name: currentProduct.nombre,
+                quantity: parseFloat(quantity),
+                unitPrice: parseFloat(currentProduct.precio)
+            }]);
+        }
+        setSelectedProductId('');
+        setQuantity(1);
+    };
+
+    const removeItem = (id) => {
+        setItems(items.filter(i => i.id !== id));
+    };
+
+    const addMixedPayment = () => {
+        if (!mixedMethodInput || !mixedAmountInput || parseFloat(mixedAmountInput) <= 0) return;
+        const val = parseFloat(mixedAmountInput);
+        const valInUSD = mixedCurrencyInput === 'BS' ? val / rate : val;
+
+        setMixedPayments([...mixedPayments, {
+            id: Date.now(),
+            method: mixedMethodInput,
+            amount: val,
+            currency: mixedCurrencyInput,
+            amountInUSD: valInUSD
+        }]);
+        setMixedMethodInput('');
+        setMixedAmountInput('');
+    };
+
+    const removeMixedPayment = (id) => {
+        setMixedPayments(mixedPayments.filter(p => p.id !== id));
+    };
+
+    const totalPaidUSD = mixedPayments.reduce((acc, p) => acc + p.amountInUSD, 0);
+    const remainingUSD = invoiceTotalUSD - totalPaidUSD;
+
+    const handleConfirm = () => {
+        // Validation
+        if (items.length === 0) return;
+
+        let finalPaymentData = {};
+
+        if (paymentType === 'SINGLE') {
+            if (!singleMethod) return;
+            finalPaymentData = { type: 'SINGLE', method: singleMethod };
+        } else {
+            // Mixed Logic
+            let details = [...mixedPayments];
+            // If there is a remaining balance, add it as debt
+            if (remainingUSD > 0.01) {
+                details.push({
+                    id: 'debt-' + Date.now() + Math.random(),
+                    method: 'PENDIENTE POR COBRAR',
+                    amount: parseFloat(remainingUSD.toFixed(3)),
+                    currency: 'USD',
+                    amountInUSD: parseFloat(remainingUSD.toFixed(3))
+                });
+            } else if (remainingUSD < -0.05) {
+                return; // Still block overpayments
+            }
+            finalPaymentData = { type: 'MIXED', details: details };
+        }
+
+        onConfirm({
+            items,
+            client,
+            payment: finalPaymentData
+        });
+    };
+
+    return createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] min-h-[500px]"
+            >
+                <div className="bg-[#0f172a] p-6 text-white flex justify-between items-center shrink-0">
+                    <div>
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <FaFileInvoice /> Nueva Factura
+                        </h3>
+                        <p className="text-slate-400 text-sm">Creación rápida de múltiples items</p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-xs text-slate-400 uppercase tracking-wider">Total Factura</div>
+                        <div className="font-mono font-bold text-2xl text-emerald-400">
+                            $ {invoiceTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="font-mono text-sm text-slate-300">
+                            Bs. {invoiceTotalBS.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+                    {/* Left: Items & Client */}
+                    <div className="flex-1 p-6 flex flex-col overflow-hidden border-r border-slate-200">
+                        {/* Client Selector */}
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cliente</label>
+                            <div className="flex gap-2">
+                                <select
+                                    value={client}
+                                    onChange={(e) => setClient(e.target.value)}
+                                    className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-700"
+                                >
+                                    <option value="">- Cliente General -</option>
+                                    <option value="CLIENTE">CLIENTE</option>
+                                    {clients
+                                        .filter(c => c.nb_cliente !== 'CLIENTE')
+                                        .map(c => <option key={c.id_cliente} value={c.nb_cliente}>{c.nb_cliente}</option>)
+                                    }
+                                </select>
+                                <input
+                                    type="text"
+                                    placeholder="Nuevo..."
+                                    value={client}
+                                    onChange={(e) => setClient(e.target.value.toUpperCase())}
+                                    className="w-1/3 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Add Item Form */}
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 shrink-0">
+                            <div className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
+                                    <select
+                                        value={selectedProductId}
+                                        onChange={(e) => setSelectedProductId(e.target.value)}
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                                    >
+                                        <option value="">Buscar producto...</option>
+                                        {products.map(p => (
+                                            <option key={p.id_producto} value={p.id_producto}>{p.nombre} - ${parseFloat(p.precio).toFixed(2)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="w-20">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cant.</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={quantity}
+                                        onChange={(e) => setQuantity(e.target.value)}
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-center font-bold show-spinner"
+                                    />
+                                </div>
+                                <button
+                                    onClick={addItem}
+                                    disabled={!selectedProductId}
+                                    className="bg-emerald-600 text-white p-2 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                    <FaPlus />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Items List */}
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-2 pr-2">
+                            {items.length === 0 && (
+                                <div className="text-center text-slate-400 py-8 italic text-sm">
+                                    Agregue productos a la factura
+                                </div>
+                            )}
+                            {items.map(item => (
+                                <div key={item.id} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+                                    {editingItemId === item.id ? (
+                                        <div className="flex-1 flex items-center gap-2">
+                                            <div className="font-bold text-slate-700 text-sm flex-1">{item.name}</div>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={editQuantity}
+                                                onChange={(e) => setEditQuantity(e.target.value)}
+                                                className="w-20 border border-slate-300 rounded px-2 py-1 text-center font-bold text-slate-700 outline-none show-spinner"
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleSaveEdit(item.id);
+                                                    if (e.key === 'Escape') handleCancelEdit();
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="font-bold text-slate-700 text-sm">{item.name}</div>
+                                            <div className="text-xs text-slate-400">
+                                                {item.quantity} x ${item.unitPrice.toFixed(2)}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center gap-4 ml-4">
+                                        {editingItemId === item.id ? (
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => handleSaveEdit(item.id)} className="text-emerald-500 hover:text-emerald-600 p-1 bg-emerald-50 rounded transition-colors" title="Guardar">
+                                                    <FaCheck />
+                                                </button>
+                                                <button onClick={handleCancelEdit} className="text-red-400 hover:text-red-500 p-1 bg-red-50 rounded transition-colors" title="Cancelar">
+                                                    <FaTimes />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="font-mono font-bold text-emerald-600">
+                                                    $ {(item.quantity * item.unitPrice).toFixed(2)}
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => handleEditItem(item)} className="text-blue-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors" title="Editar Cantidad">
+                                                        <FaEdit />
+                                                    </button>
+                                                    <button onClick={() => removeItem(item.id)} className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Right: Payment */}
+                    <div className="w-full md:w-1/3 bg-slate-50 p-6 flex flex-col border-l border-slate-200">
+                        <h4 className="font-bold text-slate-700 uppercase text-xs mb-4">Método de Pago</h4>
+
+                        <div className="flex gap-2 mb-4">
+                            <button
+                                onClick={() => setPaymentType('SINGLE')}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg border ${paymentType === 'SINGLE' ? 'bg-white border-emerald-500 text-emerald-600 shadow-sm' : 'bg-transparent border-slate-300 text-slate-500'}`}
+                            >
+                                Único
+                            </button>
+                            <button
+                                onClick={() => setPaymentType('MIXED')}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg border ${paymentType === 'MIXED' ? 'bg-white border-blue-500 text-blue-600 shadow-sm' : 'bg-transparent border-slate-300 text-slate-500'}`}
+                            >
+                                Mixto / Múltiple
+                            </button>
+                        </div>
+
+                        {paymentType === 'SINGLE' ? (
+                            <div className="mb-4">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Seleccionar Método</label>
+                                <select
+                                    value={singleMethod}
+                                    onChange={(e) => setSingleMethod(e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold"
+                                >
+                                    <option value="">- Seleccionar -</option>
+                                    {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO').map(m => (
+                                        <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col mb-4 overflow-hidden">
+                                <div className="space-y-2 mb-4 flex-1 overflow-y-auto pr-1">
+                                    {/* Mixed Payment Form */}
+                                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                                        <div className="flex gap-2 mb-2">
+                                            <select
+                                                value={mixedMethodInput}
+                                                onChange={(e) => {
+                                                    setMixedMethodInput(e.target.value);
+                                                    if (e.target.value === 'DIVISAS') setMixedCurrencyInput('USD');
+                                                    else if (e.target.value) setMixedCurrencyInput('BS');
+                                                }}
+                                                className="flex-1 text-xs border rounded p-1"
+                                            >
+                                                <option value="">Método...</option>
+                                                {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'PENDIENTE POR COBRAR').map(m => (
+                                                    <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                value={mixedCurrencyInput}
+                                                onChange={(e) => setMixedCurrencyInput(e.target.value)}
+                                                className="w-16 text-xs border rounded p-1"
+                                            >
+                                                <option value="USD">$</option>
+                                                <option value="BS">Bs</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <input
+                                                    type="number"
+                                                    value={mixedAmountInput}
+                                                    onChange={(e) => setMixedAmountInput(e.target.value)}
+                                                    placeholder="Monto"
+                                                    className="w-full text-xs border rounded p-1"
+                                                />
+                                                {mixedCurrencyInput === 'BS' && mixedAmountInput > 0 && (
+                                                    <div className="text-xs font-bold text-slate-700 text-right mt-1 font-mono">
+                                                        $ {(parseFloat(mixedAmountInput) / rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={addMixedPayment}
+                                                disabled={!mixedMethodInput || !mixedAmountInput}
+                                                className="bg-blue-500 text-white px-3 text-xs rounded font-bold disabled:opacity-50"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* List */}
+                                    {mixedPayments.map(p => (
+                                        <div key={p.id} className="flex justify-between items-center text-xs bg-white border border-slate-200 p-2 rounded">
+                                            <span>{p.method}</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-right">
+                                                    <div className="font-mono font-bold">
+                                                        {p.currency === 'USD' ? '$' : 'Bs'} {p.amount.toLocaleString(p.currency === 'USD' ? 'en-US' : 'es-VE', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    {p.currency === 'BS' && (
+                                                        <div className="text-[10px] font-bold text-slate-600 font-mono">
+                                                            $ {p.amountInUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <button onClick={() => removeMixedPayment(p.id)} className="text-red-400"><FaTrash size={10} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="text-right text-xs">
+                                    <div className="flex justify-between font-bold text-slate-500">
+                                        <span>Pagado:</span>
+                                        <span>${totalPaidUSD.toFixed(2)}</span>
+                                    </div>
+                                    <div className={`flex justify-between font-bold items-center ${remainingUSD > 0.05 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                        <span>Restante:</span>
+                                        <div className="text-right">
+                                            <div>${remainingUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                            {(Math.abs(remainingUSD) > 0.01) && (
+                                                <div className="text-xs opacity-75 font-mono">
+                                                    Bs. {(remainingUSD * parseFloat(rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-auto border-t border-slate-200 -mx-6 -mb-6 p-6 flex gap-2 bg-slate-50">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl text-sm"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                disabled={items.length === 0 || (paymentType === 'SINGLE' && !singleMethod) || (paymentType === 'MIXED' && remainingUSD < -0.05)}
+                                className="flex-1 py-3 bg-[#0f172a] text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                Confirmar Orden
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        </div>,
+        document.body
+    );
+};
+
 const AdvanceModal = ({ rate, paymentMethods, onClose, onConfirm }) => {
     const [amount, setAmount] = useState('');
     const [method, setMethod] = useState('');
@@ -1030,12 +1588,12 @@ const AdvanceModal = ({ rate, paymentMethods, onClose, onConfirm }) => {
     const commission = (parseFloat(amount) || 0) * 0.20;
     const totalToCharge = (parseFloat(amount) || 0) + commission;
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
+                className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden min-h-[500px]"
             >
                 <div className="bg-purple-600 text-white p-6">
                     <h3 className="text-xl font-bold flex items-center gap-2">
@@ -1114,7 +1672,8 @@ const AdvanceModal = ({ rate, paymentMethods, onClose, onConfirm }) => {
                     </button>
                 </div>
             </motion.div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

@@ -16,17 +16,61 @@ async function inspectSales() {
     try {
         connection = await pool.getConnection();
 
-        console.log('--- SALES (Venta) ---');
-        const [sales] = await connection.query('SELECT id_venta, fecha_venta, id_usuario FROM venta ORDER BY fecha_venta DESC LIMIT 10');
-        console.log(sales);
+        // Show raw dump of everything related to recent sales (last 3 sales)
+        const [sales] = await connection.query(`
+            SELECT v.id_venta, v.fecha_venta, v.tasa_dia, u.nombre, v.id_usuario
+            FROM venta v 
+            LEFT JOIN usuario u ON v.id_usuario = u.id_usuario 
+            ORDER BY v.fecha_venta DESC LIMIT 3
+        `);
+        console.log("--- SALES ---");
+        console.log(JSON.stringify(sales, null, 2));
 
-        console.log('--- PAYMENTS (Pago) ---');
-        const [payments] = await connection.query('SELECT id_pago, fecha_pago FROM pago ORDER BY fecha_pago DESC LIMIT 10');
-        console.log(payments);
+        if (sales.length > 0) {
+            const saleIds = sales.map(s => s.id_venta);
 
-        console.log('--- DEBTS (Deuda) ---');
-        const [debts] = await connection.query('SELECT * FROM deuda LIMIT 10');
-        console.log(debts);
+            // Details
+            const [details] = await connection.query(`
+                SELECT dv.id_detalle_venta, dv.id_venta, p.nb_producto, dv.cantidad, dv.precio_unitario, (dv.cantidad * dv.precio_unitario) as subtotal
+                FROM detalle_venta dv
+                JOIN producto p ON dv.id_producto = p.id_producto
+                WHERE dv.id_venta IN (?)
+                ORDER BY dv.id_venta, dv.id_detalle_venta
+            `, [saleIds]);
+            console.log("--- SALE ITEMS ---");
+            console.log(JSON.stringify(details, null, 2));
+
+            // Payments linked to Details
+            const [pagos] = await connection.query(`
+                SELECT p.id_pago, p.id_detalle_venta, p.fecha_pago, p.tasa_dia
+                FROM pago p
+                WHERE p.id_detalle_venta IN (
+                    SELECT id_detalle_venta FROM detalle_venta WHERE id_venta IN (?)
+                )
+            `, [saleIds]);
+
+            const pagoIds = pagos.map(p => p.id_pago);
+
+            if (pagoIds.length > 0) {
+                const [detPagos] = await connection.query(`
+                    SELECT dp.id_detalle_pago, dp.id_pago, mp.nb_metodo_pago, dp.monto
+                    FROM detalle_pago dp
+                    JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                    WHERE dp.id_pago IN (?)
+                `, [pagoIds]);
+
+                // Nesting for readability
+                const fullPagos = pagos.map(p => {
+                    return {
+                        ...p,
+                        breakdown: detPagos.filter(dp => dp.id_pago === p.id_pago)
+                    };
+                });
+
+                console.log("--- PAYMENTS ---");
+                console.log(JSON.stringify(fullPagos, null, 2));
+            }
+        }
 
     } catch (error) {
         console.error('Error:', error);

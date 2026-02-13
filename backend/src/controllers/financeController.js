@@ -73,23 +73,25 @@ exports.getFinanceSummary = async (req, res) => {
         // We will add Loan Repayments to this later
 
 
-        // 4. Accounts Receivable
-        const [initialDebtResult] = await pool.query(`
-            SELECT COALESCE(SUM(dp.monto), 0) as initial_debt
-            FROM detalle_pago dp
-            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE mp.nb_metodo_pago = 'PENDIENTE POR COBRAR'
+        // 4. Accounts Receivable (Corrected Logic)
+        // Calculate distinct pending amount from registered Debts
+        // (Cost of Items in Debt - All Payments made against those items)
+        const [receivablesResult] = await pool.query(`
+            SELECT 
+                COALESCE(SUM(
+                    (dv.cantidad * dv.precio_unitario) - 
+                    (
+                        SELECT COALESCE(SUM(dp.monto), 0)
+                        FROM pago p
+                        JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                        WHERE p.id_detalle_venta = dv.id_detalle_venta
+                    )
+                ), 0) as total_pending
+            FROM deuda d
+            JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
         `);
-        const initialDebt = parseFloat(initialDebtResult[0].initial_debt);
 
-        const [paidDebtResult] = await pool.query(`
-            SELECT COALESCE(SUM(dp.monto), 0) as paid_debt
-            FROM pago p
-            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
-            WHERE p.id_deuda IS NOT NULL
-        `);
-        const paidDebt = parseFloat(paidDebtResult[0].paid_debt);
-        const currentReceivables = initialDebt - paidDebt;
+        const currentReceivables = parseFloat(receivablesResult[0].total_pending);
 
         // 5. Sales Income (Payments)
         const [allPayments] = await pool.query(`

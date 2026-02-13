@@ -137,7 +137,28 @@ const ClientsPage = () => {
             });
             if (!response.ok) throw new Error('Error al cargar historial de compras');
             const data = await response.json();
-            setPurchaseHistory(data);
+
+            // Group by Date + Product
+            const aggregated = data.reduce((acc, curr) => {
+                const dateObj = new Date(curr.fecha_venta);
+                const dateStr = dateObj.toLocaleDateString();
+                const key = `${dateStr}-${curr.nb_producto}`;
+
+                if (!acc[key]) {
+                    acc[key] = {
+                        ...curr,
+                        fecha_venta: curr.fecha_venta,
+                        cantidad: parseFloat(curr.cantidad),
+                        total: parseFloat(curr.total)
+                    };
+                } else {
+                    acc[key].cantidad += parseFloat(curr.cantidad);
+                    acc[key].total += parseFloat(curr.total);
+                }
+                return acc;
+            }, {});
+
+            setPurchaseHistory(Object.values(aggregated));
             setIsPurchaseModalOpen(true);
         } catch (err) {
             setErrorMessage('Error al cargar historial: ' + err.message);

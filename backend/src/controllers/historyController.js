@@ -39,25 +39,54 @@ exports.getHistory = async (req, res) => {
             ORDER BY fecha DESC
         `;
 
+        // NEW: Fetch Pending Debts separately (since we don't store them in detalle_pago anymore)
+        const debtQuery = `
+            SELECT 
+                DATE_FORMAT(v.fecha_venta, '%Y-%m-%d') as fecha,
+                'PENDIENTE POR COBRAR' as metodo,
+                v.tasa_dia,
+                'DEBT' as type,
+                SUM((dv.cantidad * dv.precio_unitario) - (
+                    SELECT COALESCE(SUM(dp.monto), 0)
+                    FROM pago p
+                    JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                    WHERE p.id_detalle_venta = dv.id_detalle_venta
+                )) as total
+            FROM deuda d
+            JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
+            JOIN venta v ON dv.id_venta = v.id_venta
+            GROUP BY fecha, metodo, tasa_dia, type
+        `;
+
+        const [debtRows] = await pool.query(debtQuery);
+
+        // Merge debtRows into rows if necessary, or process separately
+        // We will process separately and merge into historyByDay
+
         const [rows] = await pool.query(query);
 
         // Group by Date for the response structure
         const historyByDay = {};
 
-        rows.forEach(row => {
-            if (!row.fecha) return;
-
-            const dateKey = row.fecha; // 'YYYY-MM-DD'
-
+        // Helper to init day
+        const initDay = (dateKey, tasa) => {
             if (!historyByDay[dateKey]) {
                 historyByDay[dateKey] = {
-                    date: row.fecha,
-                    tasa: row.tasa_dia,
+                    date: dateKey,
+                    tasa: tasa,
                     totalBS: 0,
                     totalUSD: 0,
                     breakdown: []
                 };
             }
+        };
+
+        // Process Normal Rows
+        rows.forEach(row => {
+            if (!row.fecha) return;
+            const dateKey = row.fecha;
+            initDay(dateKey, row.tasa_dia);
+
 
             // Totals Calculation & Breakdown Aggregation
             const method = row.metodo ? row.metodo.toUpperCase() : 'DESCONOCIDO';
@@ -107,6 +136,30 @@ exports.getHistory = async (req, res) => {
                     method: row.metodo,
                     amount: amountForBreakdown,
                     currency: currencyForBreakdown
+                });
+            }
+        });
+
+        // NEW: Process Debt Rows (Pending)
+        debtRows.forEach(row => {
+            if (!row.fecha) return;
+            const dateKey = row.fecha;
+            const amount = parseFloat(row.total); // Usually (Cost - Paid)
+
+            if (amount <= 0.005) return; // Skip paid debts
+
+            initDay(dateKey, row.tasa_dia);
+
+            // Add to Breakdown ONLY (Pending does not affect Net Income/Cash Flow)
+            const existingItem = historyByDay[dateKey].breakdown.find(item => item.method === 'PENDIENTE POR COBRAR');
+
+            if (existingItem) {
+                existingItem.amount += amount;
+            } else {
+                historyByDay[dateKey].breakdown.push({
+                    method: 'PENDIENTE POR COBRAR',
+                    amount: amount,
+                    currency: 'USD'
                 });
             }
         });

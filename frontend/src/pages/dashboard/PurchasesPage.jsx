@@ -712,9 +712,9 @@ const PurchasesPage = () => {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col min-h-[500px] max-h-[85vh]"
                         >
-                            <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">
+                            <div className="bg-emerald-600 text-white p-4 flex justify-between items-center shrink-0">
                                 <div>
                                     <h3 className="font-bold text-lg">Métodos de Pago</h3>
                                     <p className="text-white text-lg font-black">Total a Pagar: $ {totalCompasUsd.toFixed(2)} <span className="text-base font-bold opacity-90">(Bs {(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })})</span></p>
@@ -722,7 +722,7 @@ const PurchasesPage = () => {
                                 <button onClick={() => setIsPaymentModalOpen(false)} className="text-emerald-200 hover:text-white"><FaTimes /></button>
                             </div>
 
-                            <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+                            <div className="p-6 overflow-y-auto space-y-4 flex-1">
                                 {payments.map((p, idx) => {
                                     const selectedMethod = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
                                     const isUsd = selectedMethod && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => selectedMethod.nb_metodo_pago.toUpperCase().includes(k));
@@ -757,11 +757,13 @@ const PurchasesPage = () => {
                                                     </span>
                                                 </div>
                                             </div>
-                                            {idx > 0 && (
-                                                <button onClick={() => removePaymentRow(idx)} className="p-2.5 mb-[1px] text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors">
-                                                    <FaTimes />
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => removePaymentRow(idx)}
+                                                disabled={payments.length === 1}
+                                                className={`p-2.5 mb-[1px] rounded-lg transition-colors ${payments.length === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-red-400 hover:bg-red-50 hover:text-red-500'}`}
+                                            >
+                                                <FaTrash />
+                                            </button>
                                         </div>
                                     );
                                 })}
