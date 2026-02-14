@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaUserCog, FaSearch, FaCheckCircle, FaExclamationCircle, FaTrash } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import API_URL from '../../config/api';
 
 const UsersPage = () => {
     const [users, setUsers] = useState([]);
@@ -19,7 +20,7 @@ const UsersPage = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/users');
+            const response = await fetch(`${API_URL}/api/users');
             if (!response.ok) throw new Error('Error al cargar usuarios');
             const data = await response.json();
             setUsers(data);
@@ -36,7 +37,7 @@ const UsersPage = () => {
         setUsers(users.map(u => u.id_usuario === userId ? { ...u, rol: newRole } : u));
 
         try {
-            const response = await fetch(`http://localhost:3000/api/users/${userId}/role`, {
+            const response = await fetch(`${API_URL}/api/users/${userId}/role`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rol: newRole })
@@ -60,7 +61,7 @@ const UsersPage = () => {
         if (!userToDelete) return;
 
         try {
-            const response = await fetch(`http://localhost:3000/api/users/${userToDelete.id_usuario}`, {
+            const response = await fetch(`${API_URL}/api/users/${userToDelete.id_usuario}`, {
                 method: 'DELETE'
             });
 

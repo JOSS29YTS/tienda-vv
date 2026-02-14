@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaMoneyBillWave, FaSearch, FaTimes, FaPlus, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
+import API_URL from '../../config/api';
 
 const InvoicesPage = () => {
     const { rate } = useRate();
@@ -31,7 +32,7 @@ const InvoicesPage = () => {
     const fetchInvoices = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/finances/invoices/pending', {
+            const res = await fetch(`${API_URL}/api/finances/invoices/pending', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -46,7 +47,7 @@ const InvoicesPage = () => {
     const fetchPendingLoans = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/finances/loans/pending', {
+            const res = await fetch(`${API_URL}/api/finances/loans/pending', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -61,7 +62,7 @@ const InvoicesPage = () => {
     const fetchPaymentMethods = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/finances/payment-methods', {
+            const res = await fetch(`${API_URL}/api/finances/payment-methods', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -130,7 +131,7 @@ const InvoicesPage = () => {
                     rate: parseFloat(rate)
                 };
 
-                const res = await fetch('http://localhost:3000/api/finances/loans/pay', {
+                const res = await fetch(`${API_URL}/api/finances/loans/pay', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -165,7 +166,7 @@ const InvoicesPage = () => {
                         fecha_pago: new Date().toISOString().slice(0, 19).replace('T', ' ')
                     };
 
-                    const res = await fetch('http://localhost:3000/api/finances/invoices/pay', {
+                    const res = await fetch(`${API_URL}/api/finances/invoices/pay', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

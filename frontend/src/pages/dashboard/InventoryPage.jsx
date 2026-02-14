@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaBox, FaSearch, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import API_URL from '../../config/api';
 
 const InventoryPage = () => {
     const [products, setProducts] = useState([]);
@@ -14,7 +15,7 @@ const InventoryPage = () => {
     const fetchInventory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:3000/api/inventory', {
+            const response = await fetch(`${API_URL}/api/inventory', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();

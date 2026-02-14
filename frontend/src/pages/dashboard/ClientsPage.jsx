@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRate } from '../../context/RateContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaUser, FaSearch, FaMoneyBillWave, FaHandHoldingUsd, FaFileInvoiceDollar, FaTimes, FaCheckCircle, FaExclamationCircle, FaHistory, FaShoppingBag } from 'react-icons/fa';
+import API_URL from '../../config/api';
 
 const ClientsPage = () => {
     const [clients, setClients] = useState([]);
@@ -51,7 +52,7 @@ const ClientsPage = () => {
     const fetchDebtors = async () => {
         try {
             const token = localStorage.getItem('token');
-            const url = `http://localhost:3000/api/clients/debtors${filterDate ? `?date=${filterDate}` : ''}`;
+            const url = `${API_URL}/api/clients/debtors${filterDate ? `?date=${filterDate}` : ''}`;
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -67,7 +68,7 @@ const ClientsPage = () => {
 
     const fetchPaymentMethods = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/sales/payment-methods');
+            const response = await fetch(`${API_URL}/api/sales/payment-methods');
             const data = await response.json();
             setPaymentMethods(data);
         } catch (err) {
@@ -99,7 +100,7 @@ const ClientsPage = () => {
         setSelectedClient(client);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:3000/api/clients/${client.id_cliente}/history`, {
+            const response = await fetch(`${API_URL}/api/clients/${client.id_cliente}/history`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Error al cargar historial');
@@ -132,7 +133,7 @@ const ClientsPage = () => {
         setSelectedClient(client);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:3000/api/clients/${client.id_cliente}/purchases`, {
+            const response = await fetch(`${API_URL}/api/clients/${client.id_cliente}/purchases`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Error al cargar historial de compras');
@@ -188,7 +189,7 @@ const ClientsPage = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:3000/api/clients/pay', {
+            const response = await fetch(`${API_URL}/api/clients/pay', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

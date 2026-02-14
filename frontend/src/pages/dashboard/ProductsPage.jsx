@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash, FaBarcode } from 'react-icons/fa';
+import API_URL from '../../config/api';
 
 const ProductsPage = () => {
     const [products, setProducts] = useState([]);
@@ -58,7 +59,7 @@ const ProductsPage = () => {
         setEditingProduct(null);
 
         try {
-            const response = await fetch(`http://localhost:3000/api/products/${productId}/price`, {
+            const response = await fetch(`${API_URL}/api/products/${productId}/price`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ precio: editPriceValue })
@@ -83,7 +84,7 @@ const ProductsPage = () => {
         setEditingBarcodeProduct(null);
 
         try {
-            const response = await fetch(`http://localhost:3000/api/products/${productId}/barcode`, {
+            const response = await fetch(`${API_URL}/api/products/${productId}/barcode`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ codigo_de_barra: editBarcodeValue })
@@ -113,7 +114,7 @@ const ProductsPage = () => {
         setEditingCategoryProduct(null);
 
         try {
-            const response = await fetch(`http://localhost:3000/api/products/${productId}/category`, {
+            const response = await fetch(`${API_URL}/api/products/${productId}/category`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id_categoria: editCategoryValue })
@@ -138,7 +139,7 @@ const ProductsPage = () => {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/products/categories');
+            const response = await fetch(`${API_URL}/api/products/categories');
             if (response.ok) {
                 const data = await response.json();
                 setCategories(data);
@@ -153,7 +154,7 @@ const ProductsPage = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/products');
+            const response = await fetch(`${API_URL}/api/products');
             if (!response.ok) throw new Error('Error al cargar productos');
             const data = await response.json();
             setProducts(data);
@@ -172,7 +173,7 @@ const ProductsPage = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost:3000/api/products', {
+            const response = await fetch(`${API_URL}/api/products', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -195,7 +196,7 @@ const ProductsPage = () => {
         setProducts(products.map(p => p.id_producto === productId ? { ...p, estado: newStatus } : p));
 
         try {
-            const response = await fetch(`http://localhost:3000/api/products/${productId}/status`, {
+            const response = await fetch(`${API_URL}/api/products/${productId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ estado: newStatus })
@@ -219,7 +220,7 @@ const ProductsPage = () => {
         if (!productToDelete) return;
 
         try {
-            const response = await fetch(`http://localhost:3000/api/products/${productToDelete.id_producto}`, {
+            const response = await fetch(`${API_URL}/api/products/${productToDelete.id_producto}`, {
                 method: 'DELETE'
             });
 

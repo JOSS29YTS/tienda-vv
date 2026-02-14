@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { useRate } from '../../context/RateContext';
+import API_URL from '../../config/api';
 
 const SalesPage = () => {
     const { user } = useAuth();
@@ -131,7 +132,7 @@ const SalesPage = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/products');
+            const response = await fetch(`${API_URL}/api/products');
             const data = await response.json();
             // Filter only active products
             const activeProducts = data.filter(p => p.estado === 'activo');
@@ -145,7 +146,7 @@ const SalesPage = () => {
 
     const fetchPaymentMethods = async () => {
         try {
-            const response = await fetch('http://localhost:3000/api/sales/payment-methods');
+            const response = await fetch(`${API_URL}/api/sales/payment-methods');
             const data = await response.json();
             setPaymentMethods(data);
         } catch (err) {
@@ -157,7 +158,7 @@ const SalesPage = () => {
     const fetchClients = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:3000/api/clients', {
+            const response = await fetch(`${API_URL}/api/clients', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -370,7 +371,7 @@ const SalesPage = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:3000/api/sales/close', {
+            const response = await fetch(`${API_URL}/api/sales/close', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

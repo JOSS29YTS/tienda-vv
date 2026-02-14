@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCalendarAlt, FaMoneyBillWave, FaExchangeAlt, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import API_URL from '../../config/api';
 
 const HistoryPage = () => {
     const [history, setHistory] = useState([]);
@@ -13,7 +14,7 @@ const HistoryPage = () => {
     const fetchHistory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:3000/api/history', {
+            const response = await fetch(`${API_URL}/api/history', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();

@@ -45,6 +45,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import API_URL from '../../config/api';
 
 const DashboardHome = () => {
     const { user, logout } = useAuth();
@@ -58,7 +59,7 @@ const DashboardHome = () => {
         const fetchDashboardData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch('http://localhost:3000/api/dashboard/stats', {
+                const response = await fetch(`${API_URL}/api/dashboard/stats', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 

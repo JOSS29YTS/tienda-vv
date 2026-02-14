@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import API_URL from '../config/api';
 
 const RateContext = createContext();
 
@@ -17,7 +18,7 @@ export const RateProvider = ({ children }) => {
     useEffect(() => {
         const fetchRate = async () => {
             try {
-                const response = await fetch('http://localhost:3000/api/config/rate');
+                const response = await fetch(`${API_URL}/api/config/rate`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.rate) {
@@ -40,7 +41,7 @@ export const RateProvider = ({ children }) => {
 
         // Sync to backend (optional, but good for consistency across users)
         try {
-            await fetch('http://localhost:3000/api/config/rate', {
+            await fetch(`${API_URL}/api/config/rate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rate: numericRate })

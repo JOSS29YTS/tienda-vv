@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaUser, FaEnvelope, FaLock, FaArrowLeft, FaCheckCircle, FaEye, FaEyeSlash, FaExclamationCircle, FaInfoCircle } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import API_URL from '../../config/api';
 
 const RegisterPage = () => {
     const navigate = useNavigate();
@@ -70,7 +71,7 @@ const RegisterPage = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/auth/register-init', {
+            const response = await fetch(`${API_URL}/api/auth/register-init', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -95,7 +96,7 @@ const RegisterPage = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/auth/register-verify', {
+            const response = await fetch(`${API_URL}/api/auth/register-verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

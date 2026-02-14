@@ -7,6 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext';
 
 import { useRate } from '../../context/RateContext';
+import API_URL from '../../config/api';
 
 const PurchasesPage = () => {
     // Load initial state from localStorage if available
@@ -122,7 +123,7 @@ const PurchasesPage = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/finances/buy-currency', {
+            const res = await fetch(`${API_URL}/api/finances/buy-currency', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -171,7 +172,7 @@ const PurchasesPage = () => {
     const fetchPaymentMethods = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/finances/payment-methods', {
+            const res = await fetch(`${API_URL}/api/finances/payment-methods', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -189,7 +190,7 @@ const PurchasesPage = () => {
     const fetchProviders = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/suppliers', {
+            const res = await fetch(`${API_URL}/api/suppliers', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -204,7 +205,7 @@ const PurchasesPage = () => {
     const fetchProducts = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('http://localhost:3000/api/products', {
+            const res = await fetch(`${API_URL}/api/products', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -347,7 +348,7 @@ const PurchasesPage = () => {
                 payments: paymentsList
             };
 
-            const response = await fetch('http://localhost:3000/api/purchases', {
+            const response = await fetch(`${API_URL}/api/purchases', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

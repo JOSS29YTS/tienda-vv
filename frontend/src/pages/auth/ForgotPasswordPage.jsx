@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaEnvelope, FaArrowLeft, FaPaperPlane, FaCheckCircle, FaExclamationCircle, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import API_URL from '../../config/api';
 
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ const ForgotPasswordPage = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/auth/forgot-password', {
+            const response = await fetch(`${API_URL}/api/auth/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
@@ -59,7 +60,7 @@ const ForgotPasswordPage = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/auth/reset-password', {
+            const response = await fetch(`${API_URL}/api/auth/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, code, newPassword, recoveryToken })
