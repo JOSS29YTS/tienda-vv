@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle, FaTimes, FaCalendarAlt, FaFilePdf, FaBarcode } from 'react-icons/fa';
+import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle, FaTimes, FaCalendarAlt, FaFilePdf, FaBarcode, FaUpload, FaSpinner } from 'react-icons/fa';
+import Tesseract from 'tesseract.js';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext';
@@ -45,6 +46,10 @@ const PurchasesPage = () => {
     // Buy Currency State
     const [isBuyCurrencyModalOpen, setIsBuyCurrencyModalOpen] = useState(false);
     const [buyCurrencyData, setBuyCurrencyData] = useState({ amountUSD: '', amountBs: '', methodId: '' });
+
+    // Receipt Upload State
+    const [isProcessingImage, setIsProcessingImage] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Barcode Scan State
     const [scanCode, setScanCode] = useState('');
@@ -441,6 +446,120 @@ const PurchasesPage = () => {
         handleSave(invoiceForm, null); // Invoice purchase doesn't need immediate payment method usually
     };
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsProcessingImage(true);
+        try {
+            const result = await Tesseract.recognize(
+                file,
+                'spa',
+            );
+
+            const text = result.data.text;
+            console.log("Texto extraído:", text);
+
+            const lines = text.split('\n');
+            const newRows = [];
+            const addedProductIds = new Set(); // Track added products to prevent duplicates
+
+            // Helper to clean text for comparison
+            const normalize = (str) => {
+                return str
+                    .toLowerCase()
+                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+                    .replace(/[^a-z0-9\s]/g, " "); // Replace special chars with space
+            };
+
+            lines.forEach(line => {
+                if (!line.trim() || line.length < 5) return;
+
+                const cleanLine = normalize(line);
+                let bestMatch = null;
+                let highestScore = 0;
+
+                // 1. Try to extract quantity
+                // Format A: "* 2 (C-P)..." (Quantity after *)
+                // Format B: "... PET 1" (Quantity at end)
+                let qty = 1;
+                const starMatch = line.match(/\*\s*(\d+)/);
+
+                if (starMatch) {
+                    qty = parseInt(starMatch[1]);
+                } else {
+                    // Check end of line
+                    const parts = line.trim().split(/\s+/);
+                    const lastPart = parts[parts.length - 1];
+                    if (/^\d+$/.test(lastPart) && parts.length > 2) {
+                        qty = parseInt(lastPart);
+                    }
+                }
+
+                // 2. Find best product match based on token intersection
+                products.forEach(p => {
+                    if (!p.nombre) return;
+
+                    const cleanName = normalize(p.nombre);
+                    const productTokens = cleanName.split(/\s+/).filter(t => t.length > 2); // Ignore short words like "de", "el"
+
+                    if (productTokens.length === 0) return;
+
+                    let matches = 0;
+                    productTokens.forEach(token => {
+                        if (cleanLine.includes(token)) {
+                            matches++;
+                        }
+                    });
+
+                    // Score is percentage of product tokens found in the line
+                    const score = matches / productTokens.length;
+
+                    // Bonus for exact sequence or high similarity
+                    if (score > highestScore) {
+                        highestScore = score;
+                        bestMatch = p;
+                    }
+                });
+
+                // Threshold: at least 50% of the significant words must match
+                // AND product not already added in this batch
+                if (bestMatch && highestScore >= 0.5 && !addedProductIds.has(bestMatch.id_producto)) {
+                    console.log(`Match found: ${bestMatch.nombre} (Score: ${highestScore}) for line: ${line}`);
+                    newRows.push({
+                        id: Date.now() + Math.random(),
+                        productId: bestMatch.id_producto,
+                        profitPercent: 30,
+                        quantity: qty,
+                        currency: 'USD',
+                        costBultoBs: '',
+                        costBultoUsd: '', // User needs to fill this
+                        pvp: ''
+                    });
+                    addedProductIds.add(bestMatch.id_producto);
+                }
+            });
+
+            if (newRows.length > 0) {
+                setRows(prevRows => {
+                    // Keep existing manual rows if they have data, otherwise replace empty initial row
+                    const validPrev = prevRows.filter(r => r.productId !== '');
+                    return [...validPrev, ...newRows];
+                });
+                setSuccess(`Se identificaron ${newRows.length} productos.`);
+            } else {
+                setError('No se encontraron coincidencias suficientes. Intente tomar una foto más clara o verifique los nombres.');
+            }
+
+        } catch (err) {
+            console.error(err);
+            setError('Error al procesar la imagen.');
+        } finally {
+            setIsProcessingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
     const handleGenerateReport = () => {
         const doc = new jsPDF('l'); // Landscape due to width
         const secondaryColor = [15, 23, 42]; // Slate 900
@@ -731,6 +850,22 @@ const PurchasesPage = () => {
                 </button>
 
                 <div className="flex gap-4">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                    />
+                    <button
+                        onClick={() => fileInputRef.current.click()}
+                        disabled={isProcessingImage}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2"
+                    >
+                        {isProcessingImage ? <FaSpinner className="animate-spin" /> : <FaUpload />}
+                        {isProcessingImage ? 'Procesando...' : 'Cargar Factura'}
+                    </button>
+
                     {user && user.rol === 'Administrador' && (
                         <button onClick={handleGenerateReport} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-slate-400/50 flex items-center gap-2">
                             <FaFilePdf /> Reporte
