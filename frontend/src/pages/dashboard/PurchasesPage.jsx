@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle, FaTimes, FaCalendarAlt, FaFilePdf } from 'react-icons/fa';
+import { FaShoppingCart, FaSave, FaPlus, FaTrash, FaCheckCircle, FaExclamationCircle, FaTimes, FaCalendarAlt, FaFilePdf, FaBarcode } from 'react-icons/fa';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext';
@@ -45,6 +45,64 @@ const PurchasesPage = () => {
     // Buy Currency State
     const [isBuyCurrencyModalOpen, setIsBuyCurrencyModalOpen] = useState(false);
     const [buyCurrencyData, setBuyCurrencyData] = useState({ amountUSD: '', amountBs: '', methodId: '' });
+
+    // Barcode Scan State
+    const [scanCode, setScanCode] = useState('');
+
+    // Global Key Listener for Barcode Scanner
+    useEffect(() => {
+        let buffer = '';
+        let lastKeyTime = 0;
+
+        const handleGlobalKeyDown = (e) => {
+            // Ignore if modal is open (let modal handle it if there is one)
+            if (isBuyCurrencyModalOpen) return;
+
+            // Ignore if typing in an input
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                // Unless it's OUR scanner input, but that has its own onKeyDown
+                return;
+            }
+
+            const now = Date.now();
+            if (now - lastKeyTime > 100) {
+                buffer = '';
+            }
+            lastKeyTime = now;
+
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (buffer.trim()) {
+                    setScanCode(buffer.trim()); // Update UI
+                    // Trigger scan logic directly
+                    const product = products.find(p => p.codigo_de_barra === buffer.trim());
+                    if (product) {
+                        setRows(prevRows => {
+                            let newRows = [...prevRows];
+                            let targetRowIndex = newRows.findIndex(r => !r.productId);
+                            const newRowData = { productId: product.id_producto, profitPercent: 30, quantity: 1, currency: 'USD', costBultoBs: '', costBultoUsd: '', pvp: '' };
+
+                            if (targetRowIndex === -1) {
+                                newRows.push({ id: Date.now(), ...newRowData });
+                            } else {
+                                newRows[targetRowIndex] = { ...newRows[targetRowIndex], ...newRowData };
+                            }
+                            return newRows;
+                        });
+                        setSuccess(`Producto agregado: ${product.nombre}`);
+                    } else {
+                        setError('Producto no encontrado con ese código');
+                    }
+                    buffer = '';
+                }
+            } else if (e.key.length === 1) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [isBuyCurrencyModalOpen, products]);
 
     const handleBuyCurrencySubmit = async () => {
         if (!buyCurrencyData.amountUSD || !buyCurrencyData.amountBs || !buyCurrencyData.methodId) {
@@ -164,6 +222,54 @@ const PurchasesPage = () => {
             costBultoUsd: '',
             pvp: ''
         }]);
+    };
+
+    const handleScan = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (!scanCode.trim()) return;
+
+            const product = products.find(p => p.codigo_de_barra === scanCode.trim());
+
+            if (product) {
+                // Find empty row or add new
+                let newRows = [...rows];
+                let targetRowIndex = newRows.findIndex(r => !r.productId);
+
+                // Default values for new purchased product
+                const newRowData = {
+                    productId: product.id_producto,
+                    profitPercent: 30,
+                    quantity: 1,
+                    currency: 'USD',
+                    costBultoBs: '',
+                    costBultoUsd: '', // We don't have cost, user must enter
+                    pvp: ''
+                };
+
+                if (targetRowIndex === -1) {
+                    // No empty row, add new
+                    newRows.push({
+                        id: Date.now(),
+                        ...newRowData
+                    });
+                } else {
+                    // Use empty row
+                    newRows[targetRowIndex] = {
+                        ...newRows[targetRowIndex],
+                        ...newRowData
+                    };
+                }
+                setRows(newRows);
+                setSuccess(`Producto agregado: ${product.nombre}`);
+                setScanCode('');
+                setTimeout(() => setSuccess(''), 2000);
+            } else {
+                setError('Producto no encontrado con ese código');
+                setScanCode('');
+                setTimeout(() => setError(''), 3000);
+            }
+        }
     };
 
     const removeRow = (id) => {
@@ -473,6 +579,25 @@ const PurchasesPage = () => {
                             Bs {(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Barcode Scanner Input */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+                <div className="bg-slate-100 p-3 rounded-lg text-slate-500">
+                    <FaBarcode size={24} />
+                </div>
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escáner de Código de Barra</label>
+                    <input
+                        type="text"
+                        value={scanCode}
+                        onChange={(e) => setScanCode(e.target.value)}
+                        onKeyDown={handleScan}
+                        className="w-full bg-transparent text-xl font-mono font-bold text-slate-800 outline-none placeholder:text-slate-300"
+                        placeholder="Escanea o escribe el código y presiona Enter..."
+                        autoFocus
+                    />
                 </div>
             </div>
 
@@ -869,7 +994,7 @@ const PurchasesPage = () => {
                 )}
             </AnimatePresence>
 
-        </div>
+        </div >
     );
 };
 

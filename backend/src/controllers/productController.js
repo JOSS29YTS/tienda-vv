@@ -25,6 +25,7 @@ exports.getAllProducts = async (req, res) => {
             SELECT 
                 p.id_producto, 
                 p.nb_producto as nombre, 
+                p.codigo_de_barra,
                 p.precio, 
                 e.nb_estado as estado,
                 p.id_estado,
@@ -65,7 +66,7 @@ exports.getCategories = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
     try {
-        const { nombre, precio, estado, id_categoria } = req.body;
+        const { nombre, precio, estado, id_categoria, codigo_de_barra } = req.body;
 
         if (!nombre || !precio || !id_categoria) {
             return res.status(400).json({ message: 'Nombre, precio y categoría son requeridos' });
@@ -89,8 +90,8 @@ exports.createProduct = async (req, res) => {
         const id_estado = statusRows[0].id_estado;
 
         const [result] = await pool.query(
-            'INSERT INTO producto (nb_producto, precio, id_estado, id_categoria) VALUES (?, ?, ?, ?)',
-            [nombreUpperCase, precio, id_estado, id_categoria]
+            'INSERT INTO producto (nb_producto, precio, id_estado, id_categoria, codigo_de_barra) VALUES (?, ?, ?, ?, ?)',
+            [nombreUpperCase, precio, id_estado, id_categoria, codigo_de_barra || null]
         );
 
         res.status(201).json({
@@ -100,7 +101,8 @@ exports.createProduct = async (req, res) => {
                 nombre,
                 precio,
                 estado: estado || 'activo',
-                id_categoria
+                id_categoria,
+                codigo_de_barra: codigo_de_barra || null
             }
         });
 
@@ -205,5 +207,26 @@ exports.deleteProduct = async (req, res) => {
             return res.status(400).json({ message: 'No se puede eliminar el producto porque tiene ventas o compras asociadas. Intente marcarlo como Inactivo.' });
         }
         res.status(500).json({ message: 'Error al eliminar producto' });
+    }
+};
+
+exports.updateProductBarcode = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { codigo_de_barra } = req.body;
+
+        const [result] = await pool.query('UPDATE producto SET codigo_de_barra = ? WHERE id_producto = ?', [codigo_de_barra || null, id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Producto no encontrado' });
+        }
+
+        res.json({ message: 'Código de barra actualizado exitosamente' });
+    } catch (error) {
+        console.error('Error updating product barcode:', error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: 'El código de barra ya está registrado en otro producto.' });
+        }
+        res.status(500).json({ message: 'Error al actualizar código de barra' });
     }
 };

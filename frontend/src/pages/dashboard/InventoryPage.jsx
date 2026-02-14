@@ -29,7 +29,8 @@ const InventoryPage = () => {
     };
 
     const filteredProducts = products.filter(product =>
-        product.nb_producto.toLowerCase().includes(searchTerm.toLowerCase())
+        product.nb_producto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.codigo_de_barra && product.codigo_de_barra.includes(searchTerm))
     );
 
     return (
@@ -117,8 +118,8 @@ const InventoryPage = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${product.estado === 'Activo'
-                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                        : 'bg-yellow-100 text-yellow-700'
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-yellow-100 text-yellow-700'
                                                     }`}>
                                                     {product.estado}
                                                 </span>

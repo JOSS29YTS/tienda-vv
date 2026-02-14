@@ -341,7 +341,7 @@ const ClientsPage = () => {
                                         </div>
                                         <div>
                                             <div className="font-bold text-slate-700">{client.nb_cliente}</div>
-                                            <div className="text-xs text-slate-400">ID: {client.id_cliente}</div>
+                                            {client.telefono && <div className="text-xs text-emerald-600 font-mono font-bold">{client.telefono}</div>}
                                         </div>
                                     </div>
                                 </td>

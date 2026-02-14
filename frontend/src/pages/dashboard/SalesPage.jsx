@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle, FaFilePdf, FaFileInvoice, FaPlus, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle, FaFilePdf, FaFileInvoice, FaPlus, FaEdit, FaCheck, FaTimes, FaBarcode } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -30,7 +30,7 @@ const SalesPage = () => {
         if (savedRows) {
             return JSON.parse(savedRows);
         }
-        return [{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false }];
+        return [{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
     });
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -47,6 +47,12 @@ const SalesPage = () => {
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
     const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
     const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
+    const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false); // Shared Modal State
+    const [targetRowForClient, setTargetRowForClient] = useState(null); // Track which row triggered the modal
+    const [scanCode, setScanCode] = useState('');
+
+
+
 
     // Auto-clear notifications
     useEffect(() => {
@@ -58,6 +64,59 @@ const SalesPage = () => {
             return () => clearTimeout(timer);
         }
     }, [error, successMessage]);
+
+    // Global Key Listener for Barcode Scanner in Main Sales Page
+    useEffect(() => {
+        let buffer = '';
+        let lastKeyTime = 0;
+
+        const handleGlobalKeyDown = (e) => {
+            // Ignore if modal is open (let modal handle it)
+            if (isNewInvoiceModalOpen || isAdvanceModalOpen || showConfirmationModal) return;
+
+            // Ignore if typing in an input
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                // Unless it's OUR scanner input, but that has its own onKeyDown
+                return;
+            }
+
+            const now = Date.now();
+            if (now - lastKeyTime > 100) {
+                buffer = '';
+            }
+            lastKeyTime = now;
+
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (buffer.trim()) {
+                    setScanCode(buffer.trim()); // Update UI
+                    // Trigger scan logic directly
+                    const product = products.find(p => p.codigo_de_barra === buffer.trim());
+                    if (product) {
+                        setRows(prevRows => {
+                            let newRows = [...prevRows];
+                            let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
+                            if (targetRowIndex === -1) {
+                                newRows.push({ id: newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                            } else {
+                                newRows[targetRowIndex] = { ...newRows[targetRowIndex], productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio) };
+                            }
+                            return newRows;
+                        });
+                        setSuccessMessage(`Producto agregado: ${product.nombre}`);
+                    } else {
+                        setError('Producto no encontrado');
+                    }
+                    buffer = '';
+                }
+            } else if (e.key.length === 1) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [isNewInvoiceModalOpen, isAdvanceModalOpen, showConfirmationModal, products]);
 
     useEffect(() => {
         fetchProducts();
@@ -112,7 +171,42 @@ const SalesPage = () => {
     // Row Operations
     const addRow = () => {
         const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
-        setRows([...rows, { id: newId, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false }]);
+        setRows([...rows, { id: newId, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
+    };
+
+    const handleScan = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (!scanCode.trim()) return;
+
+            const product = products.find(p => p.codigo_de_barra === scanCode.trim());
+
+            if (product) {
+                // Find empty row or add new
+                let newRows = [...rows];
+                let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
+
+                if (targetRowIndex === -1) {
+                    // No empty row, add new
+                    const newId = newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1;
+                    newRows.push({ id: newId, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                } else {
+                    // Use empty row
+                    newRows[targetRowIndex] = {
+                        ...newRows[targetRowIndex],
+                        productId: product.id_producto,
+                        quantity: 1,
+                        unitPrice: parseFloat(product.precio)
+                    };
+                }
+                setRows(newRows);
+                setSuccessMessage(`Producto agregado: ${product.nombre}`);
+                setScanCode('');
+            } else {
+                setError('Producto no encontrado con ese código');
+                setScanCode('');
+            }
+        }
     };
 
     const removeRow = (id) => {
@@ -147,10 +241,13 @@ const SalesPage = () => {
             if (row.id === id) {
                 // New Client Logic
                 if (field === 'startNewClient') {
-                    return { ...row, isNewClient: true, client: '' };
+                    // Trigger Modal instead of inline
+                    setTargetRowForClient(id);
+                    setIsAddClientModalOpen(true);
+                    return row; // Don't change row yet
                 }
                 if (field === 'cancelNewClient') {
-                    return { ...row, isNewClient: false, client: '' };
+                    return { ...row, isNewClient: false, client: '', clientPhone: '' };
                 }
 
                 let updates = { [field]: value };
@@ -499,6 +596,42 @@ const SalesPage = () => {
                 )}
             </header>
 
+            {/* Add Client Modal */}
+            {isAddClientModalOpen && (
+                <AddClientModal
+                    onClose={() => {
+                        setIsAddClientModalOpen(false);
+                        setTargetRowForClient(null);
+                    }}
+                    onSave={(data) => {
+                        if (targetRowForClient) {
+                            // Update specific row
+                            setRows(prev => prev.map(r => r.id === targetRowForClient ? { ...r, client: data.name, clientPhone: data.phone, isNewClient: true } : r));
+                        }
+                        setIsAddClientModalOpen(false);
+                        setTargetRowForClient(null);
+                    }}
+                />
+            )}
+
+            {/* Add Client Modal */}
+            {isAddClientModalOpen && (
+                <AddClientModal
+                    onClose={() => {
+                        setIsAddClientModalOpen(false);
+                        setTargetRowForClient(null);
+                    }}
+                    onSave={(data) => {
+                        if (targetRowForClient) {
+                            // Update specific row
+                            setRows(prev => prev.map(r => r.id === targetRowForClient ? { ...r, client: data.name, clientPhone: data.phone, isNewClient: true } : r));
+                        }
+                        setIsAddClientModalOpen(false);
+                        setTargetRowForClient(null);
+                    }}
+                />
+            )}
+
             {/* Top Summary Section - Styled like the dark blue headers in the requested image */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0 rounded-xl overflow-hidden shadow-lg border border-slate-200">
                 {/* Left Side: Date & Rate */}
@@ -539,6 +672,25 @@ const SalesPage = () => {
                             $ {totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Barcode Scanner Input */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+                <div className="bg-slate-100 p-3 rounded-lg text-slate-500">
+                    <FaBarcode size={24} />
+                </div>
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Escáner de Código de Barra</label>
+                    <input
+                        type="text"
+                        value={scanCode}
+                        onChange={(e) => setScanCode(e.target.value)}
+                        onKeyDown={handleScan}
+                        className="w-full bg-transparent text-xl font-mono font-bold text-slate-800 outline-none placeholder:text-slate-300"
+                        placeholder="Escanea o escribe el código y presiona Enter..."
+                        autoFocus
+                    />
                 </div>
             </div>
 
@@ -683,23 +835,22 @@ const SalesPage = () => {
 
                                         {/* Client */}
                                         <td className="p-1">
+
                                             {row.isNewClient ? (
-                                                <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="text"
-                                                        value={row.client}
-                                                        onChange={(e) => updateRow(row.id, 'client', e.target.value.toUpperCase())}
-                                                        placeholder="Nombre Nuevo..."
-                                                        className="w-full bg-white border border-blue-300 rounded px-2 py-1.5 text-sm text-slate-700 focus:border-blue-500 outline-none placeholder:text-slate-300"
-                                                        autoFocus
-                                                    />
-                                                    <button
-                                                        onClick={() => updateRow(row.id, 'cancelNewClient')}
-                                                        className="text-red-400 hover:text-red-600 p-1"
-                                                        title="Cancelar nuevo cliente"
-                                                    >
-                                                        <FaTrash size={12} />
-                                                    </button>
+                                                <div className="flex flex-col gap-1 w-full">
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5 text-xs">
+                                                            <div className="font-bold text-emerald-800 break-all">{row.client}</div>
+                                                            {row.clientPhone && <div className="text-emerald-600 font-mono">{row.clientPhone}</div>}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => updateRow(row.id, 'cancelNewClient')}
+                                                            className="text-red-400 hover:text-red-600 p-1 shrink-0"
+                                                            title="Cancelar nuevo cliente"
+                                                        >
+                                                            <FaTrash size={12} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <select
@@ -724,7 +875,8 @@ const SalesPage = () => {
                                                             </option>
                                                         ))}
                                                 </select>
-                                            )}
+                                            )
+                                            }
                                         </td>
 
                                         {/* Actions */}
@@ -846,7 +998,8 @@ const SalesPage = () => {
                                     mixedBatchId: batchId,
                                     paymentDetails: rowPaymentDetails,
                                     client: client || 'CLIENTE',
-                                    isNewClient: client && !clients.some(c => c.nb_cliente === client) ? true : false
+                                    isNewClient: client && !clients.some(c => c.nb_cliente === client) ? true : false,
+                                    clientPhone: invoiceData.clientPhone
                                 });
                             });
 
@@ -1142,6 +1295,8 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
 export default SalesPage;
 const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onConfirm }) => {
     const [client, setClient] = useState('');
+    const [invoiceClientPhone, setInvoiceClientPhone] = useState('');
+    const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
     const [items, setItems] = useState([]);
 
     // Item Input State
@@ -1157,6 +1312,84 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
     const [mixedMethodInput, setMixedMethodInput] = useState('');
     const [mixedAmountInput, setMixedAmountInput] = useState('');
     const [mixedCurrencyInput, setMixedCurrencyInput] = useState('USD');
+
+    // Barcode Scan
+    const [scanCode, setScanCode] = useState('');
+
+    // Global Scan Listener for Modal
+    useEffect(() => {
+        let buffer = '';
+        let lastKeyTime = 0;
+
+        const handleModalGlobalKeyDown = (e) => {
+            // Check if we are typing in ANY input (including our scanner input if focused)
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+                return;
+            }
+
+            const now = Date.now();
+            if (now - lastKeyTime > 100) {
+                buffer = '';
+            }
+            lastKeyTime = now;
+
+            if (e.key === 'Enter') {
+                // If buffer is valid, use it.
+                if (buffer.trim()) {
+                    e.preventDefault();
+                    setScanCode(buffer.trim());
+                    handleScanLogic(buffer.trim());
+                    buffer = '';
+                }
+            } else if (e.key.length === 1) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleModalGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleModalGlobalKeyDown);
+    }, [products]); // Remove 'items' dependency to avoid re-binding on every add
+
+    const handleScanLogic = (code) => {
+        const product = products.find(p => p.codigo_de_barra === code);
+
+        if (product) {
+            // Add new item or update existing
+            setItems(prevItems => {
+                const existingItemIndex = prevItems.findIndex(item => item.productId === product.id_producto);
+                if (existingItemIndex > -1) {
+                    const newItems = [...prevItems];
+                    // IMPORTANT: Ensure we are only adding 1
+                    newItems[existingItemIndex] = {
+                        ...newItems[existingItemIndex],
+                        quantity: newItems[existingItemIndex].quantity + 1
+                    };
+                    return newItems;
+                } else {
+                    return [...prevItems, {
+                        id: Date.now(),
+                        productId: product.id_producto,
+                        name: product.nombre,
+                        quantity: 1,
+                        unitPrice: parseFloat(product.precio)
+                    }];
+                }
+            });
+            setScanCode('');
+        } else {
+            alert('Producto no encontrado');
+            setScanCode('');
+        }
+    };
+
+    const handleScan = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation(); // Stop global listener form seeing this
+            if (!scanCode.trim()) return;
+            handleScanLogic(scanCode.trim());
+        }
+    };
 
     // Editing State
     const [editingItemId, setEditingItemId] = useState(null);
@@ -1271,6 +1504,7 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
         onConfirm({
             items,
             client,
+            clientPhone: invoiceClientPhone,
             payment: finalPaymentData
         });
     };
@@ -1303,31 +1537,69 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
                 <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
                     {/* Left: Items & Client */}
                     <div className="flex-1 p-6 flex flex-col overflow-hidden border-r border-slate-200">
+                        {/* Barcode Scanner Input */}
+                        <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 mb-4 flex items-center gap-3 shadow-sm">
+                            <div className="bg-white p-2 rounded-lg text-emerald-500 shadow-sm">
+                                <FaBarcode size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5">Escáner Rápido</label>
+                                <input
+                                    type="text"
+                                    value={scanCode}
+                                    onChange={(e) => setScanCode(e.target.value)}
+                                    onKeyDown={handleScan}
+                                    className="w-full bg-transparent font-mono font-bold text-slate-700 outline-none text-sm placeholder:text-slate-400/70"
+                                    placeholder="Escanea aquí para agregar..."
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
                         {/* Client Selector */}
                         <div className="mb-4">
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cliente</label>
                             <div className="flex gap-2">
                                 <select
                                     value={client}
-                                    onChange={(e) => setClient(e.target.value)}
+                                    onChange={(e) => {
+                                        if (e.target.value === 'NEW_CLIENT') {
+                                            setIsAddClientModalOpen(true);
+                                        } else {
+                                            setClient(e.target.value);
+                                        }
+                                    }}
                                     className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-700"
                                 >
                                     <option value="">- Cliente General -</option>
                                     <option value="CLIENTE">CLIENTE</option>
+                                    <option value="NEW_CLIENT" className="text-emerald-600 font-bold">+ Nuevo Cliente</option>
                                     {clients
                                         .filter(c => c.nb_cliente !== 'CLIENTE')
                                         .map(c => <option key={c.id_cliente} value={c.nb_cliente}>{c.nb_cliente}</option>)
                                     }
                                 </select>
-                                <input
-                                    type="text"
-                                    placeholder="Nuevo..."
-                                    value={client}
-                                    onChange={(e) => setClient(e.target.value.toUpperCase())}
-                                    className="w-1/3 border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                                />
                             </div>
+                            {/* Show selected new client info */}
+                            {client && !clients.some(c => c.nb_cliente === client) && client !== 'CLIENTE' && (
+                                <div className="mt-2 p-2 bg-emerald-50 border border-emerald-100 rounded text-xs flex justify-between items-center">
+                                    <span className="font-bold text-emerald-800">{client} {invoiceClientPhone && <span className="font-mono opacity-75">({invoiceClientPhone})</span>}</span>
+                                    <button onClick={() => setIsAddClientModalOpen(true)} className="text-emerald-600 hover:text-emerald-800 text-xs underline">Editar</button>
+                                </div>
+                            )}
                         </div>
+
+                        {isAddClientModalOpen && (
+                            <AddClientModal
+                                onClose={() => setIsAddClientModalOpen(false)}
+                                onSave={(data) => {
+                                    setClient(data.name);
+                                    setInvoiceClientPhone(data.phone);
+                                    setIsAddClientModalOpen(false);
+                                }}
+                                initialData={{ name: client, phone: invoiceClientPhone }}
+                            />
+                        )}
 
                         {/* Add Item Form */}
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 shrink-0">
@@ -1677,3 +1949,74 @@ const AdvanceModal = ({ rate, paymentMethods, onClose, onConfirm }) => {
     );
 };
 
+// Add Client Modal Component
+const AddClientModal = ({ onClose, onSave, initialData }) => {
+    const [name, setName] = useState(initialData?.name || '');
+    const [phone, setPhone] = useState(initialData?.phone || '');
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name.trim()) {
+            setError('El nombre es obligatorio');
+            return;
+        }
+        // Phone validation if provided
+        if (phone.trim()) {
+            // Regex for 11 digits starting with 0 (e.g., 04242526986)
+            const phoneRegex = /^0\d{10}$/;
+            if (!phoneRegex.test(phone.trim())) {
+                setError('El teléfono debe tener 11 dígitos y comenzar con 0 (Ej: 04242526986)');
+                return;
+            }
+        }
+
+        onSave({ name: name.toUpperCase(), phone: phone.trim() });
+    };
+
+    return createPortal(
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm relative z-10"
+            >
+                <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Cliente</h3>
+                {error && <div className="bg-red-50 text-red-600 p-2 rounded text-sm mb-4">{error}</div>}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full border border-slate-300 rounded p-2 uppercase focus:border-emerald-500 outline-none"
+                            placeholder="NOMBRE DEL CLIENTE"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Teléfono (WhatsApp)</label>
+                        <input
+                            type="text"
+                            value={phone}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, ''); // Only numbers
+                                if (val.length <= 11) setPhone(val);
+                            }}
+                            className="w-full border border-slate-300 rounded p-2 focus:border-emerald-500 outline-none font-mono"
+                            placeholder="04141234567"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">Formato: 11 dígitos, ej: 04241234567</p>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                        <button type="button" onClick={onClose} className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">Cancelar</button>
+                        <button type="submit" className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Guardar</button>
+                    </div>
+                </form>
+            </motion.div>
+        </div>,
+        document.body
+    );
+};

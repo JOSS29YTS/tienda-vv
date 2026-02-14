@@ -90,13 +90,14 @@ exports.closeSales = async (req, res) => {
             // 2. Resolve Client
             let clientId;
             const clientName = row.client ? row.client.trim() : 'Cliente Genérico';
+            const clientPhone = row.clientPhone ? row.clientPhone.trim() : null;
 
             const [existingClient] = await connection.query('SELECT id_cliente FROM cliente WHERE nb_cliente = ?', [clientName]);
 
             if (existingClient.length > 0) {
                 clientId = existingClient[0].id_cliente;
             } else {
-                const [newClient] = await connection.query('INSERT INTO cliente (nb_cliente) VALUES (?)', [clientName]);
+                const [newClient] = await connection.query('INSERT INTO cliente (nb_cliente, telefono) VALUES (?, ?)', [clientName, clientPhone]);
                 clientId = newClient.insertId;
             }
 

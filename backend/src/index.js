@@ -28,6 +28,7 @@ app.use('/api/history', require('./routes/historyRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/finances', require('./routes/financeRoutes'));
 app.use('/api/suppliers', require('./routes/supplierRoutes'));
+app.use('/api/config', require('./routes/configRoutes'));
 
 app.get('/', (req, res) => {
     res.json({ message: 'Bienvenido al API de Venalta Bodega' });
@@ -35,9 +36,17 @@ app.get('/', (req, res) => {
 
 const pool = require('./database/db');
 
+// Services
+const whatsappService = require('./services/whatsappService');
+const exchangeRateService = require('./services/exchangeRateService');
+
 // Start server
 app.listen(PORT, async () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
+
+    // Start Services
+    whatsappService.start();
+    exchangeRateService.start();
 
     try {
         const [rows] = await pool.query('SELECT 1');

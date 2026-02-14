@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash } from 'react-icons/fa';
+import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash, FaBarcode } from 'react-icons/fa';
 
 const ProductsPage = () => {
     const [products, setProducts] = useState([]);
@@ -16,11 +16,14 @@ const ProductsPage = () => {
         nombre: '',
         precio: '',
         estado: 'activo',
-        id_categoria: ''
+        id_categoria: '',
+        codigo_de_barra: ''
     });
 
     const [editingProduct, setEditingProduct] = useState(null);
     const [editPriceValue, setEditPriceValue] = useState('');
+    const [editingBarcodeProduct, setEditingBarcodeProduct] = useState(null);
+    const [editBarcodeValue, setEditBarcodeValue] = useState('');
     const [editingCategoryProduct, setEditingCategoryProduct] = useState(null);
     const [editCategoryValue, setEditCategoryValue] = useState('');
     const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
@@ -66,6 +69,34 @@ const ProductsPage = () => {
         } catch (err) {
             setProducts(originalProducts);
             alert('Error al actualizar el precio: ' + err.message);
+        }
+    };
+
+    const handleEditBarcodeClick = (product) => {
+        setEditingBarcodeProduct(product.id_producto);
+        setEditBarcodeValue(product.codigo_de_barra || '');
+    };
+
+    const handleSaveBarcode = async (productId) => {
+        const originalProducts = [...products];
+        setProducts(products.map(p => p.id_producto === productId ? { ...p, codigo_de_barra: editBarcodeValue } : p));
+        setEditingBarcodeProduct(null);
+
+        try {
+            const response = await fetch(`http://localhost:3000/api/products/${productId}/barcode`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo_de_barra: editBarcodeValue })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Error al actualizar código');
+            }
+
+        } catch (err) {
+            setProducts(originalProducts);
+            alert('Error: ' + err.message);
         }
     };
 
@@ -151,7 +182,7 @@ const ProductsPage = () => {
 
             fetchProducts();
             setIsModalOpen(false);
-            setFormData({ nombre: '', precio: '', estado: 'activo', id_categoria: categories.length > 0 ? categories[0].id_categoria : '' });
+            setFormData({ nombre: '', precio: '', estado: 'activo', id_categoria: categories.length > 0 ? categories[0].id_categoria : '', codigo_de_barra: '' });
 
         } catch (err) {
             alert('Error: ' + err.message);
@@ -336,6 +367,7 @@ const ProductsPage = () => {
                                         </div>
                                     </div>
                                 </th>
+                                <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Código</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Categoría</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Precio</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Estado</th>
@@ -355,6 +387,45 @@ const ProductsPage = () => {
                                                 </div>
                                                 <div className="font-bold text-slate-800">{product.nombre}</div>
                                             </div>
+                                        </td>
+                                        <td className="p-4">
+                                            {editingBarcodeProduct === product.id_producto ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={editBarcodeValue}
+                                                        autoFocus
+                                                        onChange={(e) => setEditBarcodeValue(e.target.value)}
+                                                        className="w-32 px-2 py-1 rounded border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm font-mono"
+                                                        placeholder="Escanea..."
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveBarcode(product.id_producto);
+                                                            if (e.key === 'Escape') setEditingBarcodeProduct(null);
+                                                        }}
+                                                    />
+                                                    <button onClick={() => handleSaveBarcode(product.id_producto)} className="text-emerald-600 hover:text-emerald-700"><FaCheckCircle /></button>
+                                                    <button onClick={() => setEditingBarcodeProduct(null)} className="text-red-400 hover:text-red-500"><FaTimesCircle /></button>
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    className="flex items-center gap-2 group/barcode cursor-pointer hover:bg-slate-50 p-1 -ml-1 rounded-lg"
+                                                    onClick={() => handleEditBarcodeClick(product)}
+                                                    title="Click para editar código"
+                                                >
+                                                    {product.codigo_de_barra ? (
+                                                        <span className="font-mono text-sm text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                            {product.codigo_de_barra}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300 italic flex items-center gap-1">
+                                                            <FaBarcode /> Sin código
+                                                        </span>
+                                                    )}
+                                                    <span className="opacity-0 group-hover/barcode:opacity-100 transition-all duration-200 text-emerald-500">
+                                                        <FaPen size={10} />
+                                                    </span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-4 text-slate-600 text-sm font-medium">
                                             {editingCategoryProduct === product.id_producto ? (
@@ -499,6 +570,19 @@ const ProductsPage = () => {
                                             onChange={e => setFormData({ ...formData, nombre: e.target.value.toUpperCase() })}
                                             className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
                                             placeholder="Ej. Arroz Premium"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Código de Barra (Opcional)</label>
+                                    <div className="relative">
+                                        <FaBarcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={formData.codigo_de_barra}
+                                            onChange={e => setFormData({ ...formData, codigo_de_barra: e.target.value })}
+                                            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all font-mono"
+                                            placeholder="Escanea aquí..."
                                         />
                                     </div>
                                 </div>

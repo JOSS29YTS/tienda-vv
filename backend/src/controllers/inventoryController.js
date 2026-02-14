@@ -6,6 +6,7 @@ exports.getInventory = async (req, res) => {
             SELECT 
                 p.id_producto, 
                 p.nb_producto, 
+                p.codigo_de_barra,
                 p.precio, 
                 e.nb_estado as estado,
                 COALESCE(purchased.total_bought, 0) as total_bought,
