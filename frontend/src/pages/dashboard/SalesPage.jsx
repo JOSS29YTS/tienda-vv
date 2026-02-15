@@ -165,14 +165,9 @@ const SalesPage = () => {
     const saveDraftToServer = async () => {
         try {
             const token = localStorage.getItem('token');
-            // CRITICAL: Who can save?
-            // - Regular User: Only their own rows.
-            // - Admin/Manager: ALL valid rows (Master Control).
-            const isMaster = user.rol === 'Administrador' || user.rol === 'Gerente';
-            const myRowsToSave = rows.filter(r =>
-                (isMaster || !r._userId || String(r._userId) === String(user.id))
-                && r.productId && r.quantity > 0
-            );
+            // CRITICAL: Only save rows that belong to the current user
+            // Rows from other users (fetched via sync) have _userId and _isReadOnly: true
+            const myRowsToSave = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)) && r.productId && r.quantity > 0);
 
             // If I have no rows locally, but I previously had some (or just want to be sure), 
             // we SHOULD send the empty list to the server to clear it.
@@ -223,7 +218,7 @@ const SalesPage = () => {
                                 _userId: draft.id_usuario,
                                 _userName: `${draft.nombre} ${draft.apellido}`,
                                 _userRole: draft.rol,
-                                _isReadOnly: !isMe && user.rol !== 'Administrador' && user.rol !== 'Gerente'
+                                _isReadOnly: !isMe
                             });
                         }
                     });
