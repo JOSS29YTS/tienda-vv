@@ -10,6 +10,66 @@ exports.getPaymentMethods = async (req, res) => {
     }
 };
 
+// Save draft sales (work in progress)
+exports.saveDraftSales = async (req, res) => {
+    try {
+        const { rows, rate } = req.body;
+        const userId = req.user.id;
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Delete existing draft for this user today
+        await pool.query(
+            'DELETE FROM venta_borrador WHERE id_usuario = ? AND DATE(fecha_actualizacion) = ?',
+            [userId, today]
+        );
+
+        // Insert new draft
+        await pool.query(
+            'INSERT INTO venta_borrador (id_usuario, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, NOW(), ?, ?)',
+            [userId, JSON.stringify(rows), rate]
+        );
+
+        res.json({ message: 'Borrador guardado exitosamente' });
+    } catch (error) {
+        console.error('Error saving draft sales:', error);
+        res.status(500).json({ message: 'Error al guardar borrador' });
+    }
+};
+
+// Get all draft sales for today (from all users)
+exports.getDraftSales = async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        const [drafts] = await pool.query(`
+            SELECT 
+                vb.id_venta_borrador,
+                vb.id_usuario,
+                vb.datos_venta,
+                vb.tasa_dia,
+                vb.fecha_actualizacion,
+                u.nombre,
+                u.apellido,
+                u.rol
+            FROM venta_borrador vb
+            JOIN usuario u ON vb.id_usuario = u.id_usuario
+            WHERE DATE(vb.fecha_actualizacion) = ?
+            ORDER BY vb.fecha_actualizacion DESC
+        `, [today]);
+
+        // Parse JSON data
+        const parsedDrafts = drafts.map(draft => ({
+            ...draft,
+            datos_venta: JSON.parse(draft.datos_venta)
+        }));
+
+        res.json(parsedDrafts);
+    } catch (error) {
+        console.error('Error getting draft sales:', error);
+        res.status(500).json({ message: 'Error al obtener borradores' });
+    }
+};
+
 exports.closeSales = async (req, res) => {
     const connection = await pool.getConnection();
     try {
@@ -260,6 +320,14 @@ exports.closeSales = async (req, res) => {
         }
 
         await connection.commit();
+
+        // Clear all draft sales for today after successful close
+        const today = new Date().toISOString().split('T')[0];
+        await pool.query(
+            'DELETE FROM venta_borrador WHERE DATE(fecha_actualizacion) = ?',
+            [today]
+        );
+
         res.json({ message: 'Ventas cerradas exitosamente' });
 
     } catch (error) {

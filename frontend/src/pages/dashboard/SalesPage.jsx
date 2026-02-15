@@ -123,12 +123,110 @@ const SalesPage = () => {
         fetchProducts();
         fetchPaymentMethods();
         fetchClients();
+        fetchDraftSales(); // Load initial drafts
+
+        // Poll for updates every 3 seconds
+        const interval = setInterval(() => {
+            fetchDraftSales();
+        }, 3000);
+
+        return () => clearInterval(interval);
     }, []);
 
-    // Save rows to localStorage whenever they change
+    // Save rows to server AND localStorage whenever they change (with debounce)
     useEffect(() => {
         localStorage.setItem('bodega_sales_rows', JSON.stringify(rows));
-    }, [rows]);
+
+        // Debounce server save to avoid too many requests
+        const timeoutId = setTimeout(() => {
+            saveDraftToServer();
+        }, 1000); // Wait 1 second after last change
+
+        return () => clearTimeout(timeoutId);
+    }, [rows, rate]);
+
+    const saveDraftToServer = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const validRows = rows.filter(r => r.productId && r.quantity > 0);
+
+            // Only save if there are valid rows
+            if (validRows.length === 0) return;
+
+            await fetch(`${API_URL}/api/sales/draft`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    rows: rows,
+                    rate: parseFloat(rate)
+                })
+            });
+        } catch (err) {
+            console.error('Error saving draft to server:', err);
+            // Don't show error to user, this is background sync
+        }
+    };
+
+    const fetchDraftSales = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/api/sales/draft`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const drafts = await response.json();
+
+            if (!user) return;
+
+            if (user.rol === 'Administrador') {
+                // Admin sees ALL rows from ALL users
+                const allRows = [];
+                drafts.forEach(draft => {
+                    draft.datos_venta.forEach(row => {
+                        // Filter out empty rows
+                        if (row.productId && row.quantity > 0) {
+                            allRows.push({
+                                ...row,
+                                _userId: draft.id_usuario,
+                                _userName: `${draft.nombre} ${draft.apellido}`,
+                                _userRole: draft.rol,
+                                _isReadOnly: draft.id_usuario !== user.id // Can't edit other users' rows
+                            });
+                        }
+                    });
+                });
+
+                // Only update if content is different (prevents overwriting while typing)
+                const currentRowsString = JSON.stringify(rows.filter(r => r.productId && r.quantity > 0));
+                const newRowsString = JSON.stringify(allRows);
+
+                if (currentRowsString !== newRowsString) {
+                    if (allRows.length > 0) {
+                        setRows(allRows);
+                    } else {
+                        // No drafts, reset to empty
+                        setRows([{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
+                    }
+                }
+            } else {
+                // Seller: load only their own draft
+                const myDraft = drafts.find(d => d.id_usuario === user.id);
+                if (myDraft) {
+                    const currentString = JSON.stringify(rows);
+                    const draftString = JSON.stringify(myDraft.datos_venta);
+
+                    if (currentString !== draftString) {
+                        setRows(myDraft.datos_venta);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching draft sales:', err);
+            // Don't show error, this is background sync
+        }
+    };
 
     const fetchProducts = async () => {
         try {

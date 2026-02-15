@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../database/db');
 
-exports.verifyToken = (req, res, next) => {
+exports.verifyToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -11,7 +12,26 @@ exports.verifyToken = (req, res, next) => {
     try {
         const secret = process.env.JWT_SECRET || 'secreto_super_seguro';
         const decoded = jwt.verify(token, secret);
-        req.user = decoded;
+
+        // Verify that the user still exists in the database
+        const [users] = await pool.query(
+            'SELECT id_usuario, nombre, apellido, email, rol FROM usuario WHERE id_usuario = ?',
+            [decoded.id]
+        );
+
+        if (users.length === 0) {
+            return res.status(401).json({ message: 'Usuario no encontrado. Por favor, inicia sesión nuevamente.' });
+        }
+
+        // Update req.user with fresh data from database
+        req.user = {
+            id: users[0].id_usuario,
+            nombre: users[0].nombre,
+            apellido: users[0].apellido,
+            email: users[0].email,
+            rol: users[0].rol
+        };
+
         next();
     } catch (error) {
         console.error('Token verification error:', error.message);
