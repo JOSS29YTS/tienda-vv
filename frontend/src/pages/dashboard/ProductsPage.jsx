@@ -139,7 +139,7 @@ const ProductsPage = () => {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/products/categories');
+            const response = await fetch(`${API_URL}/api/products/categories`);
             if (response.ok) {
                 const data = await response.json();
                 setCategories(data);
@@ -154,7 +154,7 @@ const ProductsPage = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/products');
+            const response = await fetch(`${API_URL}/api/products`);
             if (!response.ok) throw new Error('Error al cargar productos');
             const data = await response.json();
             setProducts(data);
