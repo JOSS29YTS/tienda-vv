@@ -2,11 +2,18 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    // ⚡ ESTA ES LA PARTE CLAVE PARA QUITAR EL ERROR ENETUNREACH
+    connectionTimeout: 10000, // 10 segundos de espera
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    dnsFallback: true // Ayuda si la red de Railway tiene problemas de DNS
 });
 
 exports.sendVerificationCode = async (code) => {
