@@ -3,17 +3,14 @@ require('dotenv').config();
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587, // Cambiaremos al puerto 587 para probar una ruta diferente
-    secure: false, // Debe ser false para el puerto 587
+    port: 25, // Puerto alternativo que a veces dejan abierto
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    // ⚡ ESTA PARTE ES VITAL PARA EVITAR EL "ENETUNREACH"
-    service: 'gmail', // Al poner esto, Nodemailer configura automáticamente los mejores ajustes para Gmail
     tls: {
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2'
+        rejectUnauthorized: false
     }
 });
 
