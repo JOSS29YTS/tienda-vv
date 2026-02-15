@@ -68,7 +68,7 @@ const ClientsPage = () => {
 
     const fetchPaymentMethods = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/sales/payment-methods');
+            const response = await fetch(`${API_URL}/api/sales/payment-methods`);
             const data = await response.json();
             setPaymentMethods(data);
         } catch (err) {
