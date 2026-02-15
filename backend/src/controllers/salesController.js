@@ -50,9 +50,10 @@ exports.getDraftSales = async (req, res) => {
                 vb.fecha_actualizacion,
                 u.nombre,
                 u.apellido,
-                u.rol
+                r.nb_rol as rol
             FROM venta_borrador vb
             JOIN usuario u ON vb.id_usuario = u.id_usuario
+            LEFT JOIN rol r ON u.id_rol = r.id_rol
             WHERE DATE(vb.fecha_actualizacion) = ?
             ORDER BY vb.fecha_actualizacion DESC
         `, [today]);
