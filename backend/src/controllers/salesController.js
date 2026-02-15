@@ -17,11 +17,21 @@ exports.saveDraftSales = async (req, res) => {
         const userId = req.user.id;
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-        // Delete existing draft for this user today
-        await pool.query(
-            'DELETE FROM venta_borrador WHERE id_usuario = ? AND DATE(fecha_actualizacion) = ?',
-            [userId, today]
-        );
+        // If user is Admin or Manager, they are "Global Masters".
+        // When they save, they consolidate EVERYONE'S work into a single master draft.
+        // This avoids duplicates when an Admin fixes a Seller's row.
+        if (req.user.rol === 'Administrador' || req.user.rol === 'Gerente') {
+            await pool.query(
+                'DELETE FROM venta_borrador WHERE DATE(fecha_actualizacion) = ?',
+                [today]
+            );
+        } else {
+            // Regular user: Only delete their own draft
+            await pool.query(
+                'DELETE FROM venta_borrador WHERE id_usuario = ? AND DATE(fecha_actualizacion) = ?',
+                [userId, today]
+            );
+        }
 
         // Insert new draft
         await pool.query(

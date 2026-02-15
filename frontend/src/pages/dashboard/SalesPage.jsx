@@ -165,9 +165,14 @@ const SalesPage = () => {
     const saveDraftToServer = async () => {
         try {
             const token = localStorage.getItem('token');
-            // CRITICAL: Only save rows that belong to the current user
-            // Rows from other users (fetched via sync) have _userId and _isReadOnly: true
-            const myRowsToSave = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)) && r.productId && r.quantity > 0);
+            // CRITICAL: Who can save?
+            // - Regular User: Only their own rows.
+            // - Admin/Manager: ALL valid rows (Master Control).
+            const isMaster = user.rol === 'Administrador' || user.rol === 'Gerente';
+            const myRowsToSave = rows.filter(r =>
+                (isMaster || !r._userId || String(r._userId) === String(user.id))
+                && r.productId && r.quantity > 0
+            );
 
             // If I have no rows locally, but I previously had some (or just want to be sure), 
             // we SHOULD send the empty list to the server to clear it.
@@ -218,7 +223,7 @@ const SalesPage = () => {
                                 _userId: draft.id_usuario,
                                 _userName: `${draft.nombre} ${draft.apellido}`,
                                 _userRole: draft.rol,
-                                _isReadOnly: !isMe
+                                _isReadOnly: !isMe && user.rol !== 'Administrador' && user.rol !== 'Gerente'
                             });
                         }
                     });
@@ -226,25 +231,24 @@ const SalesPage = () => {
 
                 // 2. Resolve conflict with MY current local rows
                 const isWithinLockWindow = (Date.now() - lastInteractionRef.current) < 7000;
-                const finalMerged = [...serverResults];
-
-                // Get local rows that are "mine" (no userId or is my id)
-                const myLocalRows = prevRows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
+                let finalMerged = [];
 
                 if (isWithinLockWindow) {
-                    // TRUST local state during the interaction window
-                    myLocalRows.forEach(localRow => {
-                        const idx = finalMerged.findIndex(sr => sr.id === localRow.id);
-                        if (idx !== -1) {
-                            finalMerged[idx] = { ...localRow, _isReadOnly: false };
-                        } else {
-                            finalMerged.push({ ...localRow, _isReadOnly: false });
-                        }
-                    });
+                    // TRUST local state: 
+                    // a. Include everything that's NOT mine from the server
+                    const notMineFromServer = serverResults.filter(sr => String(sr._userId) !== String(user.id));
+
+                    // b. Include MY local state (includes existing, new, and excludes deleted)
+                    const myLocalRows = prevRows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
+
+                    finalMerged = [...notMineFromServer, ...myLocalRows];
                 } else {
-                    // Window expired: only keep truly NEW un-synced local rows 
+                    // TRUST server state:
+                    finalMerged = [...serverResults];
+
+                    // But still keep truly NEW un-synced local rows 
                     // (those that have a product but never made it to the server)
-                    const myNewLocalRows = myLocalRows.filter(r => !r._userId && r.productId && r.quantity > 0);
+                    const myNewLocalRows = prevRows.filter(r => !r._userId && r.productId && r.quantity > 0);
                     myNewLocalRows.forEach(localRow => {
                         if (!finalMerged.some(sr => sr.id === localRow.id)) {
                             finalMerged.push({ ...localRow, _isReadOnly: false });
