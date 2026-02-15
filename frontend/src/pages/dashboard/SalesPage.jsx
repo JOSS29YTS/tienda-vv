@@ -159,10 +159,16 @@ const SalesPage = () => {
     const saveDraftToServer = async () => {
         try {
             const token = localStorage.getItem('token');
-            const validRows = rows.filter(r => r.productId && r.quantity > 0);
+            // CRITICAL: Only save rows that belong to the current user
+            // Rows from other users (fetched via sync) have _userId and _isReadOnly: true
+            const myRowsToSave = rows.filter(r => (!r._userId || r._userId === user.id) && r.productId && r.quantity > 0);
 
-            // Only save if there are valid rows
-            if (validRows.length === 0) return;
+            // Even if no rows, we might want to clear the draft if it's empty
+            // but let's stick to saving only if there's content to avoid unnecessary deletes
+            if (myRowsToSave.length === 0 && rows.length > 0 && !rows[0].productId) return;
+
+            // Remove metadata before saving to keep DB clean
+            const cleanRows = myRowsToSave.map(({ _userId, _userName, _userRole, _isReadOnly, ...rest }) => rest);
 
             await fetch(`${API_URL}/api/sales/draft`, {
                 method: 'POST',
@@ -171,12 +177,12 @@ const SalesPage = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    rows: rows,
+                    rows: cleanRows,
                     rate: parseFloat(rate)
                 })
             });
         } catch (err) {
-            console.error('Error saving draft to server:', err);
+            console.error('Error saving draft:', err);
             // Don't show error to user, this is background sync
         }
     };
@@ -193,42 +199,38 @@ const SalesPage = () => {
 
             // Admin or Manager sees ALL rows from ALL users
             if (user.rol === 'Administrador' || user.rol === 'Gerente') {
-                const allRows = [];
+                const otherUsersRows = [];
+                let myServerRows = [];
+
                 drafts.forEach(draft => {
-                    draft.datos_venta.forEach(row => {
-                        // Filter out empty rows unless they are the user's own last row
-                        if (row.productId && row.quantity > 0) {
-                            allRows.push({
-                                ...row,
-                                _userId: draft.id_usuario,
-                                _userName: `${draft.nombre} ${draft.apellido}`,
-                                _userRole: draft.rol,
-                                _isReadOnly: draft.id_usuario !== user.id
-                            });
-                        }
-                    });
+                    if (draft.id_usuario === user.id) {
+                        myServerRows = draft.datos_venta;
+                    } else {
+                        draft.datos_venta.forEach(row => {
+                            if (row.productId && row.quantity > 0) {
+                                otherUsersRows.push({
+                                    ...row,
+                                    _userId: draft.id_usuario,
+                                    _userName: `${draft.nombre} ${draft.apellido}`,
+                                    _userRole: draft.rol,
+                                    _isReadOnly: true
+                                });
+                            }
+                        });
+                    }
                 });
 
-                // Comparison logic: Only valid rows
-                const currentValidRows = rows.filter(r => r.productId && r.quantity > 0);
-                const currentValidString = JSON.stringify(currentValidRows);
-                const newValidString = JSON.stringify(allRows);
+                // Get current local rows that belong to me
+                const myCurrentRows = rows.filter(r => !r._userId || r._userId === user.id);
+                const currentOthers = rows.filter(r => r._userId && r._userId !== user.id);
 
-                if (currentValidString !== newValidString) {
-                    if (allRows.length > 0) {
-                        // If we had an empty row at the end, keep it so the admin can still type
-                        const hasEmptyRow = rows.some(r => !r.productId);
-                        if (hasEmptyRow && !allRows.some(r => r._userId === user.id && !r.productId)) {
-                            // Keep the empty row if it belongs to current user
-                            const myEmptyRow = rows.find(r => r._userId === user.id && !r.productId) || { id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false };
-                            setRows([...allRows, myEmptyRow]);
-                        } else {
-                            setRows(allRows);
-                        }
-                    } else if (rows.length > 1 || (rows.length === 1 && rows[0].productId)) {
-                        // Reset to one empty row if server has nothing
-                        setRows([{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
-                    }
+                // Check if other users' rows have changed
+                const currentOthersString = JSON.stringify(currentOthers);
+                const newOthersString = JSON.stringify(otherUsersRows);
+
+                if (currentOthersString !== newOthersString) {
+                    // Merged update: Keep my current rows (to avoid overwriting while typing) + new others
+                    setRows([...myCurrentRows, ...otherUsersRows]);
                 }
             } else {
                 // Seller: load only their own draft
