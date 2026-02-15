@@ -71,7 +71,7 @@ const RegisterPage = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${API_URL}/api/auth/register-init', {
+            const response = await fetch(`${API_URL}/api/auth/register-init`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -96,7 +96,7 @@ const RegisterPage = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${API_URL}/api/auth/register-verify', {
+            const response = await fetch(`${API_URL}/api/auth/register-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

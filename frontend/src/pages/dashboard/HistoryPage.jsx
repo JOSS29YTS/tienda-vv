@@ -14,7 +14,7 @@ const HistoryPage = () => {
     const fetchHistory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/history', {
+            const response = await fetch(`${API_URL}/api/history`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();

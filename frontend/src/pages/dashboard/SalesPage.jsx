@@ -158,7 +158,7 @@ const SalesPage = () => {
     const fetchClients = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/clients', {
+            const response = await fetch(`${API_URL}/api/clients`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -371,7 +371,7 @@ const SalesPage = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/sales/close', {
+            const response = await fetch(`${API_URL}/api/sales/close`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

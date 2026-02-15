@@ -73,7 +73,7 @@ const FinancesPage = () => {
         setLoadingAllTransactions(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/transactions?limit=1000', {
+            const res = await fetch(`${API_URL}/api/finances/transactions?limit=1000`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -112,7 +112,7 @@ const FinancesPage = () => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/loans', {
+            const res = await fetch(`${API_URL}/api/finances/loans`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -183,8 +183,8 @@ const FinancesPage = () => {
             const headers = { 'Authorization': `Bearer ${token}` };
 
             const [summaryRes, transactionsRes] = await Promise.all([
-                fetch(`${API_URL}/api/finances/summary', { headers }),
-                fetch(`${API_URL}/api/finances/transactions', { headers })
+                fetch(`${API_URL}/api/finances/summary`, { headers }),
+                fetch(`${API_URL}/api/finances/transactions`, { headers })
             ]);
 
             if (summaryRes.status === 401 || summaryRes.status === 403 || transactionsRes.status === 401 || transactionsRes.status === 403) {
@@ -225,7 +225,7 @@ const FinancesPage = () => {
     const fetchFixedPaymentTypes = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/fixed-payment-types', {
+            const res = await fetch(`${API_URL}/api/finances/fixed-payment-types`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -248,7 +248,7 @@ const FinancesPage = () => {
     const fetchPaymentMethods = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/payment-methods', {
+            const res = await fetch(`${API_URL}/api/finances/payment-methods`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -321,7 +321,7 @@ const FinancesPage = () => {
             // Remove moneda from payload to avoid backend confusion (although backend ignores it, it's cleaner)
             delete payload.moneda;
 
-            const res = await fetch(`${API_URL}/api/finances/fixed-payments', {
+            const res = await fetch(`${API_URL}/api/finances/fixed-payments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -413,7 +413,7 @@ const FinancesPage = () => {
                 fecha_traspaso: localDateString
             };
 
-            const res = await fetch(`${API_URL}/api/finances/transfers', {
+            const res = await fetch(`${API_URL}/api/finances/transfers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

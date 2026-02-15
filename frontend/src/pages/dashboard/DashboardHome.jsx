@@ -59,7 +59,7 @@ const DashboardHome = () => {
         const fetchDashboardData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/api/dashboard/stats', {
+                const response = await fetch(`${API_URL}/api/dashboard/stats`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 

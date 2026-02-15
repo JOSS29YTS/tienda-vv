@@ -123,7 +123,7 @@ const PurchasesPage = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/buy-currency', {
+            const res = await fetch(`${API_URL}/api/finances/buy-currency`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -172,7 +172,7 @@ const PurchasesPage = () => {
     const fetchPaymentMethods = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/payment-methods', {
+            const res = await fetch(`${API_URL}/api/finances/payment-methods`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -190,7 +190,7 @@ const PurchasesPage = () => {
     const fetchProviders = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/suppliers', {
+            const res = await fetch(`${API_URL}/api/suppliers`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -205,7 +205,7 @@ const PurchasesPage = () => {
     const fetchProducts = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/products', {
+            const res = await fetch(`${API_URL}/api/products`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -348,7 +348,7 @@ const PurchasesPage = () => {
                 payments: paymentsList
             };
 
-            const response = await fetch(`${API_URL}/api/purchases', {
+            const response = await fetch(`${API_URL}/api/purchases`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -189,7 +189,7 @@ const ClientsPage = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/clients/pay', {
+            const response = await fetch(`${API_URL}/api/clients/pay`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
