@@ -51,7 +51,7 @@ const SalesPage = () => {
     const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false); // Shared Modal State
     const [targetRowForClient, setTargetRowForClient] = useState(null); // Track which row triggered the modal
     const [scanCode, setScanCode] = useState('');
-    const [isScanning, setIsScanning] = useState(false);
+    const isProcessingScanRef = useRef(false);
 
 
 
@@ -90,11 +90,11 @@ const SalesPage = () => {
 
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (isScanning) return;
-
                 const codeToScan = buffer.trim();
                 if (codeToScan) {
-                    setIsScanning(true);
+                    if (isProcessingScanRef.current) return;
+                    isProcessingScanRef.current = true;
+
                     setScanCode(codeToScan); // Update UI
 
                     // Trigger scan logic directly
@@ -118,7 +118,7 @@ const SalesPage = () => {
                     // Clear buffer and state
                     buffer = '';
                     setScanCode('');
-                    setIsScanning(false);
+                    setTimeout(() => { isProcessingScanRef.current = false; }, 500); // 500ms safety lock
                 }
                 buffer = '';
             } else if (e.key.length === 1) {
@@ -298,7 +298,8 @@ const SalesPage = () => {
             e.preventDefault(); // Stop form submission
             e.stopPropagation(); // Stop event bubbling
 
-            if (isScanning) return;
+            if (isProcessingScanRef.current) return;
+            isProcessingScanRef.current = true;
 
             const codigo = scanCode.trim();
             if (!codigo) return;
@@ -333,7 +334,7 @@ const SalesPage = () => {
                     setError('Producto no encontrado con ese código');
                 }
             } finally {
-                setIsScanning(false);
+                setTimeout(() => { isProcessingScanRef.current = false; }, 500); // 500ms safety lock
             }
         }
     };
