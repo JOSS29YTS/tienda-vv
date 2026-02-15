@@ -13,11 +13,18 @@ exports.verifyToken = async (req, res, next) => {
         const secret = process.env.JWT_SECRET || 'secreto_super_seguro';
         const decoded = jwt.verify(token, secret);
 
-        // Verify that the user still exists in the database
-        const [users] = await pool.query(
-            'SELECT id_usuario, nombre, apellido, email, rol FROM usuario WHERE id_usuario = ?',
-            [decoded.id]
-        );
+        // Verify that the user still exists in the database and get role name
+        const [users] = await pool.query(`
+            SELECT 
+                u.id_usuario, 
+                u.nombre, 
+                u.apellido, 
+                u.email, 
+                r.nb_rol as rol
+            FROM usuario u
+            LEFT JOIN rol r ON u.id_rol = r.id_rol
+            WHERE u.id_usuario = ?
+        `, [decoded.id]);
 
         if (users.length === 0) {
             return res.status(401).json({ message: 'Usuario no encontrado. Por favor, inicia sesión nuevamente.' });
