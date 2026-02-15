@@ -237,11 +237,13 @@ const SalesPage = () => {
             });
 
             // 2. Add local rows that belong to ME but are NOT yet on the server 
-            // (e.g. freshly scanned products during the 5s debounce)
-            const myCurrentRows = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
-            myCurrentRows.forEach(localRow => {
+            // CRITICAL: Only add rows that DON'T have a _userId. 
+            // If they have a _userId, they were already on the server once. 
+            // If they are missing from the server response, they have been DELETED.
+            const myNewUnsyncedRows = rows.filter(r => !r._userId && r.productId && r.quantity > 0);
+            myNewUnsyncedRows.forEach(localRow => {
                 // If it has a product and is not in the server list, keep it
-                if (localRow.productId && !serverAndLocalResults.some(sr => sr.id === localRow.id)) {
+                if (!serverAndLocalResults.some(sr => sr.id === localRow.id)) {
                     serverAndLocalResults.push({
                         ...localRow,
                         _isReadOnly: false
@@ -550,7 +552,7 @@ const SalesPage = () => {
 
             // Success
             setSuccessMessage('¡Venta cerrada exitosamente! Se han guardado los registros.');
-            setRows([{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '' }]);
+            setRows([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
             setSelectedRows([]);
             localStorage.removeItem('bodega_sales_rows');
             setShowConfirmationModal(false);
