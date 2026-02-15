@@ -94,8 +94,7 @@ const DashboardLayout = () => {
                     <span className="text-2xl font-bold text-white font-heading tracking-wide group-hover:text-emerald-400 transition-colors">Venalta</span>
                 </Link>
 
-                <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mb-2 font-heading">Menu Principal</div>
+                <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
                     {navItems.map((item) => (
                         <SidebarItem key={item.to} to={item.to} icon={item.icon} label={item.label} active={isActive(item.to)} />
                     ))}
