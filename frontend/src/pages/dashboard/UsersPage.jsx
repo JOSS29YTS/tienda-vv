@@ -20,7 +20,7 @@ const UsersPage = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/users');
+            const response = await fetch(`${API_URL}/api/users`);
             if (!response.ok) throw new Error('Error al cargar usuarios');
             const data = await response.json();
             setUsers(data);
