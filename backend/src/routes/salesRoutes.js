@@ -5,7 +5,7 @@ const salesController = require('../controllers/salesController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 router.get('/payment-methods', salesController.getPaymentMethods);
-router.post('/close', authMiddleware.verifyToken, salesController.closeSales);
+router.post('/close', authMiddleware.verifyToken, authMiddleware.isAdmin, salesController.closeSales);
 
 // Draft sales endpoints for real-time sync
 router.post('/draft', authMiddleware.verifyToken, salesController.saveDraftSales);

@@ -680,8 +680,8 @@ const SalesPage = () => {
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Ventas</h2>
                     <p className="text-slate-500">Registro diario de ventas tipo hoja de cálculo.</p>
                 </div>
-                {user && (user.rol === 'Administrador' || user.rol === 'Gerente') && (
-                    <div className="flex gap-3">
+                <div className="flex gap-3">
+                    {user && (user.rol === 'Administrador' || user.rol === 'Gerente') && (
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -691,6 +691,8 @@ const SalesPage = () => {
                             <FaFilePdf className="text-xl" />
                             Generar Reporte
                         </motion.button>
+                    )}
+                    {user && user.rol === 'Administrador' && (
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -700,8 +702,8 @@ const SalesPage = () => {
                             <FaCheckCircle className="text-xl" />
                             Cerrar Venta del Día
                         </motion.button>
-                    </div>
-                )}
+                    )}
+                </div>
             </header>
 
             {/* Add Client Modal */}
