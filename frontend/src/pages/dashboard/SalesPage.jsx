@@ -31,7 +31,7 @@ const SalesPage = () => {
         if (savedRows) {
             return JSON.parse(savedRows);
         }
-        return [{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
+        return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
     });
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -197,56 +197,54 @@ const SalesPage = () => {
 
             if (!user) return;
 
-            // Admin or Manager sees ALL rows from ALL users
-            if (user.rol === 'Administrador' || user.rol === 'Gerente') {
-                const otherUsersRows = [];
-                let myServerRows = [];
-
-                drafts.forEach(draft => {
-                    if (draft.id_usuario === user.id) {
-                        myServerRows = draft.datos_venta;
-                    } else {
-                        draft.datos_venta.forEach(row => {
-                            if (row.productId && row.quantity > 0) {
-                                otherUsersRows.push({
-                                    ...row,
-                                    _userId: draft.id_usuario,
-                                    _userName: `${draft.nombre} ${draft.apellido}`,
-                                    _userRole: draft.rol,
-                                    _isReadOnly: true
-                                });
-                            }
+            // Merge ALL rows from ALL users into a single list
+            const allServerRows = [];
+            drafts.forEach(draft => {
+                draft.datos_venta.forEach(row => {
+                    if (row.productId && row.quantity > 0) {
+                        allServerRows.push({
+                            ...row,
+                            _userId: draft.id_usuario,
+                            _userName: `${draft.nombre} ${draft.apellido}`,
+                            _userRole: draft.rol,
+                            _isReadOnly: draft.id_usuario !== user.id
                         });
                     }
                 });
+            });
 
-                // Get current local rows that belong to me
-                const myCurrentRows = rows.filter(r => !r._userId || r._userId === user.id);
-                const currentOthers = rows.filter(r => r._userId && r._userId !== user.id);
+            // Local state management: Combine current un-saved rows + server rows
+            const myCurrentRows = rows.filter(r => (!r._userId || r._userId === user.id));
 
-                // Check if other users' rows have changed
-                const currentOthersString = JSON.stringify(currentOthers);
-                const newOthersString = JSON.stringify(otherUsersRows);
+            // Map to track unique rows by ID
+            const mergedMap = new Map();
 
-                if (currentOthersString !== newOthersString) {
-                    // Merged update: Keep my current rows (to avoid overwriting while typing) + new others
-                    setRows([...myCurrentRows, ...otherUsersRows]);
-                }
+            // Add server rows first (they are the truth for other users)
+            allServerRows.forEach(row => mergedMap.set(row.id, row));
+
+            // Add/Overwrite with my local rows (my current work is my truth)
+            myCurrentRows.forEach(row => mergedMap.set(row.id, row));
+
+            // Convert back to array and sort by ID (which is the creation timestamp)
+            let mergedRows = Array.from(mergedMap.values());
+            mergedRows.sort((a, b) => a.id - b.id);
+
+            // If the list is empty, ensure at least one empty row for the current user
+            if (mergedRows.length === 0) {
+                mergedRows = [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
             } else {
-                // Seller: load only their own draft
-                const myDraft = drafts.find(d => d.id_usuario === user.id);
-                if (myDraft) {
-                    const currentString = JSON.stringify(rows);
-                    const draftString = JSON.stringify(myDraft.datos_venta);
+                // If the last row is not empty and belongs to me, maybe add an empty row? 
+                // Actually, let's just use the merged list. users can click "Agregar Fila" manually.
+            }
 
-                    if (currentString !== draftString) {
-                        setRows(myDraft.datos_venta);
-                    }
-                }
+            const currentString = JSON.stringify(rows);
+            const mergedString = JSON.stringify(mergedRows);
+
+            if (currentString !== mergedString) {
+                setRows(mergedRows);
             }
         } catch (err) {
-            console.error('Error fetching draft sales:', err);
-            // Don't show error, this is background sync
+            console.error('Error fetching drafts:', err);
         }
     };
 
@@ -291,8 +289,7 @@ const SalesPage = () => {
 
     // Row Operations
     const addRow = () => {
-        const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
-        setRows([...rows, { id: newId, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
+        setRows([...rows, { id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
     };
 
     const handleScan = async (e) => {
@@ -306,7 +303,6 @@ const SalesPage = () => {
             const codigo = scanCode.trim();
             if (!codigo) return;
 
-            setIsScanning(true);
             try {
                 const product = products.find(p => p.codigo_de_barra === codigo);
 
@@ -319,8 +315,7 @@ const SalesPage = () => {
                     let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
 
                     if (targetRowIndex === -1) {
-                        const newId = newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1;
-                        newRows.push({ id: newId, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                        newRows.push({ id: Date.now(), productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
                     } else {
                         newRows[targetRowIndex] = {
                             ...newRows[targetRowIndex],
