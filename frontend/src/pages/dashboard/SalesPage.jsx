@@ -284,22 +284,26 @@ const SalesPage = () => {
 
     const handleScan = (e) => {
         if (e.key === 'Enter') {
-            e.preventDefault();
-            if (!scanCode.trim()) return;
+            e.preventDefault(); // Stop form submission
+            e.stopPropagation(); // Stop event bubbling
 
-            const product = products.find(p => p.codigo_de_barra === scanCode.trim());
+            const codigo = scanCode.trim();
+            if (!codigo) return;
+
+            const product = products.find(p => p.codigo_de_barra === codigo);
 
             if (product) {
+                // Clear input immediately to avoid double scan
+                setScanCode('');
+
                 // Find empty row or add new
                 let newRows = [...rows];
                 let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
 
                 if (targetRowIndex === -1) {
-                    // No empty row, add new
                     const newId = newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1;
                     newRows.push({ id: newId, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
                 } else {
-                    // Use empty row
                     newRows[targetRowIndex] = {
                         ...newRows[targetRowIndex],
                         productId: product.id_producto,
@@ -309,10 +313,9 @@ const SalesPage = () => {
                 }
                 setRows(newRows);
                 setSuccessMessage(`Producto agregado: ${product.nombre}`);
-                setScanCode('');
             } else {
-                setError('Producto no encontrado con ese código');
                 setScanCode('');
+                setError('Producto no encontrado con ese código');
             }
         }
     };

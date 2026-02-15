@@ -56,6 +56,7 @@ exports.getDraftSales = async (req, res) => {
             LEFT JOIN rol r ON u.id_rol = r.id_rol
             WHERE DATE(vb.fecha_actualizacion) = ?
             ORDER BY vb.fecha_actualizacion DESC
+            LIMIT 100
         `, [today]);
 
         // Parse JSON data
