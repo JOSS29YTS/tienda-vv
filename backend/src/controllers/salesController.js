@@ -59,10 +59,26 @@ exports.getDraftSales = async (req, res) => {
         `, [today]);
 
         // Parse JSON data
-        const parsedDrafts = drafts.map(draft => ({
-            ...draft,
-            datos_venta: JSON.parse(draft.datos_venta)
-        }));
+        // Parse JSON data robustly
+        const parsedDrafts = drafts.map(draft => {
+            let datosFinales;
+            // Catch both string and object cases
+            if (typeof draft.datos_venta === 'string') {
+                try {
+                    datosFinales = JSON.parse(draft.datos_venta);
+                } catch (e) {
+                    console.error('Error parsing datos_venta:', e);
+                    datosFinales = [];
+                }
+            } else {
+                datosFinales = draft.datos_venta;
+            }
+
+            return {
+                ...draft,
+                datos_venta: datosFinales
+            };
+        });
 
         res.json(parsedDrafts);
     } catch (error) {
