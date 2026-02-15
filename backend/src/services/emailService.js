@@ -3,17 +3,18 @@ require('dotenv').config();
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, 
+    port: 587, // Cambiaremos al puerto 587 para probar una ruta diferente
+    secure: false, // Debe ser false para el puerto 587
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    // ⚡ ESTA ES LA PARTE CLAVE PARA QUITAR EL ERROR ENETUNREACH
-    connectionTimeout: 10000, // 10 segundos de espera
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-    dnsFallback: true // Ayuda si la red de Railway tiene problemas de DNS
+    // ⚡ ESTA PARTE ES VITAL PARA EVITAR EL "ENETUNREACH"
+    service: 'gmail', // Al poner esto, Nodemailer configura automáticamente los mejores ajustes para Gmail
+    tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+    }
 });
 
 exports.sendVerificationCode = async (code) => {
