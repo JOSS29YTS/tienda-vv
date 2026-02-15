@@ -225,9 +225,20 @@ const SalesPage = () => {
             // Add/Overwrite with my local rows (my current work is my truth)
             myCurrentRows.forEach(row => mergedMap.set(row.id, row));
 
-            // Convert back to array and sort by ID (which is the creation timestamp)
+            // Convert back to array and sort:
+            // 1. Products always first (sorted by creation time/ID)
+            // 2. Empty or scratchpad rows at the bottom
             let mergedRows = Array.from(mergedMap.values());
-            mergedRows.sort((a, b) => a.id - b.id);
+            mergedRows.sort((a, b) => {
+                const aHasProduct = a.productId && a.quantity > 0;
+                const bHasProduct = b.productId && b.quantity > 0;
+
+                if (aHasProduct && !bHasProduct) return -1;
+                if (!aHasProduct && bHasProduct) return 1;
+
+                // Both are same type (both products or both empty), sort by ID
+                return a.id - b.id;
+            });
 
             // If the list is empty, ensure at least one empty row for the current user
             if (mergedRows.length === 0) {
