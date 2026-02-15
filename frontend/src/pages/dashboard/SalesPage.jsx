@@ -180,33 +180,42 @@ const SalesPage = () => {
 
             if (!user) return;
 
-            if (user.rol === 'Administrador') {
-                // Admin sees ALL rows from ALL users
+            // Admin or Manager sees ALL rows from ALL users
+            if (user.rol === 'Administrador' || user.rol === 'Gerente') {
                 const allRows = [];
                 drafts.forEach(draft => {
                     draft.datos_venta.forEach(row => {
-                        // Filter out empty rows
+                        // Filter out empty rows unless they are the user's own last row
                         if (row.productId && row.quantity > 0) {
                             allRows.push({
                                 ...row,
                                 _userId: draft.id_usuario,
                                 _userName: `${draft.nombre} ${draft.apellido}`,
                                 _userRole: draft.rol,
-                                _isReadOnly: draft.id_usuario !== user.id // Can't edit other users' rows
+                                _isReadOnly: draft.id_usuario !== user.id
                             });
                         }
                     });
                 });
 
-                // Only update if content is different (prevents overwriting while typing)
-                const currentRowsString = JSON.stringify(rows.filter(r => r.productId && r.quantity > 0));
-                const newRowsString = JSON.stringify(allRows);
+                // Comparison logic: Only valid rows
+                const currentValidRows = rows.filter(r => r.productId && r.quantity > 0);
+                const currentValidString = JSON.stringify(currentValidRows);
+                const newValidString = JSON.stringify(allRows);
 
-                if (currentRowsString !== newRowsString) {
+                if (currentValidString !== newValidString) {
                     if (allRows.length > 0) {
-                        setRows(allRows);
-                    } else {
-                        // No drafts, reset to empty
+                        // If we had an empty row at the end, keep it so the admin can still type
+                        const hasEmptyRow = rows.some(r => !r.productId);
+                        if (hasEmptyRow && !allRows.some(r => r._userId === user.id && !r.productId)) {
+                            // Keep the empty row if it belongs to current user
+                            const myEmptyRow = rows.find(r => r._userId === user.id && !r.productId) || { id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', isNewClient: false };
+                            setRows([...allRows, myEmptyRow]);
+                        } else {
+                            setRows(allRows);
+                        }
+                    } else if (rows.length > 1 || (rows.length === 1 && rows[0].productId)) {
+                        // Reset to one empty row if server has nothing
                         setRows([{ id: 1, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
                     }
                 }
@@ -671,7 +680,7 @@ const SalesPage = () => {
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Ventas</h2>
                     <p className="text-slate-500">Registro diario de ventas tipo hoja de cálculo.</p>
                 </div>
-                {user && user.rol === 'Administrador' && (
+                {user && (user.rol === 'Administrador' || user.rol === 'Gerente') && (
                     <div className="flex gap-3">
                         <motion.button
                             whileHover={{ scale: 1.05 }}
