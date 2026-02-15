@@ -51,6 +51,7 @@ const SalesPage = () => {
     const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false); // Shared Modal State
     const [targetRowForClient, setTargetRowForClient] = useState(null); // Track which row triggered the modal
     const [scanCode, setScanCode] = useState('');
+    const [isScanning, setIsScanning] = useState(false);
 
 
 
@@ -89,10 +90,15 @@ const SalesPage = () => {
 
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (buffer.trim()) {
-                    setScanCode(buffer.trim()); // Update UI
+                if (isScanning) return;
+
+                const codeToScan = buffer.trim();
+                if (codeToScan) {
+                    setIsScanning(true);
+                    setScanCode(codeToScan); // Update UI
+
                     // Trigger scan logic directly
-                    const product = products.find(p => p.codigo_de_barra === buffer.trim());
+                    const product = products.find(p => p.codigo_de_barra === codeToScan);
                     if (product) {
                         setRows(prevRows => {
                             let newRows = [...prevRows];
@@ -108,8 +114,13 @@ const SalesPage = () => {
                     } else {
                         setError('Producto no encontrado');
                     }
+
+                    // Clear buffer and state
                     buffer = '';
+                    setScanCode('');
+                    setIsScanning(false);
                 }
+                buffer = '';
             } else if (e.key.length === 1) {
                 buffer += e.key;
             }
@@ -282,40 +293,47 @@ const SalesPage = () => {
         setRows([...rows, { id: newId, productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
     };
 
-    const handleScan = (e) => {
+    const handleScan = async (e) => {
         if (e.key === 'Enter') {
             e.preventDefault(); // Stop form submission
             e.stopPropagation(); // Stop event bubbling
 
+            if (isScanning) return;
+
             const codigo = scanCode.trim();
             if (!codigo) return;
 
-            const product = products.find(p => p.codigo_de_barra === codigo);
+            setIsScanning(true);
+            try {
+                const product = products.find(p => p.codigo_de_barra === codigo);
 
-            if (product) {
-                // Clear input immediately to avoid double scan
-                setScanCode('');
+                if (product) {
+                    // Clear input immediately to avoid double scan
+                    setScanCode('');
 
-                // Find empty row or add new
-                let newRows = [...rows];
-                let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
+                    // Find empty row or add new
+                    let newRows = [...rows];
+                    let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
 
-                if (targetRowIndex === -1) {
-                    const newId = newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1;
-                    newRows.push({ id: newId, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                    if (targetRowIndex === -1) {
+                        const newId = newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1;
+                        newRows.push({ id: newId, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                    } else {
+                        newRows[targetRowIndex] = {
+                            ...newRows[targetRowIndex],
+                            productId: product.id_producto,
+                            quantity: 1,
+                            unitPrice: parseFloat(product.precio)
+                        };
+                    }
+                    setRows(newRows);
+                    setSuccessMessage(`Producto agregado: ${product.nombre}`);
                 } else {
-                    newRows[targetRowIndex] = {
-                        ...newRows[targetRowIndex],
-                        productId: product.id_producto,
-                        quantity: 1,
-                        unitPrice: parseFloat(product.precio)
-                    };
+                    setScanCode('');
+                    setError('Producto no encontrado con ese código');
                 }
-                setRows(newRows);
-                setSuccessMessage(`Producto agregado: ${product.nombre}`);
-            } else {
-                setScanCode('');
-                setError('Producto no encontrado con ese código');
+            } finally {
+                setIsScanning(false);
             }
         }
     };
