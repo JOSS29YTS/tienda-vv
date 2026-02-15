@@ -163,9 +163,10 @@ const SalesPage = () => {
             // Rows from other users (fetched via sync) have _userId and _isReadOnly: true
             const myRowsToSave = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)) && r.productId && r.quantity > 0);
 
-            // Even if no rows, we might want to clear the draft if it's empty
-            // but let's stick to saving only if there's content to avoid unnecessary deletes
-            if (myRowsToSave.length === 0 && rows.length > 0 && !rows[0].productId) return;
+            // If I have no rows locally, but I previously had some (or just want to be sure), 
+            // we SHOULD send the empty list to the server to clear it.
+            // But we don't want to spam empty saves if the server is already empty.
+            // For now, let's just remove the early return to allow synchronization of the "Empty" state.
 
             // Remove metadata before saving to keep DB clean
             const cleanRows = myRowsToSave.map(({ _userId, _userName, _userRole, _isReadOnly, ...rest }) => rest);
@@ -213,32 +214,53 @@ const SalesPage = () => {
                 });
             });
 
-            // Local state management: Combine current un-saved rows + server rows
+            // Source of Truth: The Server
+            const serverAndLocalResults = [];
+            const serverUserIds = new Set();
+
+            // 1. Use everything from the server
+            drafts.forEach(draft => {
+                const isMe = String(draft.id_usuario) === String(user.id);
+                serverUserIds.add(String(draft.id_usuario));
+
+                draft.datos_venta.forEach(row => {
+                    if (row.productId && row.quantity > 0) {
+                        serverAndLocalResults.push({
+                            ...row,
+                            _userId: draft.id_usuario,
+                            _userName: `${draft.nombre} ${draft.apellido}`,
+                            _userRole: draft.rol,
+                            _isReadOnly: !isMe
+                        });
+                    }
+                });
+            });
+
+            // 2. Add local rows that belong to ME but are NOT yet on the server 
+            // (e.g. freshly scanned products during the 5s debounce)
             const myCurrentRows = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
+            myCurrentRows.forEach(localRow => {
+                // If it has a product and is not in the server list, keep it
+                if (localRow.productId && !serverAndLocalResults.some(sr => sr.id === localRow.id)) {
+                    serverAndLocalResults.push({
+                        ...localRow,
+                        _isReadOnly: false
+                    });
+                }
+            });
 
-            // Map to track unique rows by ID
-            const mergedMap = new Map();
-
-            // Add server rows first (they are the truth for other users)
-            allServerRows.forEach(row => mergedMap.set(row.id, row));
-
-            // Add/Overwrite with my local rows (my current work is my truth)
-            myCurrentRows.forEach(row => mergedMap.set(row.id, row));
-
-            // Convert back to array and sort:
-            // 1. Products always first (sorted by creation time/ID)
-            // 2. Empty or scratchpad rows at the bottom
-            let mergedRows = Array.from(mergedMap.values());
-            mergedRows.sort((a, b) => {
+            // 3. Sort correctly: Products first, ordered by creation time
+            serverAndLocalResults.sort((a, b) => {
                 const aHasProduct = a.productId && a.quantity > 0;
                 const bHasProduct = b.productId && b.quantity > 0;
 
                 if (aHasProduct && !bHasProduct) return -1;
                 if (!aHasProduct && bHasProduct) return 1;
 
-                // Both are same type (both products or both empty), sort by ID
                 return a.id - b.id;
             });
+
+            let mergedRows = serverAndLocalResults;
 
             // If the list is empty, ensure at least one empty row for the current user
             if (mergedRows.length === 0) {
