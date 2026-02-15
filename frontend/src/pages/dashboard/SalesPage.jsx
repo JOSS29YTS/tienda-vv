@@ -132,7 +132,7 @@ const SalesPage = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/products');
+            const response = await fetch(`${API_URL}/api/products`);
             const data = await response.json();
             // Filter only active products
             const activeProducts = data.filter(p => p.estado === 'activo');
@@ -146,7 +146,7 @@ const SalesPage = () => {
 
     const fetchPaymentMethods = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/sales/payment-methods');
+            const response = await fetch(`${API_URL}/api/sales/payment-methods`);
             const data = await response.json();
             setPaymentMethods(data);
         } catch (err) {
