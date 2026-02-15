@@ -125,10 +125,10 @@ const SalesPage = () => {
         fetchClients();
         fetchDraftSales(); // Load initial drafts
 
-        // Poll for updates every 3 seconds
+        // Poll for updates every 15 seconds to avoid saturation
         const interval = setInterval(() => {
             fetchDraftSales();
-        }, 3000);
+        }, 15000);
 
         return () => clearInterval(interval);
     }, []);
@@ -140,7 +140,7 @@ const SalesPage = () => {
         // Debounce server save to avoid too many requests
         const timeoutId = setTimeout(() => {
             saveDraftToServer();
-        }, 1000); // Wait 1 second after last change
+        }, 5000); // Wait 5 seconds after last change to allow for multiple scans
 
         return () => clearTimeout(timeoutId);
     }, [rows, rate]);
