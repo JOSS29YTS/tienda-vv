@@ -204,99 +204,75 @@ const SalesPage = () => {
 
             if (!user) return;
 
-            // Merge ALL rows from ALL users into a single list
-            const allServerRows = [];
-            drafts.forEach(draft => {
-                draft.datos_venta.forEach(row => {
-                    if (row.productId && row.quantity > 0) {
-                        allServerRows.push({
-                            ...row,
-                            _userId: draft.id_usuario,
-                            _userName: `${draft.nombre} ${draft.apellido}`,
-                            _userRole: draft.rol,
-                            _isReadOnly: String(draft.id_usuario) !== String(user.id)
-                        });
-                    }
+            // Merge logic inside setRows to ensure we use the LATEST state (prevRows)
+            setRows(prevRows => {
+                const serverResults = [];
+
+                // 1. Process all drafts from the server
+                drafts.forEach(draft => {
+                    const isMe = String(draft.id_usuario) === String(user.id);
+                    draft.datos_venta.forEach(row => {
+                        if (row.productId && row.quantity > 0) {
+                            serverResults.push({
+                                ...row,
+                                _userId: draft.id_usuario,
+                                _userName: `${draft.nombre} ${draft.apellido}`,
+                                _userRole: draft.rol,
+                                _isReadOnly: !isMe
+                            });
+                        }
+                    });
                 });
+
+                // 2. Resolve conflict with MY current local rows
+                const isWithinLockWindow = (Date.now() - lastInteractionRef.current) < 7000;
+                const finalMerged = [...serverResults];
+
+                // Get local rows that are "mine" (no userId or is my id)
+                const myLocalRows = prevRows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
+
+                if (isWithinLockWindow) {
+                    // TRUST local state during the interaction window
+                    myLocalRows.forEach(localRow => {
+                        const idx = finalMerged.findIndex(sr => sr.id === localRow.id);
+                        if (idx !== -1) {
+                            finalMerged[idx] = { ...localRow, _isReadOnly: false };
+                        } else {
+                            finalMerged.push({ ...localRow, _isReadOnly: false });
+                        }
+                    });
+                } else {
+                    // Window expired: only keep truly NEW un-synced local rows 
+                    // (those that have a product but never made it to the server)
+                    const myNewLocalRows = myLocalRows.filter(r => !r._userId && r.productId && r.quantity > 0);
+                    myNewLocalRows.forEach(localRow => {
+                        if (!finalMerged.some(sr => sr.id === localRow.id)) {
+                            finalMerged.push({ ...localRow, _isReadOnly: false });
+                        }
+                    });
+                }
+
+                // 3. Sort correctly: Products first, by ID
+                finalMerged.sort((a, b) => {
+                    const aHasP = a.productId && a.quantity > 0;
+                    const bHasP = b.productId && b.quantity > 0;
+                    if (aHasP && !bHasP) return -1;
+                    if (!aHasP && bHasP) return 1;
+                    return a.id - b.id;
+                });
+
+                // 4. Fallback if empty
+                if (finalMerged.length === 0) {
+                    return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
+                }
+
+                // Optimization: Only update if strings actually changed
+                if (JSON.stringify(prevRows) === JSON.stringify(finalMerged)) {
+                    return prevRows;
+                }
+
+                return finalMerged;
             });
-
-            // Source of Truth: The Server
-            const serverAndLocalResults = [];
-            const serverUserIds = new Set();
-
-            // 1. Use everything from the server
-            drafts.forEach(draft => {
-                const isMe = String(draft.id_usuario) === String(user.id);
-                serverUserIds.add(String(draft.id_usuario));
-
-                draft.datos_venta.forEach(row => {
-                    if (row.productId && row.quantity > 0) {
-                        serverAndLocalResults.push({
-                            ...row,
-                            _userId: draft.id_usuario,
-                            _userName: `${draft.nombre} ${draft.apellido}`,
-                            _userRole: draft.rol,
-                            _isReadOnly: !isMe
-                        });
-                    }
-                });
-            });
-
-            // 2. Resolve conflict for MY rows: Local vs Server
-            // If the user has recently interacted with the UI, we trust the local state
-            // to avoid race conditions where the server overwrites unsaved changes.
-            const isWithinLockWindow = (Date.now() - lastInteractionRef.current) < 7000; // 7s lockout
-
-            if (isWithinLockWindow) {
-                // Trust local state for my rows
-                const myCurrentRows = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
-                myCurrentRows.forEach(localRow => {
-                    // Overwrite/Add local versions of my rows
-                    const existingIndex = serverAndLocalResults.findIndex(sr => sr.id === localRow.id);
-                    if (existingIndex !== -1) {
-                        serverAndLocalResults[existingIndex] = { ...localRow, _isReadOnly: false };
-                    } else {
-                        serverAndLocalResults.push({ ...localRow, _isReadOnly: false });
-                    }
-                });
-            } else {
-                // Window expired: Trust the server state for existing rows,
-                // but still keep truly NEW rows (those with no _userId) that haven't been saved yet.
-                const myNewUnsyncedRows = rows.filter(r => !r._userId && r.productId && r.quantity > 0);
-                myNewUnsyncedRows.forEach(localRow => {
-                    if (!serverAndLocalResults.some(sr => sr.id === localRow.id)) {
-                        serverAndLocalResults.push({ ...localRow, _isReadOnly: false });
-                    }
-                });
-            }
-
-            // 3. Sort correctly: Products first, ordered by creation time
-            serverAndLocalResults.sort((a, b) => {
-                const aHasProduct = a.productId && a.quantity > 0;
-                const bHasProduct = b.productId && b.quantity > 0;
-
-                if (aHasProduct && !bHasProduct) return -1;
-                if (!aHasProduct && bHasProduct) return 1;
-
-                return a.id - b.id;
-            });
-
-            let mergedRows = serverAndLocalResults;
-
-            // If the list is empty, ensure at least one empty row for the current user
-            if (mergedRows.length === 0) {
-                mergedRows = [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
-            } else {
-                // If the last row is not empty and belongs to me, maybe add an empty row? 
-                // Actually, let's just use the merged list. users can click "Agregar Fila" manually.
-            }
-
-            const currentString = JSON.stringify(rows);
-            const mergedString = JSON.stringify(mergedRows);
-
-            if (currentString !== mergedString) {
-                setRows(mergedRows);
-            }
         } catch (err) {
             console.error('Error fetching drafts:', err);
         }
