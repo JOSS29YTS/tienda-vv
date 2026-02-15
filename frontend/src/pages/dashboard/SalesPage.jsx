@@ -161,7 +161,7 @@ const SalesPage = () => {
             const token = localStorage.getItem('token');
             // CRITICAL: Only save rows that belong to the current user
             // Rows from other users (fetched via sync) have _userId and _isReadOnly: true
-            const myRowsToSave = rows.filter(r => (!r._userId || r._userId === user.id) && r.productId && r.quantity > 0);
+            const myRowsToSave = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)) && r.productId && r.quantity > 0);
 
             // Even if no rows, we might want to clear the draft if it's empty
             // but let's stick to saving only if there's content to avoid unnecessary deletes
@@ -207,14 +207,14 @@ const SalesPage = () => {
                             _userId: draft.id_usuario,
                             _userName: `${draft.nombre} ${draft.apellido}`,
                             _userRole: draft.rol,
-                            _isReadOnly: draft.id_usuario !== user.id
+                            _isReadOnly: String(draft.id_usuario) !== String(user.id)
                         });
                     }
                 });
             });
 
             // Local state management: Combine current un-saved rows + server rows
-            const myCurrentRows = rows.filter(r => (!r._userId || r._userId === user.id));
+            const myCurrentRows = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
 
             // Map to track unique rows by ID
             const mergedMap = new Map();
