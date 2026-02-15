@@ -163,7 +163,7 @@ const ForgotPasswordPage = () => {
                             >
                                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl mb-4">
                                     <p className="text-emerald-100/80 text-xs">
-                                        Hemos enviado el código a <strong>{email}</strong>
+                                        Hemos enviado el código a <strong>venaltadm@gmail.com</strong>
                                     </p>
                                 </div>
 
