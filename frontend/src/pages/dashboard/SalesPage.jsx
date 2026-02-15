@@ -52,6 +52,11 @@ const SalesPage = () => {
     const [targetRowForClient, setTargetRowForClient] = useState(null); // Track which row triggered the modal
     const [scanCode, setScanCode] = useState('');
     const isProcessingScanRef = useRef(false);
+    const lastInteractionRef = useRef(0);
+
+    const touchInteraction = () => {
+        lastInteractionRef.current = Date.now();
+    };
 
 
 
@@ -104,7 +109,7 @@ const SalesPage = () => {
                             let newRows = [...prevRows];
                             let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
                             if (targetRowIndex === -1) {
-                                newRows.push({ id: newRows.length > 0 ? Math.max(...newRows.map(r => r.id)) + 1 : 1, productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                                newRows.push({ id: Date.now(), productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
                             } else {
                                 newRows[targetRowIndex] = { ...newRows[targetRowIndex], productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio) };
                             }
@@ -114,6 +119,7 @@ const SalesPage = () => {
                     } else {
                         setError('Producto no encontrado');
                     }
+                    touchInteraction();
 
                     // Clear buffer and state
                     buffer = '';
@@ -236,20 +242,33 @@ const SalesPage = () => {
                 });
             });
 
-            // 2. Add local rows that belong to ME but are NOT yet on the server 
-            // CRITICAL: Only add rows that DON'T have a _userId. 
-            // If they have a _userId, they were already on the server once. 
-            // If they are missing from the server response, they have been DELETED.
-            const myNewUnsyncedRows = rows.filter(r => !r._userId && r.productId && r.quantity > 0);
-            myNewUnsyncedRows.forEach(localRow => {
-                // If it has a product and is not in the server list, keep it
-                if (!serverAndLocalResults.some(sr => sr.id === localRow.id)) {
-                    serverAndLocalResults.push({
-                        ...localRow,
-                        _isReadOnly: false
-                    });
-                }
-            });
+            // 2. Resolve conflict for MY rows: Local vs Server
+            // If the user has recently interacted with the UI, we trust the local state
+            // to avoid race conditions where the server overwrites unsaved changes.
+            const isWithinLockWindow = (Date.now() - lastInteractionRef.current) < 7000; // 7s lockout
+
+            if (isWithinLockWindow) {
+                // Trust local state for my rows
+                const myCurrentRows = rows.filter(r => (!r._userId || String(r._userId) === String(user.id)));
+                myCurrentRows.forEach(localRow => {
+                    // Overwrite/Add local versions of my rows
+                    const existingIndex = serverAndLocalResults.findIndex(sr => sr.id === localRow.id);
+                    if (existingIndex !== -1) {
+                        serverAndLocalResults[existingIndex] = { ...localRow, _isReadOnly: false };
+                    } else {
+                        serverAndLocalResults.push({ ...localRow, _isReadOnly: false });
+                    }
+                });
+            } else {
+                // Window expired: Trust the server state for existing rows,
+                // but still keep truly NEW rows (those with no _userId) that haven't been saved yet.
+                const myNewUnsyncedRows = rows.filter(r => !r._userId && r.productId && r.quantity > 0);
+                myNewUnsyncedRows.forEach(localRow => {
+                    if (!serverAndLocalResults.some(sr => sr.id === localRow.id)) {
+                        serverAndLocalResults.push({ ...localRow, _isReadOnly: false });
+                    }
+                });
+            }
 
             // 3. Sort correctly: Products first, ordered by creation time
             serverAndLocalResults.sort((a, b) => {
@@ -324,6 +343,7 @@ const SalesPage = () => {
 
     // Row Operations
     const addRow = () => {
+        touchInteraction();
         setRows([...rows, { id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
     };
 
@@ -360,6 +380,7 @@ const SalesPage = () => {
                         };
                     }
                     setRows(newRows);
+                    touchInteraction();
                     setSuccessMessage(`Producto agregado: ${product.nombre}`);
                 } else {
                     setScanCode('');
@@ -373,6 +394,7 @@ const SalesPage = () => {
 
     const removeRow = (id) => {
         if (rows.length === 1) return; // Keep at least one row
+        touchInteraction();
         setRows(rows.filter(r => r.id !== id));
         setSelectedRows(selectedRows.filter(rowId => rowId !== id));
     };
@@ -424,6 +446,7 @@ const SalesPage = () => {
             }
             return row;
         }));
+        touchInteraction();
     };
 
     const viewMixedDetails = (row) => {
