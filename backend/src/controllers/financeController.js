@@ -519,16 +519,19 @@ exports.createFixedPayment = async (req, res) => {
             return res.status(400).json({ message: check.message });
         }
 
-        // Handle date: ensure it's a valid JS Date object first
-        let dateObj = new Date();
+        // Format Date Logic (Aligned with buyCurrency)
+        let dateObj = new Date(); // Server Time (UTC)
         if (fecha) {
-            dateObj = new Date(fecha);
-            if (isNaN(dateObj.getTime())) {
-                dateObj = new Date(); // Fallback to now if invalid
+            // Take YYYY-MM-DD from input, ignoring time sent by frontend
+            const datePart = fecha.split(' ')[0];
+            const [y, m, d] = datePart.split('-').map(Number);
+            if (y && m && d) {
+                dateObj.setFullYear(y);
+                dateObj.setMonth(m - 1);
+                dateObj.setDate(d);
             }
         }
 
-        // Format for MySQL: YYYY-MM-DD HH:mm:ss (Using Local Time)
         const formattedDate = dateObj.getFullYear() + "-" +
             ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
             ("0" + dateObj.getDate()).slice(-2) + " " +
@@ -574,11 +577,17 @@ exports.createTraspaso = async (req, res) => {
             return res.status(400).json({ message: check.message });
         }
 
-        // Date handling
-        let dateObj = new Date();
+        // Date handling (Aligned with buyCurrency)
+        let dateObj = new Date(); // Server Time (UTC)
         if (fecha_traspaso) {
-            dateObj = new Date(fecha_traspaso);
-            if (isNaN(dateObj.getTime())) dateObj = new Date();
+            // Take YYYY-MM-DD from input
+            const datePart = fecha_traspaso.split(' ')[0];
+            const [y, m, d] = datePart.split('-').map(Number);
+            if (y && m && d) {
+                dateObj.setFullYear(y);
+                dateObj.setMonth(m - 1);
+                dateObj.setDate(d);
+            }
         }
 
         const formattedDate = dateObj.getFullYear() + "-" +
@@ -618,12 +627,16 @@ exports.createLoan = async (req, res) => {
             return res.status(400).json({ message: 'Datos numéricos inválidos' });
         }
 
-        // Format Date for MySQL
-        let dateObj = new Date();
+        // Format Date for MySQL (Aligned with buyCurrency)
+        let dateObj = new Date(); // Server Time (UTC)
         if (date) {
-            const parsedDate = new Date(date);
-            if (!isNaN(parsedDate.getTime())) {
-                dateObj = parsedDate;
+            // Take YYYY-MM-DD (createLoan usually receives ISO date or similar, handle both)
+            const datePart = date.includes('T') ? date.split('T')[0] : date.split(' ')[0];
+            const [y, m, d] = datePart.split('-').map(Number);
+            if (y && m && d) {
+                dateObj.setFullYear(y);
+                dateObj.setMonth(m - 1);
+                dateObj.setDate(d);
             }
         }
 
