@@ -1141,7 +1141,7 @@ const FinancesPage = () => {
                                         required
                                     >
                                         <option value="">Seleccione cuenta...</option>
-                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS', 'BIOPAGO'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
+                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
                                             <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
                                                 {method.nb_metodo_pago}
                                             </option>
