@@ -96,8 +96,10 @@ const PurchasesPage = () => {
                             return newRows;
                         });
                         setSuccess(`Producto agregado: ${product.nombre}`);
+                        setTimeout(() => setSuccess(''), 3000);
                     } else {
                         setError('Producto no encontrado con ese código');
+                        setTimeout(() => setError(''), 3000);
                     }
                     buffer = '';
                 }
@@ -548,13 +550,16 @@ const PurchasesPage = () => {
                     return [...validPrev, ...newRows];
                 });
                 setSuccess(`Se identificaron ${newRows.length} productos.`);
+                setTimeout(() => setSuccess(''), 3000);
             } else {
                 setError('No se encontraron coincidencias suficientes. Intente tomar una foto más clara o verifique los nombres.');
+                setTimeout(() => setError(''), 5000);
             }
 
         } catch (err) {
             console.error(err);
             setError('Error al procesar la imagen.');
+            setTimeout(() => setError(''), 5000);
         } finally {
             setIsProcessingImage(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
