@@ -116,6 +116,7 @@ const SalesPage = () => {
                         setSuccessMessage(`Producto agregado: ${product.nombre}`);
                     } else {
                         setError('Producto no encontrado');
+                        // console.log('Producto no encontrado');
                     }
                     touchInteraction();
 
@@ -358,6 +359,7 @@ const SalesPage = () => {
                 } else {
                     setScanCode('');
                     setError('Producto no encontrado con ese código');
+                    // console.log('Producto no encontrado con ese código');
                 }
             } finally {
                 setTimeout(() => { isProcessingScanRef.current = false; }, 500); // 500ms safety lock
@@ -1458,6 +1460,15 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
     const [invoiceClientPhone, setInvoiceClientPhone] = useState('');
     const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
     const [items, setItems] = useState([]);
+    const [error, setError] = useState(null); // Local error state for modal
+
+    // Auto-clear error
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
 
     // Item Input State
     const [selectedProductId, setSelectedProductId] = useState('');
@@ -1537,7 +1548,7 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
             });
             setScanCode('');
         } else {
-            alert('Producto no encontrado');
+            setError('Producto no encontrado');
             setScanCode('');
         }
     };
@@ -1674,8 +1685,22 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] min-h-[500px]"
+                className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] min-h-[500px] relative"
             >
+                {/* Modal Error Notification */}
+                <AnimatePresence>
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-2 rounded-full shadow-lg z-[50] flex items-center gap-2 font-bold text-sm"
+                        >
+                            <FaExclamationCircle />
+                            <span>{error}</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <div className="bg-[#0f172a] p-6 text-white flex justify-between items-center shrink-0">
                     <div>
                         <h3 className="text-xl font-bold flex items-center gap-2">
