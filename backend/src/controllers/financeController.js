@@ -75,7 +75,10 @@ exports.getFinanceSummary = async (req, res) => {
 
         // 4. Accounts Receivable (Corrected Logic)
         // Calculate distinct pending amount from registered Debts
-        // (Cost of Items in Debt - All Payments made against those items)
+        // (Cost of Items in Debt - Real Payments made against those items)
+        // ALIGNED WITH CLIENT PAGE LOGIC:
+        // 1. Join cliente table to ensure client exists.
+        // 2. Exclude 'PENDIENTE POR COBRAR' payments (though they shouldn't reduce debt balance visually if treated as 0 value payment, sticking to consistent logic).
         const [receivablesResult] = await pool.query(`
             SELECT 
                 COALESCE(SUM(
@@ -84,11 +87,14 @@ exports.getFinanceSummary = async (req, res) => {
                         SELECT COALESCE(SUM(dp.monto), 0)
                         FROM pago p
                         JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                        JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
                         WHERE p.id_detalle_venta = dv.id_detalle_venta
+                        AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
                     )
                 ), 0) as total_pending
             FROM deuda d
             JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
+            JOIN cliente c ON dv.id_cliente = c.id_cliente
         `);
 
         const currentReceivables = parseFloat(receivablesResult[0].total_pending);
