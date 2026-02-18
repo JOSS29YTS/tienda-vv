@@ -298,7 +298,7 @@ exports.closeSales = async (req, res) => {
                         }
 
                         // Only insert into detalle_pago if it's a REAL payment (not Pending/Debt marker)
-                        if (subMethodId && pay.method !== 'PENDIENTE POR COBRAR') {
+                        if (subMethodId && pay.method.toUpperCase() !== 'PENDIENTE POR COBRAR') {
                             await connection.query(
                                 'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
                                 [pagoId, subMethodId, amountToStore]
@@ -306,7 +306,7 @@ exports.closeSales = async (req, res) => {
                         }
 
                         // Only count as "Paid" if it's NOT a debt registration (Pending)
-                        if (pay.method !== 'PENDIENTE POR COBRAR') {
+                        if (pay.method.toUpperCase() !== 'PENDIENTE POR COBRAR') {
                             totalPaidUSD += amountToStore;
                         }
                     }
@@ -320,7 +320,7 @@ exports.closeSales = async (req, res) => {
                 const pagoId = pagoResult.insertId;
 
                 // Only insert if NOT Pending
-                if (row.paymentMethod !== 'PENDIENTE POR COBRAR') {
+                if (row.paymentMethod.toUpperCase() !== 'PENDIENTE POR COBRAR') {
                     await connection.query(
                         'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
                         [pagoId, paymentMethodId, totalSaleUSD]
