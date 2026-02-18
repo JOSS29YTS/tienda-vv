@@ -1022,6 +1022,15 @@ const PurchasesPage = () => {
                                                         {isUsd ? '$' : 'Bs'}
                                                     </span>
                                                 </div>
+                                                {/* Equivalent Display */}
+                                                <div className="text-right mt-1">
+                                                    <span className="text-xs font-bold text-slate-400">
+                                                        {isUsd
+                                                            ? `Bs ${(parseFloat(p.amount || 0) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                            : `$ ${(parseFloat(p.amount || 0) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                        }
+                                                    </span>
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => removePaymentRow(idx)}
