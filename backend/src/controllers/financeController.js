@@ -77,30 +77,25 @@ exports.getFinanceSummary = async (req, res) => {
         // We calculate the net debt PER CLIENT (Sale - Real Payment), 
         // and only sum positive balances (Receivables).
         const [receivablesResult] = await pool.query(`
-            SELECT SUM(client_balance) as total_pending
+            SELECT SUM(client_debt) as total_pending
             FROM (
-                SELECT 
+                SELECT SUM(
+                    (dv.cantidad * dv.precio_unitario) - 
                     (
-                        SUM(dv.cantidad * dv.precio_unitario) - 
-                        (
-                            SELECT COALESCE(SUM(dp.monto), 0)
-                            FROM pago p
-                            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
-                            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                            WHERE p.id_detalle_venta = dv.id_detalle_venta
-                            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
-                        )
-                    ) as client_balance
-                FROM cliente c
-                JOIN detalle_venta dv ON c.id_cliente = dv.id_cliente
-                WHERE c.id_cliente IN (
-                    SELECT DISTINCT dv2.id_cliente 
-                    FROM detalle_venta dv2 
-                    JOIN deuda d ON dv2.id_detalle_venta = d.id_detalle_venta
-                )
+                        SELECT COALESCE(SUM(dp.monto), 0)
+                        FROM pago p
+                        JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                        JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                        WHERE p.id_detalle_venta = dv.id_detalle_venta
+                        AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                    )
+                ) as client_debt
+                FROM detalle_venta dv
+                JOIN deuda d ON dv.id_detalle_venta = d.id_detalle_venta
+                JOIN cliente c ON dv.id_cliente = c.id_cliente
                 GROUP BY c.id_cliente
-            ) as balances
-            WHERE client_balance > 0.01
+            ) as debts
+            WHERE client_debt > 0.01
         `);
 
         const currentReceivables = parseFloat(receivablesResult[0].total_pending);
