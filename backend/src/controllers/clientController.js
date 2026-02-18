@@ -51,31 +51,32 @@ exports.getDebtors = async (req, res) => {
                     c.id_cliente, 
                     c.nb_cliente, 
                     c.telefono,
-                    CAST(SUM(totals.total_sale) AS DECIMAL(10,2)) as total_comprado,
-                    CAST(SUM(totals.total_paid) AS DECIMAL(10,2)) as total_pagado,
-                    CAST((SUM(totals.total_sale) - SUM(totals.total_paid)) AS DECIMAL(10,2)) as deuda_actual
-                FROM cliente c
-                JOIN (
-                    SELECT 
-                        dv.id_cliente,
-                        dv.id_detalle_venta,
-                        (dv.cantidad * dv.precio_unitario) as total_sale,
+                    CAST(SUM(dv.cantidad * dv.precio_unitario) AS DECIMAL(10,2)) as total_comprado,
+                    CAST((
+                        SELECT COALESCE(SUM(dp.monto), 0) 
+                        FROM pago p 
+                        JOIN detalle_pago dp ON p.id_pago = dp.id_pago 
+                        JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                        JOIN detalle_venta dv2 ON p.id_detalle_venta = dv2.id_detalle_venta 
+                        WHERE dv2.id_cliente = c.id_cliente
+                        AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                    ) AS DECIMAL(10,2)) as total_pagado,
+                    CAST((
+                        SUM(dv.cantidad * dv.precio_unitario) - 
                         (
                             SELECT COALESCE(SUM(dp.monto), 0) 
                             FROM pago p 
                             JOIN detalle_pago dp ON p.id_pago = dp.id_pago 
                             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                            WHERE p.id_detalle_venta = dv.id_detalle_venta
+                            JOIN detalle_venta dv2 ON p.id_detalle_venta = dv2.id_detalle_venta 
+                            WHERE dv2.id_cliente = c.id_cliente
                             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
-                        ) as total_paid
-                    FROM detalle_venta dv
-                ) totals ON c.id_cliente = totals.id_cliente
-                WHERE c.id_cliente IN (
-                    SELECT DISTINCT dv.id_cliente 
-                    FROM detalle_venta dv 
-                    JOIN deuda d ON dv.id_detalle_venta = d.id_detalle_venta
-                )
+                        )
+                    ) AS DECIMAL(10,2)) as deuda_actual
+                FROM cliente c
+                JOIN detalle_venta dv ON c.id_cliente = dv.id_cliente
                 GROUP BY c.id_cliente
+                HAVING deuda_actual > 0.01
                 ORDER BY c.nb_cliente ASC
             `;
         }

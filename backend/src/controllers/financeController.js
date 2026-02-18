@@ -79,19 +79,19 @@ exports.getFinanceSummary = async (req, res) => {
         const [receivablesResult] = await pool.query(`
             SELECT SUM(client_debt) as total_pending
             FROM (
-                SELECT SUM(
-                    (dv.cantidad * dv.precio_unitario) - 
+                SELECT (
+                    SUM(dv.cantidad * dv.precio_unitario) - 
                     (
                         SELECT COALESCE(SUM(dp.monto), 0)
                         FROM pago p
                         JOIN detalle_pago dp ON p.id_pago = dp.id_pago
                         JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                        WHERE p.id_detalle_venta = dv.id_detalle_venta
+                        JOIN detalle_venta dv2 ON p.id_detalle_venta = dv2.id_detalle_venta
+                        WHERE dv2.id_cliente = c.id_cliente
                         AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
                     )
                 ) as client_debt
                 FROM detalle_venta dv
-                JOIN deuda d ON dv.id_detalle_venta = d.id_detalle_venta
                 JOIN cliente c ON dv.id_cliente = c.id_cliente
                 GROUP BY c.id_cliente
             ) as debts
