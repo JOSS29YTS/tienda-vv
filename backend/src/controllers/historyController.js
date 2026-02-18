@@ -20,6 +20,7 @@ exports.getHistory = async (req, res) => {
                 FROM pago p
                 JOIN detalle_pago dp ON p.id_pago = dp.id_pago
                 JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                WHERE mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
 
                 UNION ALL
 
@@ -50,7 +51,9 @@ exports.getHistory = async (req, res) => {
                     SELECT COALESCE(SUM(dp.monto), 0)
                     FROM pago p
                     JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                    JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
                     WHERE p.id_detalle_venta = dv.id_detalle_venta
+                    AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
                 )) as total
             FROM deuda d
             JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
