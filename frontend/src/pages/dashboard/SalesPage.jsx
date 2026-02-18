@@ -52,13 +52,11 @@ const SalesPage = () => {
     const [targetRowForClient, setTargetRowForClient] = useState(null); // Track which row triggered the modal
     const [scanCode, setScanCode] = useState('');
     const isProcessingScanRef = useRef(false);
-    const lastInteractionRef = useRef(0);
+    const lastInteractionRef = useRef(Date.now()); // Start with current time to trust LocalStorage on mount
 
     const touchInteraction = () => {
         lastInteractionRef.current = Date.now();
     };
-
-
 
 
     // Auto-clear notifications
@@ -157,7 +155,7 @@ const SalesPage = () => {
         // Debounce server save to avoid too many requests
         const timeoutId = setTimeout(() => {
             saveDraftToServer();
-        }, 5000); // Wait 5 seconds after last change to allow for multiple scans
+        }, 1000); // Wait 1 second after last change (reduced from 5s)
 
         return () => clearTimeout(timeoutId);
     }, [rows, rate]);
