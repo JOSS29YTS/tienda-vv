@@ -56,7 +56,10 @@ exports.getDashboardStats = async (req, res) => {
         const salesTrend = adjustedPrevSales === 0 ? 100 : ((adjustedCurrentSales - adjustedPrevSales) / adjustedPrevSales) * 100;
 
         // 2. Facturas Pendientes (Pending Invoices Count)
-        const getPendingInvoicesCount = async () => {
+        let pendingInvoicesCount = 0;
+
+        // Count Pending Supplier Invoices
+        const getPendingSupplierInvoicesCount = async () => {
             const query = `
                 SELECT COUNT(*) as count 
                 FROM factura_proveedor fp
@@ -67,8 +70,53 @@ exports.getDashboardStats = async (req, res) => {
             const [rows] = await pool.query(query);
             return rows[0].count;
         };
+        pendingInvoicesCount += await getPendingSupplierInvoicesCount();
 
-        const pendingInvoicesCount = await getPendingInvoicesCount();
+        // Count Pending Loans (Liabilities) - Logic reused to match Finance Summary
+        const [loans] = await pool.query(`
+            SELECT 
+                p.id_prestamo, 
+                p.monto_prestamo, 
+                p.tasa_dia as tasa_prestamo, 
+                mp.nb_metodo_pago
+            FROM prestamo p
+            JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+        `);
+
+        for (const loan of loans) {
+            const [payments] = await pool.query(`
+                SELECT pp.monto, pp.tasa_dia, mp.nb_metodo_pago 
+                FROM pago_prestamo pp
+                JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+                WHERE pp.id_prestamo = ?
+            `, [loan.id_prestamo]);
+
+            let totalPaid = 0;
+            const usdKeywords = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
+            const method = loan.nb_metodo_pago.toUpperCase();
+            const isLoanUSD = usdKeywords.some(k => method.includes(k));
+
+            for (const pay of payments) {
+                const payMethod = pay.nb_metodo_pago.toUpperCase();
+                const isPayUSD = usdKeywords.some(k => payMethod.includes(k));
+                const payAmount = parseFloat(pay.monto);
+                const payRate = parseFloat(pay.tasa_dia);
+
+                if (isLoanUSD) {
+                    if (isPayUSD) totalPaid += payAmount;
+                    else totalPaid += (payAmount / payRate);
+                } else {
+                    if (isPayUSD) totalPaid += (payAmount * payRate);
+                    else totalPaid += payAmount;
+                }
+            }
+
+            const remaining = parseFloat(loan.monto_prestamo) - totalPaid;
+            if (remaining > 0.05) {
+                pendingInvoicesCount += 1;
+            }
+        }
+
         // Trend is not really applicable for a snapshot of "Currently Pending", so we can set it to 0 or calculate change from yesterday if we had history. 
         // For now, let's just show the current count.
 
