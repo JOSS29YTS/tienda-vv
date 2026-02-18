@@ -57,12 +57,31 @@ exports.payInvoice = async (req, res) => {
         }
 
 
+        // Fix Date Time: Combine provided date (YYYY-MM-DD) with current time
+        let dateObj = new Date();
+        if (fecha_pago) {
+            const datePart = fecha_pago.includes('T') ? fecha_pago.split('T')[0] : fecha_pago.split(' ')[0];
+            const [y, m, d] = datePart.split('-').map(Number);
+            if (y && m && d) {
+                dateObj.setFullYear(y);
+                dateObj.setMonth(m - 1);
+                dateObj.setDate(d);
+            }
+        }
+
+        const formattedDate = dateObj.getFullYear() + "-" +
+            ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
+            ("0" + dateObj.getDate()).slice(-2) + " " +
+            ("0" + dateObj.getHours()).slice(-2) + ":" +
+            ("0" + dateObj.getMinutes()).slice(-2) + ":" +
+            ("0" + dateObj.getSeconds()).slice(-2);
+
         // Insert Payment
         await connection.query(`
             INSERT INTO pago_factura_proveedor 
             (id_factura_proveedor, id_usuario, id_metodo_pago, monto, tasa_dia, fecha_pago)
             VALUES (?, ?, ?, ?, ?, ?)
-        `, [id_factura_proveedor, userId, methodId, amount, rate, fecha_pago]);
+        `, [id_factura_proveedor, userId, methodId, amount, rate, formattedDate]);
 
         // Check if fully paid
         const [invResult] = await connection.query('SELECT monto_deuda, id_compra FROM factura_proveedor WHERE id_factura_proveedor = ?', [id_factura_proveedor]);
