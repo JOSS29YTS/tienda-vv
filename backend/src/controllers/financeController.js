@@ -98,7 +98,7 @@ exports.getFinanceSummary = async (req, res) => {
             WHERE client_debt > 0.01
         `);
 
-        const currentReceivables = parseFloat(receivablesResult[0].total_pending);
+        const currentReceivables = parseFloat(receivablesResult[0]?.total_pending || 0);
 
         // 5. Sales Income (Payments)
         const [allPayments] = await pool.query(`
