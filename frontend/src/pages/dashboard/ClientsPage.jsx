@@ -283,16 +283,26 @@ const ClientsPage = () => {
                     <p className="text-slate-500 mt-1">Gestiona las deudas de tus clientes.</p>
                 </div>
 
-                {/* Global Rate Input for Reference */}
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
-                    <span className="text-sm font-bold text-slate-500 uppercase">Tasa del Día:</span>
-                    <input
-                        type="number"
-                        value={rate}
-                        onChange={(e) => setRate(e.target.value)}
-                        className="w-24 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-right font-mono font-bold text-slate-700"
-                    />
-                    <span className="text-slate-400 font-bold">Bs/$</span>
+                <div className="flex flex-wrap gap-3">
+                    {/* Total Debt Display */}
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
+                        <span className="text-sm font-bold text-slate-500 uppercase">Total por Cobrar:</span>
+                        <span className="font-mono font-black text-red-600 text-lg">
+                            $ {clients.reduce((acc, client) => acc + (parseFloat(client.deuda_actual) || 0), 0).toFixed(2)}
+                        </span>
+                    </div>
+
+                    {/* Global Rate Input for Reference */}
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
+                        <span className="text-sm font-bold text-slate-500 uppercase">Tasa del Día:</span>
+                        <input
+                            type="number"
+                            value={rate}
+                            onChange={(e) => setRate(e.target.value)}
+                            className="w-24 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-right font-mono font-bold text-slate-700"
+                        />
+                        <span className="text-slate-400 font-bold">Bs/$</span>
+                    </div>
                 </div>
             </header>
 
