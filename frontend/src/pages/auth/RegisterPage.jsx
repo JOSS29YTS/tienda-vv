@@ -85,7 +85,7 @@ const RegisterPage = () => {
             setStep(2);
 
         } catch (error) {
-            alert(error.message);
+            showNotification(error.message, 'error');
         } finally {
             setIsLoading(false);
         }
@@ -117,7 +117,7 @@ const RegisterPage = () => {
             }, 2000);
 
         } catch (error) {
-            alert(error.message);
+            showNotification(error.message, 'error');
         } finally {
             setIsLoading(false);
         }
