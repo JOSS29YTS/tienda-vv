@@ -269,8 +269,66 @@ exports.getFinanceSummary = async (req, res) => {
             JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
             WHERE ec.nb_estado_compra = 'PENDIENTE'
         `);
-        const pendingInvoiceCount = pendingInvoices[0].count || 0;
-        const pendingInvoiceTotal = parseFloat(pendingInvoices[0].total_debt || 0);
+        let pendingInvoiceCount = pendingInvoices[0].count || 0;
+        let pendingInvoiceTotal = parseFloat(pendingInvoices[0].total_debt || 0);
+
+        // 11. Add Pending Loans to Liabilities (User Request: "facturas pendientes tambien debe sumar si hay un prestamo pendiente")
+        // We reuse the logic from getPendingLoans to find the pending amount in USD
+        const [loans] = await pool.query(`
+            SELECT 
+                p.id_prestamo, 
+                p.monto_prestamo, 
+                p.tasa_dia as tasa_prestamo, 
+                mp.nb_metodo_pago
+            FROM prestamo p
+            JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+        `);
+
+        for (const loan of loans) {
+            const [payments] = await pool.query(`
+                SELECT pp.monto, pp.tasa_dia, mp.nb_metodo_pago 
+                FROM pago_prestamo pp
+                JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+                WHERE pp.id_prestamo = ?
+            `, [loan.id_prestamo]);
+
+            let totalPaid = 0;
+            const method = loan.nb_metodo_pago.toUpperCase();
+            const isLoanUSD = usdKeywords.some(k => method.includes(k));
+
+            for (const pay of payments) {
+                const payMethod = pay.nb_metodo_pago.toUpperCase();
+                const isPayUSD = usdKeywords.some(k => payMethod.includes(k));
+                const payAmount = parseFloat(pay.monto);
+                const payRate = parseFloat(pay.tasa_dia);
+
+                if (isLoanUSD) {
+                    if (isPayUSD) totalPaid += payAmount;
+                    else totalPaid += (payAmount / payRate);
+                } else {
+                    if (isPayUSD) totalPaid += (payAmount * payRate);
+                    else totalPaid += payAmount;
+                }
+            }
+
+            const remaining = parseFloat(loan.monto_prestamo) - totalPaid;
+            if (remaining > 0.05) {
+                pendingInvoiceCount += 1; // Count as a pending "invoice"
+
+                // Add amount to total. Normalize to USD for consistency if needed, 
+                // but currently pendingInvoiceTotal seems to be a mix or primarily USD context from supplier invoices?
+                // Supplier invoices are usually in USD.
+                // If loan is in Bs, convert to USD for the total.
+                if (isLoanUSD) {
+                    pendingInvoiceTotal += remaining;
+                } else {
+                    // Use loan's original rate or current rate? 
+                    // Usually original rate for debt value, or current for payment.
+                    // Let's use loan rate for estimation.
+                    pendingInvoiceTotal += (remaining / (parseFloat(loan.tasa_prestamo) || 1));
+                }
+            }
+        }
 
         const [invoicePayments] = await pool.query(`
             SELECT pfp.monto, pfp.tasa_dia, mp.nb_metodo_pago

@@ -6,6 +6,7 @@ import API_URL from '../../config/api';
 const HistoryPage = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedIndex, setExpandedIndex] = useState(null);
 
     useEffect(() => {
         fetchHistory();
@@ -33,6 +34,10 @@ const HistoryPage = () => {
         return new Date(dateString).toLocaleDateString('es-ES', options);
     };
 
+    const handleToggle = (index) => {
+        setExpandedIndex(expandedIndex === index ? null : index);
+    };
+
     return (
         <div>
             <div className="mb-8 flex justify-between items-end">
@@ -52,7 +57,13 @@ const HistoryPage = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {history.map((day, index) => (
-                        <HistoryCard key={index} day={day} formatDate={formatDate} />
+                        <HistoryCard
+                            key={index}
+                            day={day}
+                            formatDate={formatDate}
+                            isOpen={expandedIndex === index}
+                            onToggle={() => handleToggle(index)}
+                        />
                     ))}
                 </div>
             )}
@@ -60,9 +71,7 @@ const HistoryPage = () => {
     );
 };
 
-const HistoryCard = ({ day, formatDate }) => {
-    const [isOpen, setIsOpen] = useState(false);
-
+const HistoryCard = ({ day, formatDate, isOpen, onToggle }) => {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -115,7 +124,7 @@ const HistoryCard = ({ day, formatDate }) => {
 
                 <div className="border-t border-slate-100 pt-4">
                     <button
-                        onClick={() => setIsOpen(!isOpen)}
+                        onClick={onToggle}
                         className="flex items-center justify-between w-full text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
                     >
                         <span>Desglose por Método</span>
