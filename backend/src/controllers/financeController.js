@@ -73,28 +73,34 @@ exports.getFinanceSummary = async (req, res) => {
         // We will add Loan Repayments to this later
 
 
-        // 4. Accounts Receivable (Corrected Logic)
-        // Calculate distinct pending amount from registered Debts
-        // (Cost of Items in Debt - Real Payments made against those items)
-        // ALIGNED WITH CLIENT PAGE LOGIC:
-        // 1. Join cliente table to ensure client exists.
-        // 2. Exclude 'PENDIENTE POR COBRAR' payments (though they shouldn't reduce debt balance visually if treated as 0 value payment, sticking to consistent logic).
+        // 4. Accounts Receivable (Corrected Logic) - ALIGNED WITH CLIENT PAGE
+        // We calculate the net debt PER CLIENT (Sale - Real Payment), 
+        // and only sum positive balances (Receivables).
         const [receivablesResult] = await pool.query(`
-            SELECT 
-                COALESCE(SUM(
-                    (dv.cantidad * dv.precio_unitario) - 
+            SELECT SUM(client_balance) as total_pending
+            FROM (
+                SELECT 
                     (
-                        SELECT COALESCE(SUM(dp.monto), 0)
-                        FROM pago p
-                        JOIN detalle_pago dp ON p.id_pago = dp.id_pago
-                        JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                        WHERE p.id_detalle_venta = dv.id_detalle_venta
-                        AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
-                    )
-                ), 0) as total_pending
-            FROM deuda d
-            JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
-            JOIN cliente c ON dv.id_cliente = c.id_cliente
+                        SUM(dv.cantidad * dv.precio_unitario) - 
+                        (
+                            SELECT COALESCE(SUM(dp.monto), 0)
+                            FROM pago p
+                            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                            WHERE p.id_detalle_venta = dv.id_detalle_venta
+                            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                        )
+                    ) as client_balance
+                FROM cliente c
+                JOIN detalle_venta dv ON c.id_cliente = dv.id_cliente
+                WHERE c.id_cliente IN (
+                    SELECT DISTINCT dv2.id_cliente 
+                    FROM detalle_venta dv2 
+                    JOIN deuda d ON dv2.id_detalle_venta = d.id_detalle_venta
+                )
+                GROUP BY c.id_cliente
+            ) as balances
+            WHERE client_balance > 0.01
         `);
 
         const currentReceivables = parseFloat(receivablesResult[0].total_pending);
