@@ -994,7 +994,7 @@ const PurchasesPage = () => {
                                     const isUsd = selectedMethod && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => selectedMethod.nb_metodo_pago.toUpperCase().includes(k));
 
                                     return (
-                                        <div key={idx} className="flex gap-3 items-end">
+                                        <div key={idx} className="flex gap-3 items-start">
                                             <div className="flex-1">
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método</label>
                                                 <select
@@ -1032,13 +1032,16 @@ const PurchasesPage = () => {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => removePaymentRow(idx)}
-                                                disabled={payments.length === 1}
-                                                className={`p-2.5 mb-[1px] rounded-lg transition-colors ${payments.length === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-red-400 hover:bg-red-50 hover:text-red-500'}`}
-                                            >
-                                                <FaTrash />
-                                            </button>
+                                            <div>
+                                                <label className="block text-xs font-bold text-transparent uppercase mb-1">.</label>
+                                                <button
+                                                    onClick={() => removePaymentRow(idx)}
+                                                    disabled={payments.length === 1}
+                                                    className={`p-2.5 rounded-lg transition-colors ${payments.length === 1 ? 'text-slate-300 cursor-not-allowed' : 'text-red-400 hover:bg-red-50 hover:text-red-500'}`}
+                                                >
+                                                    <FaTrash />
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })}
