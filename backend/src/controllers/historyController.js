@@ -4,7 +4,7 @@ exports.getHistory = async (req, res) => {
     try {
         const query = `
             SELECT 
-                DATE_FORMAT(fecha, '%Y-%m-%d') as fecha,
+                DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
                 metodo,
                 tasa_dia,
                 type,
@@ -36,14 +36,14 @@ exports.getHistory = async (req, res) => {
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
                 WHERE tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
             ) AS daily_movements
-            GROUP BY fecha, metodo, tasa_dia, type
+            GROUP BY DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, tasa_dia, type
             ORDER BY fecha DESC
         `;
 
         // NEW: Fetch Pending Debts separately (since we don't store them in detalle_pago anymore)
         const debtQuery = `
             SELECT 
-                DATE_FORMAT(v.fecha_venta, '%Y-%m-%d') as fecha,
+                DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
                 'PENDIENTE POR COBRAR' as metodo,
                 v.tasa_dia,
                 'DEBT' as type,
@@ -58,7 +58,7 @@ exports.getHistory = async (req, res) => {
             FROM deuda d
             JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
             JOIN venta v ON dv.id_venta = v.id_venta
-            GROUP BY fecha, metodo, tasa_dia, type
+            GROUP BY DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, tasa_dia, type
         `;
 
         const [debtRows] = await pool.query(debtQuery);
