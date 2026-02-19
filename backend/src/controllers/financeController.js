@@ -586,6 +586,11 @@ exports.createFixedPayment = async (req, res) => {
 
         // Format Date Logic (Aligned with buyCurrency)
         let dateObj = new Date(); // Server Time (UTC)
+
+        // Correct for Venezuela Timezone (UTC-4) context
+        // Shift time -4 hours to operate in "Venezuela Time"
+        dateObj.setHours(dateObj.getHours() - 4);
+
         if (fecha) {
             // Take YYYY-MM-DD from input, ignoring time sent by frontend
             const datePart = fecha.split(' ')[0];
@@ -596,6 +601,9 @@ exports.createFixedPayment = async (req, res) => {
                 dateObj.setDate(d);
             }
         }
+
+        // Shift back to UTC +4 hours for storage
+        dateObj.setHours(dateObj.getHours() + 4);
 
         const formattedDate = dateObj.getFullYear() + "-" +
             ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
@@ -644,6 +652,10 @@ exports.createTraspaso = async (req, res) => {
 
         // Date handling (Aligned with buyCurrency)
         let dateObj = new Date(); // Server Time (UTC)
+
+        // Correct for Venezuela Timezone (UTC-4) context
+        dateObj.setHours(dateObj.getHours() - 4);
+
         if (fecha_traspaso) {
             // Take YYYY-MM-DD from input
             const datePart = fecha_traspaso.split(' ')[0];
@@ -654,6 +666,9 @@ exports.createTraspaso = async (req, res) => {
                 dateObj.setDate(d);
             }
         }
+
+        // Shift back to UTC +4 hours for storage
+        dateObj.setHours(dateObj.getHours() + 4);
 
         const formattedDate = dateObj.getFullYear() + "-" +
             ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
@@ -694,6 +709,10 @@ exports.createLoan = async (req, res) => {
 
         // Format Date for MySQL (Aligned with buyCurrency)
         let dateObj = new Date(); // Server Time (UTC)
+
+        // Correct for Venezuela Timezone (UTC-4) context
+        dateObj.setHours(dateObj.getHours() - 4);
+
         if (date) {
             // Take YYYY-MM-DD (createLoan usually receives ISO date or similar, handle both)
             const datePart = date.includes('T') ? date.split('T')[0] : date.split(' ')[0];
@@ -704,6 +723,9 @@ exports.createLoan = async (req, res) => {
                 dateObj.setDate(d);
             }
         }
+
+        // Shift back to UTC for storage
+        dateObj.setHours(dateObj.getHours() + 4);
 
         const formattedDate = dateObj.getFullYear() + "-" +
             ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
