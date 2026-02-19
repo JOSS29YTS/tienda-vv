@@ -11,14 +11,15 @@ class ExchangeRateService {
     }
 
     start() {
-        console.log('Exchange Rate Service Started: Scheduled for 5:00 AM daily');
+        console.log('Exchange Rate Service Started');
 
-        // Initial fetch on startup
-        this.fetchRate();
+        // Initial check on startup
+        this.initializeRate();
 
-        // Schedule updates ONLY at 5:00 AM every day
-        cron.schedule('0 5 * * *', async () => {
-            console.log('Daily 5 AM Exchange Rate Check...');
+        // Schedule updates ONLY between 8:00 AM and 2:00 PM (Safe Window)
+        // This prevents capturing the "Next Day" rate published in the afternoon
+        cron.schedule('0 8-14 * * *', async () => {
+            console.log('Hourly Safe-Window Exchange Rate Check...');
             await this.fetchRate();
         }, {
             scheduled: true,
@@ -26,17 +27,49 @@ class ExchangeRateService {
         });
     }
 
+    async initializeRate() {
+        const now = new Date();
+        const hour = now.getHours();
+
+        // Define safe window: 6 AM to 2 PM (14:00)
+        // Adjust logic: if we are in the morning/early afternoon, we want the latest rate.
+        // If we are in late afternoon/evening, we want to KEEP the established rate for the day.
+        const isSafeWindow = hour >= 6 && hour < 15;
+
+        if (isSafeWindow) {
+            console.log(`[EXCHANGE RATE] Startup inside safe window (${hour}:00). Fetching fresh rate.`);
+            await this.fetchRate();
+        } else {
+            console.log(`[EXCHANGE RATE] Startup outside safe window (${hour}:00). Attempting to load existing rate from DB.`);
+            const hasRate = await this.loadRateFromDB();
+            if (!hasRate) {
+                console.warn('[EXCHANGE RATE] No rate found in DB. Forcing fetch despite being outside safe window.');
+                await this.fetchRate();
+            }
+        }
+    }
+
+    async loadRateFromDB() {
+        try {
+            const [rows] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_dolar']);
+            if (rows.length > 0) {
+                this.currentRate = parseFloat(rows[0].valor);
+                this.lastUpdated = new Date(); // Approximate
+                console.log(`[EXCHANGE RATE] loaded from DB: ${this.currentRate} Bs/$`);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('[EXCHANGE RATE] Error loading from DB:', error);
+            return false;
+        }
+    }
+
     async fetchRate() {
         try {
             console.log(`[EXCHANGE RATE] Fetching from ${this.apiUrl}...`);
             const response = await axios.get(this.apiUrl);
 
-            // Response format confirmed via debug script:
-            // {
-            //   "fuente": "oficial",
-            //   "promedio": 396.3674,
-            //   "fechaActualizacion": "..."
-            // }
             const data = response.data;
             let newRate = 0;
 
