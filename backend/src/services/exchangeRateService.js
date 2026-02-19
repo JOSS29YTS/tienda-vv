@@ -28,8 +28,10 @@ class ExchangeRateService {
     }
 
     async initializeRate() {
-        const now = new Date();
-        const hour = now.getHours();
+        // Fix Timezone: Ensure we check the hour in Venezuela Time (VET), not Server Time (UTC)
+        // 'en-US' locale with hour12: false returns 0-23
+        const hourString = new Date().toLocaleString('en-US', { timeZone: 'America/Caracas', hour: 'numeric', hour12: false });
+        const hour = parseInt(hourString, 10);
 
         // Define safe window: 6 AM to 2 PM (14:00)
         // Adjust logic: if we are in the morning/early afternoon, we want the latest rate.
@@ -37,10 +39,10 @@ class ExchangeRateService {
         const isSafeWindow = hour >= 6 && hour < 15;
 
         if (isSafeWindow) {
-            console.log(`[EXCHANGE RATE] Startup inside safe window (${hour}:00). Fetching fresh rate.`);
+            console.log(`[EXCHANGE RATE] Startup inside safe window (${hour}:00 VET). Fetching fresh rate.`);
             await this.fetchRate();
         } else {
-            console.log(`[EXCHANGE RATE] Startup outside safe window (${hour}:00). Attempting to load existing rate from DB.`);
+            console.log(`[EXCHANGE RATE] Startup outside safe window (${hour}:00 VET). Attempting to load existing rate from DB.`);
             const hasRate = await this.loadRateFromDB();
             if (!hasRate) {
                 console.warn('[EXCHANGE RATE] No rate found in DB. Forcing fetch despite being outside safe window.');
