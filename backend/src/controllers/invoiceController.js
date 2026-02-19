@@ -37,17 +37,47 @@ exports.payInvoice = async (req, res) => {
         const { id_factura_proveedor, id_metodo_pago, monto, tasa_dia, fecha_pago } = req.body;
         const userId = req.user.id;
 
+        // 1. Fetch Invoice Info & Current Payments (Locking the row)
+        const [invoice] = await connection.query(
+            `SELECT fp.monto_deuda, fp.id_compra,
+             COALESCE((SELECT SUM(monto) FROM pago_factura_proveedor WHERE id_factura_proveedor = fp.id_factura_proveedor), 0) as total_pagado
+             FROM factura_proveedor fp 
+             WHERE fp.id_factura_proveedor = ? FOR UPDATE`,
+            [id_factura_proveedor]
+        );
+
+        if (invoice.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Factura no encontrada' });
+        }
+
+        const totalDebt = parseFloat(invoice[0].monto_deuda);
+        const alreadyPaid = parseFloat(invoice[0].total_pagado);
+        const remainingDebt = totalDebt - alreadyPaid;
+        const paymentAmount = parseFloat(monto);
+        const purchaseId = invoice[0].id_compra;
+
+        // VALIDATION: Prevent Overpayment
+        // Allow strict equality or very small epsilon
+        if (paymentAmount > (remainingDebt + 0.01)) {
+            await connection.rollback();
+            return res.status(400).json({
+                message: `El monto a pagar ($${paymentAmount.toFixed(2)}) excede la deuda restante ($${remainingDebt.toFixed(2)})`
+            });
+        }
+
         // VALIDATION: Check Sufficient Funds
-        const amount = parseFloat(monto);
         const rate = parseFloat(tasa_dia);
         const methodId = parseInt(id_metodo_pago);
 
-        const balances = await balanceUtils.getMethodBalances();
-        const method = balances[methodId];
+        const balances = await balanceUtils.getMethodBalances(connection); // Pass connection if supported, but utils might not use it yet. 
+        // Note: checking existing balanceUtils, it doesn't take connection. It reads committed data.
+        // This is acceptable for "Suficiente Dinero" check.
 
-        let requiredAmount = amount;
+        const method = balances[methodId];
+        let requiredAmount = paymentAmount;
         if (method && method.type === 'BS') {
-            requiredAmount = amount * rate;
+            requiredAmount = paymentAmount * rate;
         }
 
         const check = await balanceUtils.checkSufficientFunds(methodId, requiredAmount);
@@ -56,16 +86,17 @@ exports.payInvoice = async (req, res) => {
             return res.status(400).json({ message: check.message });
         }
 
-
-        // Fix Date Time: Combine provided date (YYYY-MM-DD) with current time
+        // Fix Date Time
         let dateObj = new Date();
         if (fecha_pago) {
-            const datePart = fecha_pago.includes('T') ? fecha_pago.split('T')[0] : fecha_pago.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) {
-                dateObj.setFullYear(y);
-                dateObj.setMonth(m - 1);
-                dateObj.setDate(d);
+            const datePart = fecha_pago.includes('T') ? fecha_pago.split('T')[0] : fecha_pago.split(' ');
+            if (Array.isArray(datePart)) { // Handle potential split issue
+                // ... handled below
+            }
+            // Simple parsing
+            const d = new Date(fecha_pago);
+            if (!isNaN(d.getTime())) {
+                dateObj = d;
             }
         }
 
@@ -81,22 +112,13 @@ exports.payInvoice = async (req, res) => {
             INSERT INTO pago_factura_proveedor 
             (id_factura_proveedor, id_usuario, id_metodo_pago, monto, tasa_dia, fecha_pago)
             VALUES (?, ?, ?, ?, ?, ?)
-        `, [id_factura_proveedor, userId, methodId, amount, rate, formattedDate]);
+        `, [id_factura_proveedor, userId, methodId, paymentAmount, rate, formattedDate]);
 
-        // Check if fully paid
-        const [invResult] = await connection.query('SELECT monto_deuda, id_compra FROM factura_proveedor WHERE id_factura_proveedor = ?', [id_factura_proveedor]);
+        // Check if fully paid (Using the values we already calculated + new payment)
+        const newTotalPaid = alreadyPaid + paymentAmount;
 
-        if (invResult.length === 0) throw new Error('Factura no encontrada');
-
-        const totalDebt = parseFloat(invResult[0].monto_deuda);
-        const purchaseId = invResult[0].id_compra;
-
-        const [payResult] = await connection.query('SELECT SUM(monto) as total_paid FROM pago_factura_proveedor WHERE id_factura_proveedor = ?', [id_factura_proveedor]);
-        const totalPaid = parseFloat(payResult[0].total_paid || 0);
-
-        if (totalPaid >= totalDebt - 0.01) {
-            // Update Purchase Status (Sync) (Assume purchase becomes PAGADA if Invoice is fully paid)
-            // Find status ID
+        if (newTotalPaid >= (totalDebt - 0.01)) {
+            // Update Purchase Status to 'PAGADA'
             const [statusRes] = await connection.query("SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = 'PAGADA' LIMIT 1");
             if (statusRes.length > 0 && purchaseId) {
                 await connection.query(`UPDATE compra SET id_estado_compra = ? WHERE id_compra = ?`, [statusRes[0].id_estado_compra, purchaseId]);
