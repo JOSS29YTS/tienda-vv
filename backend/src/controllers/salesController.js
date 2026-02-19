@@ -130,8 +130,10 @@ exports.closeSales = async (req, res) => {
 
         rows.forEach((row, index) => {
             if (row.paymentMethod === 'MIXTO') {
-                // Use provided batchId or fallback to unique ID per row if missing (legacy/independent)
-                const batchId = row.mixedBatchId || `legacy-${index}`;
+                // Use provided batchId or fallback to a single default batch for the request
+                // This ensures that if the frontend sends a single invoice with multiple mixed rows,
+                // they are grouped together for correct pro-ration of payments.
+                const batchId = row.mixedBatchId || 'default-batch';
 
                 if (!mixedGroups[batchId]) {
                     mixedGroups[batchId] = {
@@ -259,7 +261,7 @@ exports.closeSales = async (req, res) => {
             }
 
             if (row.paymentMethod === 'MIXTO') {
-                const batchId = row.mixedBatchId || `legacy-${i}`;
+                const batchId = row.mixedBatchId || 'default-batch';
                 const group = mixedGroups[batchId];
 
                 if (group && row.paymentDetails && row.paymentDetails.length > 0) {
