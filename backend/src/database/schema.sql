@@ -1,9 +1,9 @@
 -- ==========================================================
 -- 1. CREACIÓN DE LA BASE DE DATOS
 -- ==========================================================
-DROP DATABASE IF EXISTS bodega_db;
-CREATE DATABASE bodega_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE bodega_db;
+DROP DATABASE IF EXISTS tienda_db;
+CREATE DATABASE tienda_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE tienda_db;
 
 -- ==========================================================
 -- 2. TABLAS CATÁLOGO
