@@ -38,7 +38,7 @@ const FinancesPage = () => {
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         return now.toISOString().split('T')[0];
     };
-
+    // Helper function for local date string
     const [formData, setFormData] = useState({
         id_tipo_pago_fijo: '',
         id_metodo_pago: '',
