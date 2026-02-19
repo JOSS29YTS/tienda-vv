@@ -38,14 +38,18 @@ async function initDB() {
         // We need to ensure we are using the correct DB for the check
         await connection.query(`USE ${process.env.DB_NAME}`);
 
+        // Get 'Administrador' Role ID
+        const [rolRows] = await connection.query("SELECT id_rol FROM rol WHERE nb_rol = 'Administrador'");
+        const idAdmin = rolRows.length > 0 ? rolRows[0].id_rol : 1; // Default to 1 if not found (should be there from schema)
+
         const [rows] = await connection.query('SELECT * FROM usuario WHERE email = ?', [user.email]);
 
         if (rows.length === 0) {
             await connection.query(
-                `INSERT INTO usuario (nombre, apellido, email, password, rol) VALUES (?, ?, ?, ?, ?)`,
-                [user.nombre, user.apellido, user.email, user.password, user.rol]
+                `INSERT INTO usuario (nombre, apellido, email, password, id_rol) VALUES (?, ?, ?, ?, ?)`,
+                [user.nombre, user.apellido, user.email, user.password, idAdmin]
             );
-            console.log('Usuario inicial (Contador) creado exitosamente.');
+            console.log('Usuario inicial (Administrador) creado exitosamente.');
         } else {
             console.log('El usuario inicial ya existe.');
         }

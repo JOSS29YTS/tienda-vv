@@ -40,8 +40,9 @@ CREATE TABLE usuario (
     apellido VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL, 
-    rol ENUM('contador', 'administrativo', 'bodeguero', 'pendiente') DEFAULT 'pendiente',
-    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+    id_rol INT NOT NULL,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
 );
 
 -- Tabla de Clientes (Flexible para "Mamá de Jaimito")
