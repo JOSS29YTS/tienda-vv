@@ -24,6 +24,11 @@ CREATE TABLE categoria (
     nb_categoria VARCHAR(50) NOT NULL
 );
 
+CREATE TABLE rol (
+    id_rol INT AUTO_INCREMENT PRIMARY KEY,
+    nb_rol VARCHAR(50) NOT NULL UNIQUE
+);
+
 -- ==========================================================
 -- 3. TABLAS DE PERSONAS
 -- ==========================================================
@@ -157,3 +162,8 @@ INSERT INTO categoria (nb_categoria) VALUES
 ('Short'), 
 ('Pijama'), 
 ('Sweater');
+
+INSERT INTO rol (nb_rol) VALUES 
+('Administrador'), 
+('Gerente'), 
+('Vendedor');
