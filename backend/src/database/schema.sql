@@ -129,3 +129,17 @@ CREATE TABLE detalle_pago (
     FOREIGN KEY (id_pago) REFERENCES pago(id_pago) ON DELETE CASCADE,
     FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
 );
+
+
+-- ==========================================================
+-- 8. MÓDULO DE CONFIGURACIÓN
+-- ==========================================================
+
+CREATE TABLE configuracion (
+    id_configuracion INT AUTO_INCREMENT PRIMARY KEY,
+    clave VARCHAR(50) UNIQUE NOT NULL,
+    valor VARCHAR(255) NOT NULL, -- Ej: '40.50'
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '0.00');

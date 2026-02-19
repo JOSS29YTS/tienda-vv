@@ -24,8 +24,8 @@ exports.updateRate = async (req, res) => {
         }
 
         await pool.query(
-            'INSERT INTO configuracion (clave, valor, descripcion) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valor = ?',
-            ['tasa_dolar', rate.toString(), 'Tasa de cambio BCV oficial', rate.toString()]
+            'INSERT INTO configuracion (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = ?',
+            ['tasa_dolar', rate.toString(), rate.toString()]
         );
 
         res.json({ message: 'Rate updated successfully', rate: parseFloat(rate) });

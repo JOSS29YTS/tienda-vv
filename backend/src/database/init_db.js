@@ -36,7 +36,7 @@ async function initDB() {
         };
 
         // We need to ensure we are using the correct DB for the check
-        await connection.query('USE bodega_db');
+        await connection.query(`USE ${process.env.DB_NAME}`);
 
         const [rows] = await connection.query('SELECT * FROM usuario WHERE email = ?', [user.email]);
 

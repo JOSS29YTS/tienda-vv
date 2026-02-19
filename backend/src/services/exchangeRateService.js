@@ -87,10 +87,10 @@ class ExchangeRateService {
                 try {
                     const connection = await pool.getConnection();
                     await connection.query(
-                        `INSERT INTO configuracion (clave, valor, descripcion) 
-                         VALUES (?, ?, ?) 
+                        `INSERT INTO configuracion (clave, valor) 
+                         VALUES (?, ?) 
                          ON DUPLICATE KEY UPDATE valor = ?`,
-                        ['tasa_dolar', newRate.toString(), 'Tasa de cambio BCV oficial', newRate.toString()]
+                        ['tasa_dolar', newRate.toString(), newRate.toString()]
                     );
                     connection.release();
                     console.log(`[EXCHANGE RATE] Database successfully updated. New BCV Rate: ${newRate} Bs/$`);
