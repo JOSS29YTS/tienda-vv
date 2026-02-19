@@ -19,6 +19,11 @@ CREATE TABLE metodo_pago (
     nb_metodo_pago VARCHAR(50) NOT NULL
 );
 
+CREATE TABLE categoria (
+    id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+    nb_categoria VARCHAR(50) NOT NULL
+);
+
 -- ==========================================================
 -- 3. TABLAS DE PERSONAS
 -- ==========================================================
@@ -143,3 +148,12 @@ CREATE TABLE configuracion (
 );
 
 INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '0.00');
+
+INSERT INTO categoria (nb_categoria) VALUES 
+('Camisa'), 
+('Pantalón'), 
+('Ropa interior'), 
+('Mono'), 
+('Short'), 
+('Pijama'), 
+('Sweater');
