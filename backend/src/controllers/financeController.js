@@ -835,10 +835,80 @@ exports.payLoan = async (req, res) => {
         await connection.beginTransaction();
 
         const { loanId, payments, rate } = req.body; // payments: [{ methodId, amount }]
-        // amount is NATIVE to methodId.
 
         if (!loanId || !payments || payments.length === 0) {
             return res.status(400).json({ message: 'Datos incompletos para el pago' });
+        }
+
+        // VALIDATION: Check Overpayment
+        const [loanRows] = await connection.query(`
+            SELECT p.monto_prestamo, mp.nb_metodo_pago 
+            FROM prestamo p 
+            JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago 
+            WHERE p.id_prestamo = ?
+        `, [loanId]);
+
+        if (loanRows.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Préstamo no encontrado' });
+        }
+
+        const loan = loanRows[0];
+        const usdKeywords = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
+        const isLoanUSD = usdKeywords.some(k => loan.nb_metodo_pago.toUpperCase().includes(k));
+
+        // Calculate Amount Already Paid
+        const [existingPayments] = await connection.query(`
+            SELECT pp.monto, pp.tasa_dia, mp.nb_metodo_pago
+            FROM pago_prestamo pp
+            JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+            WHERE pp.id_prestamo = ?
+        `, [loanId]);
+
+        let totalPaidSoFar = 0;
+        for (const p of existingPayments) {
+            const isPayUSD = usdKeywords.some(k => p.nb_metodo_pago.toUpperCase().includes(k));
+            const payAmount = parseFloat(p.monto);
+            const payRate = parseFloat(p.tasa_dia);
+
+            if (isLoanUSD) {
+                if (isPayUSD) totalPaidSoFar += payAmount;
+                else totalPaidSoFar += (payAmount / payRate);
+            } else {
+                if (isPayUSD) totalPaidSoFar += (payAmount * payRate);
+                else totalPaidSoFar += payAmount;
+            }
+        }
+
+        const remainingBalance = parseFloat(loan.monto_prestamo) - totalPaidSoFar;
+
+        // Calculate New Payment Amount (Normalized)
+        let newPaymentTotal = 0;
+        const currentRate = parseFloat(rate);
+
+        for (const p of payments) {
+            const [mRows] = await connection.query('SELECT nb_metodo_pago FROM metodo_pago WHERE id_metodo_pago = ?', [p.methodId]);
+            if (mRows.length === 0) continue;
+
+            const methodName = mRows[0].nb_metodo_pago.toUpperCase();
+            const isNewPayUSD = usdKeywords.some(k => methodName.includes(k));
+            const amount = parseFloat(p.amount);
+
+            if (isLoanUSD) {
+                if (isNewPayUSD) newPaymentTotal += amount;
+                else newPaymentTotal += (amount / currentRate);
+            } else {
+                if (isNewPayUSD) newPaymentTotal += (amount * currentRate);
+                else newPaymentTotal += amount;
+            }
+        }
+
+        // Check if Exceeds (with slight tolerance)
+        if (newPaymentTotal > remainingBalance + 0.05) {
+            await connection.rollback();
+            return res.status(400).json({
+                message: `El monto excede la deuda. Restante: ${isLoanUSD ? '$' : 'Bs'} ${remainingBalance.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+            });
         }
 
         // Validate Balances

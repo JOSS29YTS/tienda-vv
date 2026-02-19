@@ -121,6 +121,35 @@ const InvoicesPage = () => {
             const token = localStorage.getItem('token');
 
             if (paymentType === 'loan') {
+                // Client-side Overpayment Validation
+                let totalNewPayment = 0;
+                const loanIsUsd = selectedItem.is_usd;
+
+                for (const p of payments) {
+                    if (!p.amount || !p.methodId) continue;
+                    const method = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
+                    if (!method) continue;
+
+                    const methodIsUsd = ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => method.nb_metodo_pago.toUpperCase().includes(k));
+                    const amount = parseFloat(p.amount);
+
+                    // Normalize to Loan Currency
+                    if (loanIsUsd) {
+                        if (methodIsUsd) totalNewPayment += amount;
+                        else totalNewPayment += (amount / rate);
+                    } else {
+                        if (methodIsUsd) totalNewPayment += (amount * rate);
+                        else totalNewPayment += amount;
+                    }
+                }
+
+                const remaining = parseFloat(selectedItem.monto_pendiente);
+                if (totalNewPayment > remaining + 0.10) {
+                    setError(`El monto excede la deuda restante (${loanIsUsd ? '$' : 'Bs'} ${remaining.toLocaleString('es-VE', { minimumFractionDigits: 2 })})`);
+                    setTimeout(() => setError(''), 4000);
+                    return;
+                }
+
                 // LOAN PAYMENT LOGIC (Native Amounts, Bulk)
                 const payload = {
                     loanId: selectedItem.id_prestamo,
