@@ -856,6 +856,12 @@ const PurchasesPage = () => {
                 </button>
 
                 <div className="flex gap-4">
+                    {user && user.rol === 'Administrador' && (
+                        <button onClick={handleGenerateReport} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-slate-400/50 flex items-center gap-2">
+                            <FaFilePdf /> Reporte
+                        </button>
+                    )}
+
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -871,12 +877,6 @@ const PurchasesPage = () => {
                         {isProcessingImage ? <FaSpinner className="animate-spin" /> : <FaUpload />}
                         {isProcessingImage ? 'Procesando...' : 'Cargar Factura'}
                     </button>
-
-                    {user && user.rol === 'Administrador' && (
-                        <button onClick={handleGenerateReport} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-slate-400/50 flex items-center gap-2">
-                            <FaFilePdf /> Reporte
-                        </button>
-                    )}
                     <button onClick={() => setIsBuyCurrencyModalOpen(true)} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-cyan-200 flex items-center gap-2">
                         <span className="font-mono">$</span> Compra de Divisas
                     </button>

@@ -478,7 +478,9 @@ const ClientsPage = () => {
                                                     placeholder="Monto"
                                                     className="pl-8 bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 font-mono font-bold"
                                                 />
-                                                <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">$</span>
+                                                <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">
+                                                    {payment.currency === 'USD' ? '$' : 'Bs'}
+                                                </span>
                                             </div>
 
                                             <select
