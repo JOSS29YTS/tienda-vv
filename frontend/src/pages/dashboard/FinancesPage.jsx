@@ -33,13 +33,19 @@ const FinancesPage = () => {
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false); // New state for loan modal
     const [fixedPaymentTypes, setFixedPaymentTypes] = useState([]);
     const [paymentMethods, setPaymentMethods] = useState([]);
+    const getLocalISODate = () => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().split('T')[0];
+    };
+
     const [formData, setFormData] = useState({
         id_tipo_pago_fijo: '',
         id_metodo_pago: '',
         monto: '',
         moneda: 'USD',
         tasa_dia: rate,
-        fecha: new Date().toISOString().split('T')[0]
+        fecha: getLocalISODate()
     });
     const getLocalISOString = () => {
         const now = new Date();
@@ -52,7 +58,7 @@ const FinancesPage = () => {
         id_metodo_destino: '',
         monto: '',
         tasa_dia: rate,
-        fecha_traspaso: new Date().toISOString().split('T')[0]
+        fecha_traspaso: getLocalISODate()
     });
 
     const [loanForm, setLoanForm] = useState({ // New loan form state
@@ -337,7 +343,7 @@ const FinancesPage = () => {
                 setFormData(prev => ({
                     ...prev,
                     monto: '',
-                    fecha: new Date().toISOString().split('T')[0]
+                    fecha: getLocalISODate()
                 }));
                 toast.success('Pago registrado exitosamente', {
                     style: {
@@ -430,7 +436,7 @@ const FinancesPage = () => {
                     monto: '',
                     id_metodo_origen: '',
                     id_metodo_destino: '',
-                    fecha_traspaso: new Date().toISOString().split('T')[0]
+                    fecha_traspaso: getLocalISODate()
                 }));
                 toast.success('Traspaso realizado exitosamente', {
                     style: {
