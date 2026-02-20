@@ -73,32 +73,8 @@ exports.getFinanceSummary = async (req, res) => {
         // We will add Loan Repayments to this later
 
 
-        // 4. Accounts Receivable (Corrected Logic) - ALIGNED WITH CLIENT PAGE
-        // We calculate the net debt PER CLIENT (Sale - Real Payment), 
-        // and only sum positive balances (Receivables).
-        const [receivablesResult] = await pool.query(`
-            SELECT SUM(client_debt) as total_pending
-            FROM (
-                SELECT (
-                    SUM(dv.cantidad * dv.precio_unitario) - 
-                    (
-                        SELECT COALESCE(SUM(dp.monto), 0)
-                        FROM pago p
-                        JOIN detalle_pago dp ON p.id_pago = dp.id_pago
-                        JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                        JOIN detalle_venta dv2 ON p.id_detalle_venta = dv2.id_detalle_venta
-                        WHERE dv2.id_cliente = c.id_cliente
-                        AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
-                    )
-                ) as client_debt
-                FROM detalle_venta dv
-                JOIN cliente c ON dv.id_cliente = c.id_cliente
-                GROUP BY c.id_cliente
-            ) as debts
-            WHERE client_debt > 0.01
-        `);
-
-        const currentReceivables = parseFloat(receivablesResult[0]?.total_pending || 0);
+        // 4. Accounts Receivable - DISABLED/REMOVED
+        const currentReceivables = 0;
 
         // 5. Sales Income (Payments)
         const [allPayments] = await pool.query(`
@@ -355,7 +331,7 @@ exports.getFinanceSummary = async (req, res) => {
                 if (method.includes('EFECTIVO')) deductions.efectivo += deductionBs;
                 else if (method.includes('PUNTO')) deductions.punto += deductionBs;
                 else if (method.includes('MOVIL') || method.includes('MÓVIL')) deductions.pagoMovil += deductionBs;
-                else if (method.includes('BIOPAGO')) deductions.biopago += deductionBs;
+                else if (method.includes('BIOPAGO')) deductions.biopago += deductionBs; // This assumes deductions object has this property!
                 else if (method.includes('TRANSFERENCIA')) deductions.transferencia += deductionBs;
             }
         }
@@ -370,15 +346,8 @@ exports.getFinanceSummary = async (req, res) => {
         const netBalance = collectedIncomeUSD + totalLoansUSD - totalExpensesForBalance;
 
         // Apply Deductions to Display Totals (Net Income as per User Request)
-        // User wants: Sales ($30.11) + Loans ($300) = $330.11.
-        // collectedIncomeUSD includes Sales + Avance In ($30.64).
-        // totalAvance represents Avance Out ($0.53).
-        // By subtracting totalAvance, we strip the Avance In from the Income view.
         const totalAvance = totalFixedPaymentsForBalance - totalFixedPayments;
         const netIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD;
-        // incomeUSD_Only tracks DIVISAS transactions specifically.
-        // We assume incomeUSD_Only should also reflect expenses paid in Divisas.
-        // (Logic already subtracts expenses from incomeUSD_Only inside the loop).
 
         res.json({
             stats: {
@@ -422,9 +391,7 @@ exports.getRecentTransactions = async (req, res) => {
                     JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago
                     JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago
                     LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta
-                    LEFT JOIN deuda d ON p.id_deuda = d.id_deuda
-                    LEFT JOIN detalle_venta dv2 ON d.id_detalle_venta = dv2.id_detalle_venta
-                    WHERE (dv1.id_venta = v.id_venta OR dv2.id_venta = v.id_venta)
+                    WHERE dv1.id_venta = v.id_venta
                 ) as payment_method,
                 NULL as exchange_rate
             FROM venta v

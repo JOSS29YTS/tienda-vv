@@ -68,6 +68,9 @@ exports.registerInit = async (req, res) => {
     try {
         const { nombre, apellido, email, password } = req.body;
 
+        const nombreUpper = nombre ? nombre.toUpperCase() : '';
+        const apellidoUpper = apellido ? apellido.toUpperCase() : '';
+
         if (!nombre || !apellido || !email || !password) {
             return res.status(400).json({ message: 'Todos los campos son obligatorios' });
         }
@@ -104,7 +107,7 @@ exports.registerInit = async (req, res) => {
         // Create a temporary registration token
         const tempToken = jwt.sign(
             {
-                userData: { nombre, apellido, email, passwordHash },
+                userData: { nombre: nombreUpper, apellido: apellidoUpper, email, passwordHash },
                 codeHash
             },
             process.env.JWT_SECRET || 'secreto_super_seguro',

@@ -90,7 +90,7 @@ const DashboardHome = () => {
 
         const doc = new jsPDF();
         const secondaryColor = [15, 23, 42]; // Slate 900
-        const primaryColor = [16, 185, 129]; // Emerald 500
+        const primaryColor = [249, 115, 22]; // Orange 500
 
         // Header
         doc.setFillColor(...secondaryColor);
@@ -98,7 +98,7 @@ const DashboardHome = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text('VENALTA SYSTEM', 20, 20);
+        doc.text('ROPA MANIAZ SYSTEM', 20, 20);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text('REPORTE EJECUTIVO DE BODEGA', 20, 30);
@@ -138,9 +138,13 @@ const DashboardHome = () => {
 
         const salesVal = `$ ${stats.sales?.value?.toLocaleString() || '0'}`;
         drawStatBox(20, 65, 'Ventas Totales', salesVal, primaryColor);
-        drawStatBox(65, 65, 'Facturas Pendientes', stats.pendingInvoices?.value || 0, [59, 130, 246]);
-        drawStatBox(110, 65, 'Productos Activos', stats.products?.value || 0, [245, 158, 11]);
-        drawStatBox(155, 65, 'Clientes', stats.clients?.value || 0, [139, 92, 246]);
+
+        const purchasesVal = `$ ${stats.purchases?.value?.toLocaleString() || '0'}`;
+        drawStatBox(65, 65, 'Compras Totales', purchasesVal, [59, 130, 246]); // Blue
+
+        drawStatBox(110, 65, 'Facturas Pendientes', stats.pendingInvoices?.value || 0, [239, 68, 68]); // Red
+        drawStatBox(155, 65, 'Productos Activos', stats.products?.value || 0, [245, 158, 11]); // Orange
+
 
         // Section: Top Products
         doc.setTextColor(...secondaryColor);
@@ -170,9 +174,9 @@ const DashboardHome = () => {
         const footerY = doc.internal.pageSize.height - 10;
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text('Este documento es un reporte generado automáticamente por Venalta System.', 105, footerY, { align: 'center' });
+        doc.text('Este documento es un reporte generado automáticamente por Ropa Maniaz System.', 105, footerY, { align: 'center' });
 
-        doc.save(`Reporte_Venalta_${date.replace(/\//g, '-')}.pdf`);
+        doc.save(`Reporte_RopaManiaz_${date.replace(/\//g, '-')}.pdf`);
         toast.success('Reporte PDF descargado exitosamente');
     };
 
@@ -183,7 +187,7 @@ const DashboardHome = () => {
             <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <h1 className="text-4xl font-black text-slate-800 font-heading tracking-tight">
-                        Hola, <span className="text-emerald-600">{user ? user.nombre : 'Usuario'}</span>
+                        Hola, <span className="text-orange-600">{user ? user.nombre : 'Usuario'}</span>
                     </h1>
                     <p className="text-slate-500 mt-2 text-lg">Aquí tienes el resumen de tu bodega hoy.</p>
                 </div>
@@ -207,6 +211,14 @@ const DashboardHome = () => {
                     gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
                 />
                 <StatCard
+                    title="Compras del Mes"
+                    value={`$ ${stats?.purchases?.value?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                    icon={FaShoppingCart}
+                    trend={stats?.purchases?.trend >= 0 ? 'up' : 'down'}
+                    trendValue={`${Math.abs(stats?.purchases?.trend || 0).toFixed(1)}%`}
+                    gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
+                />
+                <StatCard
                     title="Facturas Pendientes"
                     value={stats?.pendingInvoices?.value || 0}
                     icon={FaReceipt}
@@ -222,14 +234,7 @@ const DashboardHome = () => {
                     trendValue="0%"
                     gradient="bg-gradient-to-br from-amber-500 to-orange-600"
                 />
-                <StatCard
-                    title="Clientes Totales"
-                    value={stats?.clients?.value || 0}
-                    icon={FaUserFriends}
-                    trend="up" // Static for now
-                    trendValue="0%"
-                    gradient="bg-gradient-to-br from-violet-500 to-purple-600"
-                />
+
             </div>
 
             {/* Charts & Lists Section */}
@@ -268,7 +273,7 @@ const DashboardHome = () => {
                                                     initial={{ height: 0 }}
                                                     animate={{ height: `${heightPercent}%` }}
                                                     transition={{ duration: 0.8, delay: i * 0.05, ease: "easeOut" }}
-                                                    className="w-full bg-emerald-500 rounded-t-lg opacity-80 group-hover:opacity-100 transition-all shadow-lg shadow-emerald-200"
+                                                    className="w-full bg-orange-500 rounded-t-lg opacity-80 group-hover:opacity-100 transition-all shadow-lg shadow-orange-200"
                                                 />
                                             </div>
                                         );
@@ -305,7 +310,7 @@ const DashboardHome = () => {
                                         <FaBox className="text-lg" />
                                     </div>
                                     <div className="flex-1">
-                                        <h4 className="font-bold text-slate-700 text-sm group-hover:text-emerald-600 transition-colors">{item.name}</h4>
+                                        <h4 className="font-bold text-slate-700 text-sm group-hover:text-orange-600 transition-colors">{item.name}</h4>
                                         <p className="text-xs text-slate-400 font-medium">{item.category || 'General'}</p>
                                     </div>
                                     <div className="text-slate-800 font-black text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">

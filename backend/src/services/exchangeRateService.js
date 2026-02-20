@@ -55,11 +55,15 @@ class ExchangeRateService {
         try {
             const [rows] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_dolar']);
             if (rows.length > 0) {
-                this.currentRate = parseFloat(rows[0].valor);
-                this.lastUpdated = new Date(); // Approximate
-                console.log(`[EXCHANGE RATE] loaded from DB: ${this.currentRate} Bs/$`);
-                return true;
+                const rate = parseFloat(rows[0].valor);
+                if (rate > 0) {
+                    this.currentRate = rate;
+                    this.lastUpdated = new Date(); // Approximate
+                    console.log(`[EXCHANGE RATE] loaded from DB: ${this.currentRate} Bs/$`);
+                    return true;
+                }
             }
+            return false;
             return false;
         } catch (error) {
             console.error('[EXCHANGE RATE] Error loading from DB:', error);

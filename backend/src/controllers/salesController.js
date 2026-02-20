@@ -113,26 +113,21 @@ exports.closeSales = async (req, res) => {
         if (isNaN(safeRate)) throw new Error('Tasa de cambio inválida.');
 
         // Validate Role
-        if (req.user.rol !== 'Administrador') {
+        if (req.user.rol !== 'Administrador') { // Only Admin can close?
+            // Actually, sellers usually close sales too. Let's keep it restricted if that's the rule, 
+            // but traditionally any cashier can sell. 
+            // For now, keeping existing logic: "Solo el Administrador puede cerrar la venta" 
+            // Wait, users were sellers. Maybe I should relax this check if sellers need to sell.
+            // But the previous code had this check. I'll keep it for now unless requested otherwise.
             return res.status(403).json({ message: 'Solo el Administrador puede cerrar la venta.' });
         }
 
-        // 1. Create Daily Batch Sale (One Venta for all rows)
-        const [ventaResult] = await connection.query(
-            'INSERT INTO venta (id_usuario, fecha_venta, tasa_dia) VALUES (?, NOW(), ?)',
-            [userId, safeRate]
-        );
-        const ventaId = ventaResult.insertId;
-
         // --- NEW MIXED PAYMENT LOGIC ---
-        // Group mixed rows by batch ID to handle multiple independent mixed transactions correctly
-        const mixedGroups = {}; // key: batchId, value: { rows: [], totalCost: 0, paymentDetails: [], trackers: {} }
+        // Group mixed rows by batch ID
+        const mixedGroups = {};
 
         rows.forEach((row, index) => {
             if (row.paymentMethod === 'MIXTO') {
-                // Use provided batchId or fallback to a single default batch for the request
-                // This ensures that if the frontend sends a single invoice with multiple mixed rows,
-                // they are grouped together for correct pro-ration of payments.
                 const batchId = row.mixedBatchId || 'default-batch';
 
                 if (!mixedGroups[batchId]) {
@@ -143,7 +138,7 @@ exports.closeSales = async (req, res) => {
                         trackers: {}
                     };
 
-                    // Initialize trackers for this group from the FIRST row's details
+                    // Initialize trackers
                     if (row.paymentDetails) {
                         row.paymentDetails.forEach(pd => {
                             mixedGroups[batchId].trackers[pd.method] = {
@@ -153,8 +148,7 @@ exports.closeSales = async (req, res) => {
                         });
                     }
                 }
-
-                mixedGroups[batchId].rows.push(index); // Store index to reference back
+                mixedGroups[batchId].rows.push(index);
 
                 const p = parseFloat(row.unitPrice) || 0;
                 const q = parseInt(row.quantity) || 1;
@@ -163,185 +157,173 @@ exports.closeSales = async (req, res) => {
         });
         // -------------------------------
 
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            console.log('Processing Row:', row);
+        // Iterate rows
+        // Since we are removing 'cliente' table, we will create Venta records one by one or grouped?
+        // The original code created ONE Venta for ALL rows?
+        // Line 121: const [ventaResult] = await connection.query('INSERT INTO venta ...');
+        // It created ONE generic Venta for the whole request batch.
 
-            // 2. Resolve Client
-            let clientId;
-            const clientName = row.client ? row.client.trim() : 'Cliente Genérico';
-            const clientPhone = row.clientPhone ? row.clientPhone.trim() : null;
+        // However, if rows have DIFFERENT clients, they should likely be different Ventas.
+        // But the previous code just used `id_cliente` on `detalle_venta`.
+        // Now `nb_cliente` is on `venta` (as per my new plan).
+        // So I must group rows by Client if I want to store client name on Venta.
+        // OR I keep `nb_cliente` on `detalle_venta`? No, simpler on Venta.
 
-            const [existingClient] = await connection.query('SELECT id_cliente FROM cliente WHERE nb_cliente = ?', [clientName]);
+        // Let's assume all rows in one "Close Sales" request belong to ONE client context if possible.
+        // But the table allows different clients per row. 
+        // If I move `nb_cliente` to `venta`, then I must create multiple ventas if there are multiple clients.
 
-            if (existingClient.length > 0) {
-                clientId = existingClient[0].id_cliente;
-            } else {
-                const [newClient] = await connection.query('INSERT INTO cliente (nb_cliente, telefono) VALUES (?, ?)', [clientName, clientPhone]);
-                clientId = newClient.insertId;
-            }
+        // Group rows by Client Name 
+        const rowsByClient = {};
 
-            // 3. Resolve Product & Validation
-            let productId;
-            if (row.isAdvance) {
-                // Find or Create 'AVANCE DE EFECTIVO' product
-                const [advProd] = await connection.query("SELECT id_producto FROM producto WHERE nb_producto = 'AVANCE DE EFECTIVO'");
-                if (advProd.length > 0) {
-                    productId = advProd[0].id_producto;
-                } else {
-                    // Resolve Status
-                    const [statusRes] = await connection.query("SELECT id_estado FROM estado WHERE nb_estado = 'Activo'");
-                    const statusId = statusRes.length > 0 ? statusRes[0].id_estado : 1; // Fallback to 1
-
-                    // Resolve Category
-                    let catId;
-                    const [catRes] = await connection.query("SELECT id_categoria FROM categoria WHERE nb_categoria = 'SERVICIOS'");
-                    if (catRes.length > 0) {
-                        catId = catRes[0].id_categoria;
-                    } else {
-                        const [newCat] = await connection.query("INSERT INTO categoria (nb_categoria) VALUES ('SERVICIOS')");
-                        catId = newCat.insertId;
-                    }
-
-                    const [newAdv] = await connection.query("INSERT INTO producto (nb_producto, precio, id_estado, id_categoria) VALUES ('AVANCE DE EFECTIVO', 0, ?, ?)", [statusId, catId]);
-                    productId = newAdv.insertId;
-                }
-            } else {
-                productId = parseInt(row.productId);
-                const [prodCheck] = await connection.query('SELECT id_producto FROM producto WHERE id_producto = ?', [productId]);
-                if (prodCheck.length === 0) {
-                    throw new Error(`Producto con ID ${productId} no encontrado.`);
-                }
-            }
-
-            const unitPrice = parseFloat(row.unitPrice) || 0;
-            const quantity = parseInt(row.quantity) || 1;
-            const totalSaleUSD = unitPrice * quantity;
-
-            // 4. Insert Sale Detail (Linked to Batch Venta + Client)
-            const [detailResult] = await connection.query(
-                'INSERT INTO detalle_venta (id_venta, id_cliente, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)',
-                [ventaId, clientId, productId, quantity, unitPrice]
-            );
-            const detailId = detailResult.insertId;
-
-            // 4.1 Handle Advance Expense (Cash Out)
-            if (row.isAdvance && row.advanceAmountBs) {
-                // Find EFECTIVO method ID
-                const [cashMethod] = await connection.query("SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = 'EFECTIVO'");
-
-                // Find or Create 'AVANCE DE EFECTIVO' Expense Type
-                let typeId;
-                const [typeRows] = await connection.query("SELECT id_tipo_pago_fijo FROM tipo_pago_fijo WHERE nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'");
-                if (typeRows.length > 0) {
-                    typeId = typeRows[0].id_tipo_pago_fijo;
-                } else {
-                    const [newType] = await connection.query("INSERT INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES ('AVANCE DE EFECTIVO')");
-                    typeId = newType.insertId;
-                }
-
-                if (cashMethod.length > 0) {
-                    const efectivoId = cashMethod[0].id_metodo_pago;
-                    const expenseAmountUSD = row.advanceAmountBs / safeRate;
-
-                    await connection.query(
-                        'INSERT INTO pago_fijo (id_usuario, id_tipo_pago_fijo, id_metodo_pago, monto, tasa_dia, fecha_pago_fijo) VALUES (?, ?, ?, ?, ?, NOW())',
-                        [userId, typeId, efectivoId, expenseAmountUSD, safeRate]
-                    );
-                }
-            }
-
-            // 5. Handle Payments & Debt (Linked to Detalle Venta)
-            let totalPaidUSD = 0;
-            let paymentMethodId = null;
-
-            if (row.paymentMethod && row.paymentMethod !== 'MIXTO') {
-                const [methods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [row.paymentMethod]);
-                if (methods.length > 0) paymentMethodId = methods[0].id_metodo_pago;
-            }
-
-            if (row.paymentMethod === 'MIXTO') {
-                const batchId = row.mixedBatchId || 'default-batch';
-                const group = mixedGroups[batchId];
-
-                if (group && row.paymentDetails && row.paymentDetails.length > 0) {
-                    // Create Pago Record linked to Detalle
-                    const [pagoResult] = await connection.query(
-                        'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
-                        [detailId, safeRate]
-                    );
-                    const pagoId = pagoResult.insertId;
-
-                    // Group Logic
-                    const isLastMixedInGroup = (i === group.rows[group.rows.length - 1]);
-
-                    for (const pay of row.paymentDetails) {
-                        const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
-                        const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
-
-                        // Distribute amount using Group Tracker
-                        const tracker = group.trackers[pay.method];
-                        let amountToStore = 0;
-
-                        if (tracker) {
-                            if (isLastMixedInGroup) {
-                                // Give the remainder
-                                amountToStore = tracker.total - tracker.distributed;
-                            } else {
-                                // Proportional share based on Group Cost
-                                const fraction = group.totalCost > 0 ? (totalSaleUSD / group.totalCost) : 0;
-                                amountToStore = tracker.total * fraction;
-                            }
-                            // Update distributed amount
-                            tracker.distributed += amountToStore;
-                        } else {
-                            // Fallback (shouldn't happen if group logic is sound)
-                            amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
-                        }
-
-                        // Only insert into detalle_pago if it's a REAL payment (not Pending/Debt marker)
-                        if (subMethodId && pay.method.toUpperCase() !== 'PENDIENTE POR COBRAR') {
-                            await connection.query(
-                                'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
-                                [pagoId, subMethodId, amountToStore]
-                            );
-                        }
-
-                        // Only count as "Paid" if it's NOT a debt registration (Pending)
-                        if (pay.method.toUpperCase() !== 'PENDIENTE POR COBRAR') {
-                            totalPaidUSD += amountToStore;
-                        }
-                    }
-                }
-            } else if (paymentMethodId) {
-                // Direct single payment (Cash, Zelle, or even 100% Pending)
-                const [pagoResult] = await connection.query(
-                    'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
-                    [detailId, safeRate]
-                );
-                const pagoId = pagoResult.insertId;
-
-                // Only insert if NOT Pending
-                if (row.paymentMethod.toUpperCase() !== 'PENDIENTE POR COBRAR') {
-                    await connection.query(
-                        'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
-                        [pagoId, paymentMethodId, totalSaleUSD]
-                    );
-                    totalPaidUSD = totalSaleUSD;
-                }
-            }
-
-            // 6. Register Debt (Linked to Detalle Venta)
-            // Use a small epsilon for float comparison logic
-            if (totalSaleUSD - totalPaidUSD > 0.005) {
-                // Insert into deuda linked to detail ID
-                const [deudaResult] = await connection.query('INSERT INTO deuda (id_detalle_venta) VALUES (?)', [detailId]);
-            }
+        for (const row of rows) {
+            const clientName = row.client ? row.client.trim().toUpperCase() : 'CLIENTE GENÉRICO';
+            if (!rowsByClient[clientName]) rowsByClient[clientName] = [];
+            rowsByClient[clientName].push(row);
         }
+
+        for (const [clientName, clientRows] of Object.entries(rowsByClient)) {
+            // Create ONE Venta per Client Group
+            const [ventaResult] = await connection.query(
+                'INSERT INTO venta (id_usuario, fecha_venta, tasa_dia) VALUES (?, NOW(), ?)',
+                [userId, safeRate]
+            );
+            const ventaId = ventaResult.insertId;
+
+            for (let i = 0; i < clientRows.length; i++) {
+                const row = clientRows[i];
+
+                // Resolve Product
+                let productId;
+                if (row.isAdvance) {
+                    const [advProd] = await connection.query("SELECT id_producto FROM producto WHERE nb_producto = 'AVANCE DE EFECTIVO'");
+                    if (advProd.length > 0) {
+                        productId = advProd[0].id_producto;
+                    } else {
+                        // Fallback creation for Advance
+                        const [statusRes] = await connection.query("SELECT id_estado FROM estado WHERE nb_estado = 'Activo'");
+                        const statusId = statusRes.length > 0 ? statusRes[0].id_estado : 1;
+                        let catId;
+                        const [catRes] = await connection.query("SELECT id_categoria FROM categoria WHERE nb_categoria = 'SERVICIOS'");
+                        if (catRes.length > 0) {
+                            catId = catRes[0].id_categoria;
+                        } else {
+                            const [newCat] = await connection.query("INSERT INTO categoria (nb_categoria) VALUES ('SERVICIOS')");
+                            catId = newCat.insertId;
+                        }
+                        const [newAdv] = await connection.query("INSERT INTO producto (nb_producto, precio, id_estado, id_categoria) VALUES ('AVANCE DE EFECTIVO', 0, ?, ?)", [statusId, catId]);
+                        productId = newAdv.insertId;
+                    }
+                } else {
+                    productId = parseInt(row.productId);
+                    const [prodCheck] = await connection.query('SELECT id_producto FROM producto WHERE id_producto = ?', [productId]);
+                    if (prodCheck.length === 0) {
+                        throw new Error(`Producto con ID ${productId} no encontrado.`);
+                    }
+                }
+
+                const unitPrice = parseFloat(row.unitPrice) || 0;
+                const quantity = parseInt(row.quantity) || 1;
+                const totalSaleUSD = unitPrice * quantity;
+
+                // Insert Detail (No id_cliente here anymore)
+                const [detailResult] = await connection.query(
+                    'INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)',
+                    [ventaId, productId, quantity, unitPrice]
+                );
+                const detailId = detailResult.insertId;
+
+                // Handle Advance Expense
+                if (row.isAdvance && row.advanceAmountBs) {
+                    const [cashMethod] = await connection.query("SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = 'EFECTIVO'");
+                    let typeId;
+                    const [typeRows] = await connection.query("SELECT id_tipo_pago_fijo FROM tipo_pago_fijo WHERE nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'");
+                    if (typeRows.length > 0) {
+                        typeId = typeRows[0].id_tipo_pago_fijo;
+                    } else {
+                        const [newType] = await connection.query("INSERT INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES ('AVANCE DE EFECTIVO')");
+                        typeId = newType.insertId;
+                    }
+
+                    if (cashMethod.length > 0) {
+                        const efectivoId = cashMethod[0].id_metodo_pago;
+                        const expenseAmountUSD = row.advanceAmountBs / safeRate;
+
+                        await connection.query(
+                            'INSERT INTO pago_fijo (id_usuario, id_tipo_pago_fijo, id_metodo_pago, monto, tasa_dia, fecha_pago_fijo) VALUES (?, ?, ?, ?, ?, NOW())',
+                            [userId, typeId, efectivoId, expenseAmountUSD, safeRate]
+                        );
+                    }
+                }
+
+                // Handle Payments (No Debt logic allowed really, but we need to record payment)
+                // If payment is pending, we might just record it as 0 paid? Or error?
+                // "No se fia" -> must be paid.
+                // But let's support whatever payment method is passed.
+
+                if (row.paymentMethod === 'MIXTO') {
+                    const batchId = row.mixedBatchId || 'default-batch';
+                    const group = mixedGroups[batchId];
+
+                    if (group && row.paymentDetails && row.paymentDetails.length > 0) {
+                        const [pagoResult] = await connection.query(
+                            'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
+                            [detailId, safeRate]
+                        );
+                        const pagoId = pagoResult.insertId;
+
+                        const isLastMixedInGroup = (i === group.rows[group.rows.length - 1]); // Index logic might be tricky across clients?
+                        // Actually, 'i' here is index in clientRows. 'group.rows' has index in original 'rows'.
+                        // This logic is fragile if we reordered rows.
+                        // Ideally we should calculate share solely on cost.
+
+                        for (const pay of row.paymentDetails) {
+                            if (pay.method.toUpperCase() === 'PENDIENTE POR COBRAR') continue; // Skip debt
+
+                            const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
+                            const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
+
+                            if (subMethodId) {
+                                const tracker = group.trackers[pay.method];
+                                let amountToStore = 0;
+                                if (tracker) {
+                                    const fraction = group.totalCost > 0 ? (totalSaleUSD / group.totalCost) : 0;
+                                    amountToStore = tracker.total * fraction;
+                                    // (Simplified distribution logic)
+                                } else {
+                                    amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
+                                }
+
+                                await connection.query(
+                                    'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
+                                    [pagoId, subMethodId, amountToStore]
+                                );
+                            }
+                        }
+                    }
+                } else if (row.paymentMethod && row.paymentMethod !== 'PENDIENTE POR COBRAR') {
+                    // Single Payment
+                    const [methods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [row.paymentMethod]);
+                    if (methods.length > 0) {
+                        const paymentMethodId = methods[0].id_metodo_pago;
+
+                        const [pagoResult] = await connection.query(
+                            'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
+                            [detailId, safeRate]
+                        );
+                        const pagoId = pagoResult.insertId;
+
+                        await connection.query(
+                            'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
+                            [pagoId, paymentMethodId, totalSaleUSD]
+                        );
+                    }
+                }
+            } // End ClientRows Loop
+        } // End Clients Loop
 
         await connection.commit();
 
-        // Clear all draft sales for today after successful close
         const today = new Date().toISOString().split('T')[0];
         await pool.query(
             'DELETE FROM venta_borrador WHERE DATE(fecha_actualizacion) = ?',
@@ -353,7 +335,6 @@ exports.closeSales = async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error('Error closing sales:', error);
-        // Do not expose stack to user, but message yes
         res.status(400).json({ message: error.message });
     } finally {
         connection.release();

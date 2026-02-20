@@ -33,14 +33,12 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const salesRoutes = require('./routes/salesRoutes');
-const clientRoutes = require('./routes/clientRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', salesRoutes);
-app.use('/api/clients', clientRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/history', require('./routes/historyRoutes'));

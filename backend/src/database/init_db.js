@@ -28,8 +28,8 @@ async function initDB() {
         console.log('Insertando usuario inicial...');
         const passwordHash = await bcrypt.hash('React29d$', 10);
         const user = {
-            nombre: 'Alejandro',
-            apellido: 'Villa',
+            nombre: 'ALEJANDRO',
+            apellido: 'VILLA',
             email: 'alejandrovilla2912@gmail.com',
             password: passwordHash,
             rol: 'contador'

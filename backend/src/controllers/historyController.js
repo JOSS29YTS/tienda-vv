@@ -61,8 +61,6 @@ exports.getHistory = async (req, res) => {
             GROUP BY DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, tasa_dia, type
         `;
 
-        const [debtRows] = await pool.query(debtQuery);
-
         // Merge debtRows into rows if necessary, or process separately
         // We will process separately and merge into historyByDay
 
@@ -93,12 +91,9 @@ exports.getHistory = async (req, res) => {
 
             // Totals Calculation & Breakdown Aggregation
             const method = row.metodo ? row.metodo.toUpperCase() : 'DESCONOCIDO';
-            const isPending = method === 'PENDIENTE POR COBRAR';
-
-            // Use regex for robust USD detection matching SQL logic
             // Note: PENDIENTE POR COBRAR is treated as USD in the original logic for classification, 
             // but might be excluded from totals.
-            const isUSD = /DIVISA|ZELLE|BINANCE|PAYPAL|USD|DOLAR|[$]/.test(method) || isPending;
+            const isUSD = /DIVISA|ZELLE|BINANCE|PAYPAL|USD|DOLAR|[$]/.test(method);
 
             const amountVal = parseFloat(row.total) || 0;
             const rate = parseFloat(row.tasa_dia) || 1;
@@ -120,9 +115,7 @@ exports.getHistory = async (req, res) => {
             // User requested to match History ($27.11) which was Net Flow.
             if (isUSD) {
                 // Exclude Pending/Debt from Total Cash/Income USD
-                if (!isPending) {
-                    historyByDay[dateKey].totalUSD += amountVal;
-                }
+                historyByDay[dateKey].totalUSD += amountVal;
             } else {
                 const amountInBs = amountVal * rate;
                 historyByDay[dateKey].totalBS += amountInBs;
@@ -139,30 +132,6 @@ exports.getHistory = async (req, res) => {
                     method: row.metodo,
                     amount: amountForBreakdown,
                     currency: currencyForBreakdown
-                });
-            }
-        });
-
-        // NEW: Process Debt Rows (Pending)
-        debtRows.forEach(row => {
-            if (!row.fecha) return;
-            const dateKey = row.fecha;
-            const amount = parseFloat(row.total); // Usually (Cost - Paid)
-
-            if (amount <= 0.005) return; // Skip paid debts
-
-            initDay(dateKey, row.tasa_dia);
-
-            // Add to Breakdown ONLY (Pending does not affect Net Income/Cash Flow)
-            const existingItem = historyByDay[dateKey].breakdown.find(item => item.method === 'PENDIENTE POR COBRAR');
-
-            if (existingItem) {
-                existingItem.amount += amount;
-            } else {
-                historyByDay[dateKey].breakdown.push({
-                    method: 'PENDIENTE POR COBRAR',
-                    amount: amount,
-                    currency: 'USD'
                 });
             }
         });

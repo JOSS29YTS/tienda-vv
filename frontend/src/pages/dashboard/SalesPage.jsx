@@ -23,7 +23,7 @@ const SalesPage = () => {
     // Data State
     const [products, setProducts] = useState([]);
     const [paymentMethods, setPaymentMethods] = useState([]);
-    const [clients, setClients] = useState([]);
+
 
     // Rows State (The Sheet)
     const [rows, setRows] = useState(() => {
@@ -31,7 +31,7 @@ const SalesPage = () => {
         if (savedRows) {
             return JSON.parse(savedRows);
         }
-        return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
+        return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }];
     });
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -46,10 +46,9 @@ const SalesPage = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-    const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+
     const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
-    const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false); // Shared Modal State
-    const [targetRowForClient, setTargetRowForClient] = useState(null); // Track which row triggered the modal
+
     const [scanCode, setScanCode] = useState('');
     const isProcessingScanRef = useRef(false);
     const lastInteractionRef = useRef(Date.now()); // Start with current time to trust LocalStorage on mount
@@ -77,7 +76,7 @@ const SalesPage = () => {
 
         const handleGlobalKeyDown = (e) => {
             // Ignore if modal is open (let modal handle it)
-            if (isNewInvoiceModalOpen || isAdvanceModalOpen || showConfirmationModal) return;
+            if (isNewInvoiceModalOpen || showConfirmationModal) return;
 
             // Ignore if typing in an input
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
@@ -107,7 +106,7 @@ const SalesPage = () => {
                             let newRows = [...prevRows];
                             let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
                             if (targetRowIndex === -1) {
-                                newRows.push({ id: Date.now(), productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                                newRows.push({ id: Date.now(), productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '' });
                             } else {
                                 newRows[targetRowIndex] = { ...newRows[targetRowIndex], productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio) };
                             }
@@ -133,12 +132,12 @@ const SalesPage = () => {
 
         window.addEventListener('keydown', handleGlobalKeyDown);
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, [isNewInvoiceModalOpen, isAdvanceModalOpen, showConfirmationModal, products]);
+    }, [isNewInvoiceModalOpen, showConfirmationModal, products]);
 
     useEffect(() => {
         fetchProducts();
         fetchPaymentMethods();
-        fetchClients();
+
         fetchDraftSales(); // Load initial drafts
 
         // Poll for updates every 15 seconds to avoid saturation
@@ -261,7 +260,7 @@ const SalesPage = () => {
 
                 // 4. Fallback if empty
                 if (finalMerged.length === 0) {
-                    return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }];
+                    return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }];
                 }
 
                 // Optimization: Only update if strings actually changed
@@ -301,24 +300,12 @@ const SalesPage = () => {
         }
     };
 
-    const fetchClients = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/clients`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await response.json();
-            setClients(data);
-        } catch (err) {
-            console.error(err);
-            // Don't block UI if clients fail loading, just log
-        }
-    };
+
 
     // Row Operations
     const addRow = () => {
         touchInteraction();
-        setRows([...rows, { id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
+        setRows([...rows, { id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }]);
     };
 
     const handleScan = async (e) => {
@@ -344,7 +331,7 @@ const SalesPage = () => {
                     let targetRowIndex = newRows.findIndex(r => !r.productId && !r.isAdvance);
 
                     if (targetRowIndex === -1) {
-                        newRows.push({ id: Date.now(), productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '', client: '', isNewClient: false });
+                        newRows.push({ id: Date.now(), productId: product.id_producto, quantity: 1, unitPrice: parseFloat(product.precio), paymentMethod: '' });
                     } else {
                         newRows[targetRowIndex] = {
                             ...newRows[targetRowIndex],
@@ -398,16 +385,7 @@ const SalesPage = () => {
 
         setRows(rows.map(row => {
             if (row.id === id) {
-                // New Client Logic
-                if (field === 'startNewClient') {
-                    // Trigger Modal instead of inline
-                    setTargetRowForClient(id);
-                    setIsAddClientModalOpen(true);
-                    return row; // Don't change row yet
-                }
-                if (field === 'cancelNewClient') {
-                    return { ...row, isNewClient: false, client: '', clientPhone: '' };
-                }
+
 
                 let updates = { [field]: value };
 
@@ -607,14 +585,13 @@ const SalesPage = () => {
                 `$ ${(row.unitPrice || 0).toFixed(2)}`,
                 `$ ${rowTotalUSD.toFixed(2)}`,
                 `Bs. ${rowTotalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                row.paymentMethod,
-                row.client || '-'
+                row.paymentMethod
             ];
         });
 
         autoTable(doc, {
             startY: 50,
-            head: [['Producto', 'Cant', '$ Unit', 'Total $', 'Total Bs', 'Método', 'Cliente']],
+            head: [['Producto', 'Cant', '$ Unit', 'Total $', 'Total Bs', 'Método']],
             body: tableBody,
             theme: 'striped',
             headStyles: { fillColor: secondaryColor, textColor: 255, fontStyle: 'bold' },
@@ -759,40 +736,7 @@ const SalesPage = () => {
             </header>
 
             {/* Add Client Modal */}
-            {isAddClientModalOpen && (
-                <AddClientModal
-                    onClose={() => {
-                        setIsAddClientModalOpen(false);
-                        setTargetRowForClient(null);
-                    }}
-                    onSave={(data) => {
-                        if (targetRowForClient) {
-                            // Update specific row
-                            setRows(prev => prev.map(r => r.id === targetRowForClient ? { ...r, client: data.name, clientPhone: data.phone, isNewClient: true } : r));
-                        }
-                        setIsAddClientModalOpen(false);
-                        setTargetRowForClient(null);
-                    }}
-                />
-            )}
 
-            {/* Add Client Modal */}
-            {isAddClientModalOpen && (
-                <AddClientModal
-                    onClose={() => {
-                        setIsAddClientModalOpen(false);
-                        setTargetRowForClient(null);
-                    }}
-                    onSave={(data) => {
-                        if (targetRowForClient) {
-                            // Update specific row
-                            setRows(prev => prev.map(r => r.id === targetRowForClient ? { ...r, client: data.name, clientPhone: data.phone, isNewClient: true } : r));
-                        }
-                        setIsAddClientModalOpen(false);
-                        setTargetRowForClient(null);
-                    }}
-                />
-            )}
 
             {/* Top Summary Section - Styled like the dark blue headers in the requested image */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0 rounded-xl overflow-hidden shadow-lg border border-slate-200">
@@ -882,7 +826,7 @@ const SalesPage = () => {
                                 <th className="p-3 font-bold text-xs uppercase tracking-wider w-28 text-right">PRECIO BS</th>
                                 <th className="p-3 font-bold text-xs uppercase tracking-wider w-32 text-right bg-[#1e293b]">TOTAL BS</th>
                                 <th className="p-3 font-bold text-xs uppercase tracking-wider min-w-[180px]">MÉTODO DE PAGO</th>
-                                <th className="p-3 font-bold text-xs uppercase tracking-wider min-w-[200px]">CLIENTE</th>
+
                                 <th className="p-3 w-10"></th>
                             </tr>
                         </thead>
@@ -911,25 +855,18 @@ const SalesPage = () => {
 
                                         {/* Product Select */}
                                         <td className="p-1">
-                                            {row.isAdvance ? (
-                                                <div className="w-full bg-purple-50 border border-purple-200 rounded px-2 py-1.5 text-sm font-black text-purple-700 uppercase tracking-wide flex items-center justify-between">
-                                                    <span>AVANCE EFECTIVO</span>
-                                                    <span className="text-xs bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded font-bold">20%</span>
-                                                </div>
-                                            ) : (
-                                                <select
-                                                    value={row.productId}
-                                                    onChange={(e) => updateRow(row.id, 'productId', e.target.value)}
-                                                    className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700"
-                                                >
-                                                    <option value="">Seleccionar Producto...</option>
-                                                    {products.map(p => (
-                                                        <option key={p.id_producto} value={p.id_producto}>
-                                                            {p.nombre}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            )}
+                                            <select
+                                                value={row.productId}
+                                                onChange={(e) => updateRow(row.id, 'productId', e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700"
+                                            >
+                                                <option value="">Seleccionar Producto...</option>
+                                                {products.map(p => (
+                                                    <option key={p.id_producto} value={p.id_producto}>
+                                                        {p.nombre}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </td>
 
                                         {/* Quantity */}
@@ -939,8 +876,7 @@ const SalesPage = () => {
                                                 min="0"
                                                 value={row.quantity}
                                                 onChange={(e) => updateRow(row.id, 'quantity', parseFloat(e.target.value))}
-                                                className={`w-full border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold focus:border-emerald-500 outline-none show-spinner ${row.isAdvance ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-900'}`}
-                                                readOnly={row.isAdvance}
+                                                className={`w-full border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold focus:border-emerald-500 outline-none show-spinner bg-white text-slate-900`}
                                             />
                                         </td>
 
@@ -996,50 +932,7 @@ const SalesPage = () => {
                                         </td>
 
                                         {/* Client */}
-                                        <td className="p-1">
 
-                                            {row.isNewClient ? (
-                                                <div className="flex flex-col gap-1 w-full">
-                                                    <div className="flex items-center gap-1">
-                                                        <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5 text-xs">
-                                                            <div className="font-bold text-emerald-800 break-all">{row.client}</div>
-                                                            {row.clientPhone && <div className="text-emerald-600 font-mono">{row.clientPhone}</div>}
-                                                        </div>
-                                                        <button
-                                                            onClick={() => updateRow(row.id, 'cancelNewClient')}
-                                                            className="text-red-400 hover:text-red-600 p-1 shrink-0"
-                                                            title="Cancelar nuevo cliente"
-                                                        >
-                                                            <FaTrash size={12} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <select
-                                                    value={row.client}
-                                                    onChange={(e) => {
-                                                        if (e.target.value === 'NEW_CLIENT') {
-                                                            updateRow(row.id, 'startNewClient');
-                                                        } else {
-                                                            updateRow(row.id, 'client', e.target.value);
-                                                        }
-                                                    }}
-                                                    className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700"
-                                                >
-                                                    <option value="">- Cliente -</option>
-                                                    <option value="NEW_CLIENT" className="font-bold text-emerald-600 bg-emerald-50">+ Nuevo Cliente</option>
-                                                    <option value="CLIENTE" className="font-bold text-slate-800">CLIENTE</option>
-                                                    {clients
-                                                        .filter(c => c.nb_cliente !== 'CLIENTE')
-                                                        .map(c => (
-                                                            <option key={c.id_cliente} value={c.nb_cliente}>
-                                                                {c.nb_cliente}
-                                                            </option>
-                                                        ))}
-                                                </select>
-                                            )
-                                            }
-                                        </td>
 
                                         {/* Actions */}
                                         <td className="p-1 text-center">
@@ -1067,12 +960,7 @@ const SalesPage = () => {
                         >
                             <span className="text-xl leading-none">+</span> Agregar Fila
                         </button>
-                        <button
-                            onClick={() => setIsAdvanceModalOpen(true)}
-                            className="px-4 py-2 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 font-bold transition-all shadow-sm text-sm flex items-center gap-2"
-                        >
-                            <FaMoneyBillWave /> Agregar Avance
-                        </button>
+
                         <button
                             onClick={() => setIsNewInvoiceModalOpen(true)}
                             className="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100 font-bold transition-all shadow-sm text-sm flex items-center gap-2"
@@ -1084,43 +972,14 @@ const SalesPage = () => {
                 </div>
             </motion.div>
 
-            {/* Advance Modal */}
-            <AnimatePresence>
-                {isAdvanceModalOpen && (
-                    <AdvanceModal
-                        rate={rate}
-                        paymentMethods={paymentMethods}
-                        onClose={() => setIsAdvanceModalOpen(false)}
-                        onConfirm={(data) => {
-                            const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
-                            const totalBs = parseFloat(data.amount) * 1.20; // 20% commission
-                            const priceUsd = totalBs / parseFloat(rate);
 
-                            setRows([...rows, {
-                                id: newId,
-                                isAdvance: true,
-                                productId: 'AVANCE', // Placeholder
-                                quantity: 1,
-                                unitPrice: priceUsd,
-                                paymentMethod: data.method,
-                                client: data.client || 'CLIENTE',
-                                isNewClient: false,
-                                advanceAmountBs: parseFloat(data.amount), // Cost to deduct from Cash
-                                advanceCommissionBs: parseFloat(data.amount) * 0.20
-                            }]);
-                            setIsAdvanceModalOpen(false);
-                            setSuccessMessage('Avance registrado correctamente');
-                        }}
-                    />
-                )}
-            </AnimatePresence>
 
             {/* New Invoice Modal */}
             <AnimatePresence>
                 {isNewInvoiceModalOpen && (
                     <NewInvoiceModal
                         products={products}
-                        clients={clients}
+
                         paymentMethods={paymentMethods}
                         rate={rate}
                         onClose={() => setIsNewInvoiceModalOpen(false)}
@@ -1158,10 +1017,7 @@ const SalesPage = () => {
                                     unitPrice: item.unitPrice,
                                     paymentMethod: rowPaymentMethod,
                                     mixedBatchId: batchId,
-                                    paymentDetails: rowPaymentDetails,
-                                    client: client || 'CLIENTE',
-                                    isNewClient: client && !clients.some(c => c.nb_cliente === client) ? true : false,
-                                    clientPhone: invoiceData.clientPhone
+                                    paymentDetails: rowPaymentDetails
                                 });
                             });
 
@@ -1455,10 +1311,8 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
 };
 
 export default SalesPage;
-const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onConfirm }) => {
-    const [client, setClient] = useState('');
-    const [invoiceClientPhone, setInvoiceClientPhone] = useState('');
-    const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
+const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm }) => {
+
     const [items, setItems] = useState([]);
     const [error, setError] = useState(null); // Local error state for modal
 
@@ -1674,8 +1528,6 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
 
         onConfirm({
             items,
-            client,
-            clientPhone: invoiceClientPhone,
             payment: finalPaymentData
         });
     };
@@ -1741,50 +1593,9 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
                             </div>
                         </div>
 
-                        {/* Client Selector */}
-                        <div className="mb-4">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cliente</label>
-                            <div className="flex gap-2">
-                                <select
-                                    value={client}
-                                    onChange={(e) => {
-                                        if (e.target.value === 'NEW_CLIENT') {
-                                            setIsAddClientModalOpen(true);
-                                        } else {
-                                            setClient(e.target.value);
-                                        }
-                                    }}
-                                    className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-700"
-                                >
-                                    <option value="">- Cliente General -</option>
-                                    <option value="CLIENTE">CLIENTE</option>
-                                    <option value="NEW_CLIENT" className="text-emerald-600 font-bold">+ Nuevo Cliente</option>
-                                    {clients
-                                        .filter(c => c.nb_cliente !== 'CLIENTE')
-                                        .map(c => <option key={c.id_cliente} value={c.nb_cliente}>{c.nb_cliente}</option>)
-                                    }
-                                </select>
-                            </div>
-                            {/* Show selected new client info */}
-                            {client && !clients.some(c => c.nb_cliente === client) && client !== 'CLIENTE' && (
-                                <div className="mt-2 p-2 bg-emerald-50 border border-emerald-100 rounded text-xs flex justify-between items-center">
-                                    <span className="font-bold text-emerald-800">{client} {invoiceClientPhone && <span className="font-mono opacity-75">({invoiceClientPhone})</span>}</span>
-                                    <button onClick={() => setIsAddClientModalOpen(true)} className="text-emerald-600 hover:text-emerald-800 text-xs underline">Editar</button>
-                                </div>
-                            )}
-                        </div>
 
-                        {isAddClientModalOpen && (
-                            <AddClientModal
-                                onClose={() => setIsAddClientModalOpen(false)}
-                                onSave={(data) => {
-                                    setClient(data.name);
-                                    setInvoiceClientPhone(data.phone);
-                                    setIsAddClientModalOpen(false);
-                                }}
-                                initialData={{ name: client, phone: invoiceClientPhone }}
-                            />
-                        )}
+
+
 
                         {/* Add Item Form */}
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 shrink-0">
@@ -2037,171 +1848,4 @@ const NewInvoiceModal = ({ products, clients, paymentMethods, rate, onClose, onC
     );
 };
 
-const AdvanceModal = ({ rate, paymentMethods, onClose, onConfirm }) => {
-    const [amount, setAmount] = useState('');
-    const [method, setMethod] = useState('');
-    const [client, setClient] = useState('');
 
-    const commission = (parseFloat(amount) || 0) * 0.20;
-    const totalToCharge = (parseFloat(amount) || 0) + commission;
-
-    return createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-            <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden min-h-[500px]"
-            >
-                <div className="bg-purple-600 text-white p-6">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                        <FaMoneyBillWave /> Nuevo Avance
-                    </h3>
-                    <p className="text-purple-200 text-sm">Entrega de efectivo con comisión</p>
-                </div>
-
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monto a Entregar (Bs)</label>
-                        <input
-                            type="number"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            className="w-full text-2xl font-black text-slate-800 border-b-2 border-purple-200 hover:border-purple-500 focus:border-purple-600 outline-none py-2 bg-transparent transition-colors"
-                            placeholder="0.00"
-                            autoFocus
-                        />
-                    </div>
-
-                    <div className="bg-slate-50 p-4 rounded-xl space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 font-bold">Comisión (20%)</span>
-                            <span className="font-bold text-slate-600">Bs {commission.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
-                            <span className="text-purple-700 font-bold uppercase text-xs">Total a Cobrar</span>
-                            <span className="font-black text-xl text-purple-700">Bs {totalToCharge.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="text-right text-xs text-slate-400 font-bold">
-                            $ {(totalToCharge / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método de Cobro</label>
-                        <select
-                            value={method}
-                            onChange={(e) => setMethod(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 font-bold text-slate-700 focus:ring-2 focus:ring-purple-500 outline-none"
-                        >
-                            <option value="">Seleccionar...</option>
-                            {paymentMethods
-                                .filter(m => m.nb_metodo_pago !== 'EFECTIVO' && m.nb_metodo_pago !== 'MIXTO')
-                                .map(m => (
-                                    <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
-                                ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cliente (Opcional)</label>
-                        <input
-                            type="text"
-                            value={client}
-                            onChange={(e) => setClient(e.target.value.toUpperCase())}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 font-bold text-slate-700 focus:ring-2 focus:ring-purple-500 outline-none placeholder:font-normal"
-                            placeholder="Nombre del cliente..."
-                        />
-                    </div>
-
-                    <button
-                        onClick={() => onConfirm({ amount, method, client })}
-                        disabled={!amount || !method || parseFloat(amount) <= 0}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg shadow-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-                    >
-                        Procesar Avance
-                    </button>
-
-                    <button
-                        onClick={onClose}
-                        className="w-full py-2 text-slate-400 hover:text-slate-600 font-bold text-sm"
-                    >
-                        Cancelar
-                    </button>
-                </div>
-            </motion.div>
-        </div>,
-        document.body
-    );
-};
-
-// Add Client Modal Component
-const AddClientModal = ({ onClose, onSave, initialData }) => {
-    const [name, setName] = useState(initialData?.name || '');
-    const [phone, setPhone] = useState(initialData?.phone || '');
-    const [error, setError] = useState('');
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!name.trim()) {
-            setError('El nombre es obligatorio');
-            return;
-        }
-        // Phone validation if provided
-        if (phone.trim()) {
-            // Regex for 11 digits starting with 0 (e.g., 04242526986)
-            const phoneRegex = /^0\d{10}$/;
-            if (!phoneRegex.test(phone.trim())) {
-                setError('El teléfono debe tener 11 dígitos y comenzar con 0 (Ej: 04242526986)');
-                return;
-            }
-        }
-
-        onSave({ name: name.toUpperCase(), phone: phone.trim() });
-    };
-
-    return createPortal(
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm relative z-10"
-            >
-                <h3 className="text-xl font-bold text-slate-800 mb-4">Nuevo Cliente</h3>
-                {error && <div className="bg-red-50 text-red-600 p-2 rounded text-sm mb-4">{error}</div>}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full border border-slate-300 rounded p-2 uppercase focus:border-emerald-500 outline-none"
-                            placeholder="NOMBRE DEL CLIENTE"
-                            autoFocus
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Teléfono (WhatsApp)</label>
-                        <input
-                            type="text"
-                            value={phone}
-                            onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, ''); // Only numbers
-                                if (val.length <= 11) setPhone(val);
-                            }}
-                            className="w-full border border-slate-300 rounded p-2 focus:border-emerald-500 outline-none font-mono"
-                            placeholder="04141234567"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">Formato: 11 dígitos, ej: 04241234567</p>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={onClose} className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">Cancelar</button>
-                        <button type="submit" className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Guardar</button>
-                    </div>
-                </form>
-            </motion.div>
-        </div>,
-        document.body
-    );
-};

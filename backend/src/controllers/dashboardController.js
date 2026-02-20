@@ -150,7 +150,23 @@ exports.getDashboardStats = async (req, res) => {
         const [chartData] = await pool.query(chartQuery);
         // Fill missing months? Maybe later. For now send what we have.
 
-        // 6. Top Products
+        // 6. Purchases (Current Month vs Prev Month)
+        const getTotalPurchases = async (month, year) => {
+            const query = `
+                SELECT COALESCE(SUM(total_compra), 0) as total
+                FROM compra
+                WHERE MONTH(fecha_compra) = ? 
+                AND YEAR(fecha_compra) = ?
+            `;
+            const [rows] = await pool.query(query, [month, year]);
+            return parseFloat(rows[0].total);
+        };
+
+        const currentPurchases = await getTotalPurchases(currentMonth, currentYear);
+        const prevPurchases = await getTotalPurchases(prevMonth, prevMonthYear);
+        const purchasesTrend = prevPurchases === 0 ? 100 : ((currentPurchases - prevPurchases) / prevPurchases) * 100;
+
+        // 7. Top Products
         const topProductsQuery = `
             SELECT 
                 p.nb_producto as name, 
@@ -169,6 +185,7 @@ exports.getDashboardStats = async (req, res) => {
         res.json({
             stats: {
                 sales: { value: adjustedCurrentSales, trend: salesTrend },
+                purchases: { value: currentPurchases, trend: purchasesTrend },
                 pendingInvoices: { value: pendingInvoicesCount, trend: 0 },
                 products: { value: totalProducts, trend: 0 }, // Static for now
                 clients: { value: totalClients, trend: 0 }    // Static for now

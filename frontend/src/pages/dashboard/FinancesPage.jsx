@@ -550,7 +550,6 @@ const FinancesPage = () => {
             ['Efectivo (Bs)', `Bs. ${stats.totalEfectivoBs.toFixed(2)}`],
             ['Punto de Venta', `Bs. ${stats.totalPunto.toFixed(2)}`],
             ['Pago Móvil', `Bs. ${stats.totalPagoMovil.toFixed(2)}`],
-            ['Biopago', `Bs. ${stats.totalBiopago.toFixed(2)}`],
             ['Transferencia', `Bs. ${stats.totalTransferencia.toFixed(2)}`]
         ];
 
@@ -698,7 +697,7 @@ const FinancesPage = () => {
                     title="Egresos Totales (Compras + Pagos)"
                     value={stats.expenses}
                     icon={FaShoppingCart}
-                    gradient="bg-gradient-to-br from-red-500 to-rose-600"
+                    gradient="bg-gradient-to-br from-red-600 to-rose-700"
                 />
                 <StatCard
                     title="Balance Neto"
@@ -706,17 +705,12 @@ const FinancesPage = () => {
                     icon={FaWallet}
                     gradient={stats.balance >= 0 ? "bg-gradient-to-br from-blue-500 to-indigo-600" : "bg-gradient-to-br from-orange-500 to-amber-600"}
                 />
-                <StatCard
-                    title="Cuentas por Cobrar"
-                    value={stats.receivables}
-                    icon={FaReceipt}
-                    gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-                />
+
                 <StatCard
                     title={`Facturas Pendientes (${stats.pendingInvoiceCount})`}
                     value={stats.pendingInvoiceTotal}
                     icon={FaFileInvoiceDollar}
-                    gradient="bg-gradient-to-br from-red-600 to-rose-700"
+                    gradient="bg-gradient-to-br from-amber-500 to-orange-600"
                 />
 
                 {/* Payment Methods Breakdown */}
@@ -739,13 +733,6 @@ const FinancesPage = () => {
                     value={stats.totalPagoMovil}
                     icon={FaMobileAlt}
                     gradient="bg-gradient-to-br from-indigo-500 to-purple-600"
-                    isBs={true}
-                />
-                <StatCard
-                    title="Biopago"
-                    value={stats.totalBiopago}
-                    icon={FaFingerprint}
-                    gradient="bg-gradient-to-br from-teal-500 to-cyan-600"
                     isBs={true}
                 />
                 <StatCard

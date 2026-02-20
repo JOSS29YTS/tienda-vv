@@ -6,8 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 
 const SidebarItem = ({ to, icon: Icon, label, active }) => {
     return (
-        <Link to={to} className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden isolate ${active ? 'text-white font-bold bg-gradient-to-r from-emerald-600 to-teal-600 shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-            <Icon className={`text-xl ${active ? 'text-white scale-110' : 'text-slate-500 group-hover:text-emerald-400'} transition-transform duration-300`} />
+        <Link to={to} className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden isolate ${active ? 'text-white font-bold bg-gradient-to-r from-orange-600 to-amber-600 shadow-lg shadow-orange-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+            <Icon className={`text-xl ${active ? 'text-white scale-110' : 'text-slate-500 group-hover:text-orange-400'} transition-transform duration-300`} />
             <span className="relative z-10">{label}</span>
         </Link>
     );
@@ -42,23 +42,21 @@ const DashboardLayout = () => {
 
         if (role === 'vendedor') {
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
-            navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
         } else if (role === 'gerente') {
             // Gerente sees everything EXCEPT History and Users
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
-            navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
+            navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
         } else if (role === 'administrador') {
             // Admin sees EVERYTHING
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
-            navItems.push({ to: "/dashboard/clients", icon: FaUserFriends, label: "Clientes" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
@@ -88,10 +86,13 @@ const DashboardLayout = () => {
                 style={{ position: window.innerWidth < 1024 ? 'fixed' : 'relative' }}
             >
                 <Link to="/" className="p-6 flex items-center gap-4 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
-                    <div className="bg-gradient-to-br from-emerald-500 to-teal-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
-                        <img src="/img/venalta-logo.png" alt="Venalta" className="h-8 w-auto" />
+                    {/* Logo - Ropa Maniaz Style */}
+                    <div className="relative px-3 py-2 bg-slate-950 ring-1 ring-white/10 rounded-lg leading-none flex items-center gap-2 w-full justify-center">
+                        <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">RM</div>
+                        <span className="text-xl font-bold font-heading tracking-wide text-white">
+                            Ropa <span className="text-orange-500">Maniaz</span>
+                        </span>
                     </div>
-                    <span className="text-2xl font-bold text-white font-heading tracking-wide group-hover:text-emerald-400 transition-colors">Venalta</span>
                 </Link>
 
                 <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
@@ -105,7 +106,7 @@ const DashboardLayout = () => {
                         to="/"
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-slate-400 hover:bg-white/5 hover:text-white transition-all font-medium group"
                     >
-                        <FaHome className="group-hover:text-emerald-400 transition-colors" />
+                        <FaHome className="group-hover:text-amber-400 transition-colors" />
                         <span>Volver al Inicio</span>
                     </Link>
                     <button
@@ -116,7 +117,7 @@ const DashboardLayout = () => {
                         <span>Cerrar Sesión</span>
                     </button>
                     <div className="px-4 py-3 mt-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 font-medium">Venalta System</div>
+                        <div className="text-xs text-slate-400 font-medium">Ropa Maniaz System</div>
                         <div className="text-[10px] text-slate-600">v2.0.0 Business Edition</div>
                     </div>
                 </div>
@@ -134,7 +135,7 @@ const DashboardLayout = () => {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                            className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-emerald-600 transition-all active:scale-95"
+                            className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-orange-600 transition-all active:scale-95"
                         >
                             {isSidebarOpen ? <FaTimes /> : <FaBars />}
                         </button>
@@ -145,27 +146,27 @@ const DashboardLayout = () => {
 
                     <div className="flex items-center gap-6">
                         {/* Global Rate Input */}
-                        <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
-                            <span className="text-xs font-bold text-emerald-600 uppercase">Tasa: BS</span>
+                        <div className="flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100">
+                            <span className="text-xs font-bold text-orange-600 uppercase">Tasa: BS</span>
                             <input
                                 type="number"
                                 value={rate}
                                 onChange={(e) => setRate(e.target.value)}
-                                className="w-20 bg-transparent border-none focus:ring-0 text-right font-black text-emerald-700 p-0 text-lg"
+                                className="w-20 bg-transparent border-none focus:ring-0 text-right font-black text-orange-700 p-0 text-lg"
                                 step="0.01"
                             />
                         </div>
 
                         <div className="flex items-center gap-3 pl-2 pr-2 py-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
                             <div className="text-right hidden sm:block">
-                                <div className="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">
+                                <div className="text-sm font-bold text-slate-700 group-hover:text-orange-700 transition-colors">
                                     {user ? `${user.nombre} ${user.apellido}` : 'Usuario'}
                                 </div>
                                 <div className="text-xs text-slate-400 font-medium capitalize">
                                     {user ? user.rol : 'Invitado'}
                                 </div>
                             </div>
-                            <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white group-hover:ring-emerald-200 transition-all">
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white group-hover:ring-orange-200 transition-all">
                                 {user ? user.nombre.charAt(0).toUpperCase() : 'U'}
                             </div>
                         </div>
