@@ -6,13 +6,13 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 exports.sendVerificationCode = async (code) => {
     try {
         const { data, error } = await resend.emails.send({
-            from: 'Venalta <onboarding@resend.dev>',
+            from: 'Ropa Mania <onboarding@resend.dev>',
             to: ['venaltadm@gmail.com'],
-            subject: 'Código de Verificación - Registro Venalta',
+            subject: 'Código de Verificación - Registro Ropa Mania',
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <h2 style="color: #059669;">Nuevo Registro Intentado</h2>
-                    <p>Alguien está intentando registrarse en la plataforma Venalta Bodega.</p>
+                    <p>Alguien está intentando registrarse en la plataforma Ropa Mania.</p>
                     <p>El código de verificación es:</p>
                     <h1 style="font-size: 32px; letter-spacing: 5px; color: #000;">${code}</h1>
                     <p>Por favor, proporcione este código al usuario si autoriza su registro.</p>
@@ -39,9 +39,9 @@ exports.sendPasswordRecovery = async (email, code, name) => {
         console.log(`[EMAIL] Código de recuperación: ${code}`);
 
         const { data, error } = await resend.emails.send({
-            from: 'Venalta <onboarding@resend.dev>',
+            from: 'Ropa Mania <onboarding@resend.dev>',
             to: ['venaltadm@gmail.com'], // Enviamos a venaltadm porque Resend solo permite este email
-            subject: `Venalta - Recuperación de Contraseña para ${email}`,
+            subject: `Ropa Mania - Recuperación de Contraseña para ${email}`,
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <h1 style="color: #059669;">Recuperación de Contraseña</h1>

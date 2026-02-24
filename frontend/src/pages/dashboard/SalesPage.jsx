@@ -555,7 +555,7 @@ const SalesPage = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text('VENALTA SYSTEM', 20, 20);
+        doc.text('ROPA MANIA SYSTEM', 20, 20);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text('REPORTE DE VENTAS (HOJA DE CÁLCULO)', 20, 30);

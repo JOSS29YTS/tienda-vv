@@ -1,7 +1,7 @@
 {
     "name": "bodega-app-backend",
     "version": "1.0.0",
-    "description": "Backend for Venalta Bodega App",
+    "description": "Backend for Ropa Mania App",
     "main": "src/index.js",
     "scripts": {
         "start": "node src/index.js",

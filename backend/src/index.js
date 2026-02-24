@@ -49,7 +49,7 @@ app.use('/api/suppliers', require('./routes/supplierRoutes'));
 app.use('/api/config', require('./routes/configRoutes'));
 
 app.get('/', (req, res) => {
-    res.json({ message: 'Bienvenido al API de Venalta Bodega' });
+    res.json({ message: 'Bienvenido al API de Ropa Mania' });
 });
 
 const pool = require('./database/db');

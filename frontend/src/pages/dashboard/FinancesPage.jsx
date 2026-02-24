@@ -593,7 +593,7 @@ const FinancesPage = () => {
         const footerY = doc.internal.pageSize.height - 10;
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text('Reporte generado automáticamente por Venalta System.', 105, footerY, { align: 'center' });
+        doc.text('Reporte generado automáticamente por Ropa Mania System.', 105, footerY, { align: 'center' });
 
         doc.save(`Reporte_Financiero_${date.replace(/\//g, '-')}.pdf`);
         toast.success('Reporte financiero descargado', {

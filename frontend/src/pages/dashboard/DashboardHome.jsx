@@ -101,7 +101,7 @@ const DashboardHome = () => {
         doc.text('ROPA MANIA SYSTEM', 20, 20);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
-        doc.text('REPORTE EJECUTIVO DE BODEGA', 20, 30);
+        doc.text('REPORTE EJECUTIVO DE ROPA MANIA', 20, 30);
 
         // Metadata
         const date = new Date().toLocaleDateString('es-VE');
@@ -191,7 +191,7 @@ const DashboardHome = () => {
                     <h1 className="text-4xl font-black text-slate-800 font-heading tracking-tight">
                         Hola, <span className="text-orange-600">{user ? user.nombre : 'Usuario'}</span>
                     </h1>
-                    <p className="text-slate-500 mt-2 text-lg">Aquí tienes el resumen de tu bodega hoy.</p>
+                    <p className="text-slate-500 mt-2 text-lg">Aquí tienes el resumen de tu tienda hoy.</p>
                 </div>
                 <button
                     onClick={handleGenerateReport}
