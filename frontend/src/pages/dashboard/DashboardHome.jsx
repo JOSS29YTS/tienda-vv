@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FaBox, FaMoneyBillWave, FaShoppingCart, FaUserFriends, FaArrowUp, FaArrowDown, FaReceipt, FaChartLine } from 'react-icons/fa';
+import { FaBox, FaMoneyBillWave, FaShoppingCart, FaUserFriends, FaArrowUp, FaArrowDown, FaReceipt, FaChartLine, FaCalendarDay } from 'react-icons/fa';
 
-const StatCard = ({ title, value, icon: Icon, trend, trendValue, gradient }) => {
+const StatCard = ({ title, value, icon: Icon, trend, trendValue, gradient, footerText }) => {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -31,7 +31,7 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, gradient }) => 
                     <h3 className="text-white/80 font-bold text-xs mb-1 uppercase tracking-wider">{title}</h3>
                     <div className="text-4xl font-black text-white tracking-tight">{value}</div>
                     <p className="text-white/60 text-xs mt-2 font-medium flex items-center gap-1">
-                        <FaChartLine /> vs mes anterior
+                        <FaChartLine /> {footerText || 'vs mes anterior'}
                     </p>
                 </div>
             </div>
@@ -98,7 +98,7 @@ const DashboardHome = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text('ROPA MANIAZ SYSTEM', 20, 20);
+        doc.text('ROPA MANIA SYSTEM', 20, 20);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text('REPORTE EJECUTIVO DE BODEGA', 20, 30);
@@ -114,7 +114,9 @@ const DashboardHome = () => {
         doc.setTextColor(...secondaryColor);
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text('Resumen General del Mes', 20, 55);
+        const currentMonth = new Date().toLocaleDateString('es-ES', { month: 'long' });
+        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+        doc.text(`Resumen General de ${capitalize(currentMonth)}`, 20, 55);
         doc.setDrawColor(...primaryColor);
         doc.setLineWidth(0.5);
         doc.line(20, 58, 190, 58);
@@ -139,11 +141,11 @@ const DashboardHome = () => {
         const salesVal = `$ ${stats.sales?.value?.toLocaleString() || '0'}`;
         drawStatBox(20, 65, 'Ventas Totales', salesVal, primaryColor);
 
-        const purchasesVal = `$ ${stats.purchases?.value?.toLocaleString() || '0'}`;
-        drawStatBox(65, 65, 'Compras Totales', purchasesVal, [59, 130, 246]); // Blue
+        const todaySalesVal = `$ ${stats.todaySales?.value?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
+        drawStatBox(65, 65, 'Ventas de Hoy', todaySalesVal, [245, 158, 11]); // Amber
 
         drawStatBox(110, 65, 'Facturas Pendientes', stats.pendingInvoices?.value || 0, [239, 68, 68]); // Red
-        drawStatBox(155, 65, 'Productos Activos', stats.products?.value || 0, [245, 158, 11]); // Orange
+        drawStatBox(155, 65, 'Productos Activos', stats.products?.value || 0, [59, 130, 246]); // Blue
 
 
         // Section: Top Products
@@ -174,9 +176,9 @@ const DashboardHome = () => {
         const footerY = doc.internal.pageSize.height - 10;
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text('Este documento es un reporte generado automáticamente por Ropa Maniaz System.', 105, footerY, { align: 'center' });
+        doc.text('Este documento es un reporte generado automáticamente por Ropa Mania System.', 105, footerY, { align: 'center' });
 
-        doc.save(`Reporte_RopaManiaz_${date.replace(/\//g, '-')}.pdf`);
+        doc.save(`Reporte_RopaMania_${date.replace(/\//g, '-')}.pdf`);
         toast.success('Reporte PDF descargado exitosamente');
     };
 
@@ -211,12 +213,13 @@ const DashboardHome = () => {
                     gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
                 />
                 <StatCard
-                    title="Compras del Mes"
-                    value={`$ ${stats?.purchases?.value?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
-                    icon={FaShoppingCart}
-                    trend={stats?.purchases?.trend >= 0 ? 'up' : 'down'}
-                    trendValue={`${Math.abs(stats?.purchases?.trend || 0).toFixed(1)}%`}
-                    gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
+                    title="Ventas de Hoy"
+                    value={`$ ${stats?.todaySales?.value?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`}
+                    icon={FaCalendarDay}
+                    trend="up"
+                    trendValue="hoy"
+                    gradient="bg-gradient-to-br from-amber-500 to-orange-600"
+                    footerText="ventas del día actual"
                 />
                 <StatCard
                     title="Facturas Pendientes"
@@ -232,7 +235,7 @@ const DashboardHome = () => {
                     icon={FaBox}
                     trend="up" // Static for now
                     trendValue="0%"
-                    gradient="bg-gradient-to-br from-amber-500 to-orange-600"
+                    gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
                 />
 
             </div>

@@ -57,12 +57,14 @@ exports.payInvoice = async (req, res) => {
         const paymentAmount = parseFloat(monto);
         const purchaseId = invoice[0].id_compra;
 
-        // VALIDATION: Prevent Overpayment
-        // Allow strict equality or very small epsilon
+        // VALIDATION: Prevent Overpayment — tolerancia máxima $0.01
         if (paymentAmount > (remainingDebt + 0.01)) {
             await connection.rollback();
+            const rate = parseFloat(tasa_dia);
+            const paidBs = (paymentAmount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+            const remainBs = (remainingDebt * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
             return res.status(400).json({
-                message: `El monto a pagar ($${paymentAmount.toFixed(2)}) excede la deuda restante ($${remainingDebt.toFixed(2)})`
+                message: `El monto a pagar ($${paymentAmount.toFixed(2)} / Bs ${paidBs}) excede la deuda restante ($${remainingDebt.toFixed(2)} / Bs ${remainBs})`
             });
         }
 

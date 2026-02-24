@@ -190,6 +190,30 @@ exports.updateProductCategory = async (req, res) => {
     }
 };
 
+exports.updateProductName = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nombre } = req.body;
+
+        if (!nombre || !nombre.trim()) {
+            return res.status(400).json({ message: 'Nombre requerido' });
+        }
+
+        const nombreUpperCase = nombre.trim().toUpperCase();
+
+        const [result] = await pool.query('UPDATE producto SET nb_producto = ? WHERE id_producto = ?', [nombreUpperCase, id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Producto no encontrado' });
+        }
+
+        res.json({ message: 'Nombre actualizado exitosamente' });
+    } catch (error) {
+        console.error('Error updating product name:', error);
+        res.status(500).json({ message: 'Error al actualizar nombre' });
+    }
+};
+
 exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;

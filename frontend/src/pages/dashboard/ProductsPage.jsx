@@ -27,6 +27,8 @@ const ProductsPage = () => {
     const [editBarcodeValue, setEditBarcodeValue] = useState('');
     const [editingCategoryProduct, setEditingCategoryProduct] = useState(null);
     const [editCategoryValue, setEditCategoryValue] = useState('');
+    const [editingNameProduct, setEditingNameProduct] = useState(null);
+    const [editNameValue, setEditNameValue] = useState('');
     const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
 
     // Delete Modal State
@@ -70,6 +72,31 @@ const ProductsPage = () => {
         } catch (err) {
             setProducts(originalProducts);
             alert('Error al actualizar el precio: ' + err.message);
+        }
+    };
+
+    const handleEditNameClick = (product) => {
+        setEditingNameProduct(product.id_producto);
+        setEditNameValue(product.nombre);
+    };
+
+    const handleSaveName = async (productId) => {
+        if (!editNameValue.trim()) return;
+        const originalProducts = [...products];
+        const newName = editNameValue.trim().toUpperCase();
+        setProducts(products.map(p => p.id_producto === productId ? { ...p, nombre: newName } : p));
+        setEditingNameProduct(null);
+
+        try {
+            const response = await fetch(`${API_URL}/api/products/${productId}/name`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre: newName })
+            });
+            if (!response.ok) throw new Error('Error al actualizar nombre');
+        } catch (err) {
+            setProducts(originalProducts);
+            alert('Error al actualizar el nombre: ' + err.message);
         }
     };
 
@@ -386,7 +413,34 @@ const ProductsPage = () => {
                                                 <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 font-bold border border-indigo-100">
                                                     <FaBox />
                                                 </div>
-                                                <div className="font-bold text-slate-800">{product.nombre}</div>
+                                                {editingNameProduct === product.id_producto ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={editNameValue}
+                                                            autoFocus
+                                                            onChange={(e) => setEditNameValue(e.target.value.toUpperCase())}
+                                                            className="w-40 px-2 py-1 rounded border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 text-sm font-bold uppercase"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleSaveName(product.id_producto);
+                                                                if (e.key === 'Escape') setEditingNameProduct(null);
+                                                            }}
+                                                        />
+                                                        <button onClick={() => handleSaveName(product.id_producto)} className="text-emerald-600 hover:text-emerald-700"><FaCheckCircle /></button>
+                                                        <button onClick={() => setEditingNameProduct(null)} className="text-red-400 hover:text-red-500"><FaTimesCircle /></button>
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        className="flex items-center gap-2 group/name cursor-pointer"
+                                                        onClick={() => handleEditNameClick(product)}
+                                                        title="Click para editar nombre"
+                                                    >
+                                                        <span className="font-bold text-slate-800">{product.nombre}</span>
+                                                        <span className="opacity-0 group-hover/name:opacity-100 transition-all duration-200 text-emerald-500 bg-emerald-50 p-1.5 rounded-md">
+                                                            <FaPen size={10} />
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="p-4">

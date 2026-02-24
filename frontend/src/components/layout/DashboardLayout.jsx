@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar } from 'react-icons/fa';
+import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 
@@ -42,6 +42,7 @@ const DashboardLayout = () => {
 
         if (role === 'vendedor') {
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
+            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
         } else if (role === 'gerente') {
             // Gerente sees everything EXCEPT History and Users
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
@@ -50,6 +51,7 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
+            navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
         } else if (role === 'administrador') {
             // Admin sees EVERYTHING
@@ -59,6 +61,7 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
+            navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
             navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuario" });
         }
@@ -86,11 +89,11 @@ const DashboardLayout = () => {
                 style={{ position: window.innerWidth < 1024 ? 'fixed' : 'relative' }}
             >
                 <Link to="/" className="p-6 flex items-center gap-4 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
-                    {/* Logo - Ropa Maniaz Style */}
+                    {/* Logo - Ropa Mania Style */}
                     <div className="relative px-3 py-2 bg-slate-950 ring-1 ring-white/10 rounded-lg leading-none flex items-center gap-2 w-full justify-center">
                         <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">RM</div>
                         <span className="text-xl font-bold font-heading tracking-wide text-white">
-                            Ropa <span className="text-orange-500">Maniaz</span>
+                            Ropa <span className="text-orange-500">Mania</span>
                         </span>
                     </div>
                 </Link>
@@ -117,7 +120,7 @@ const DashboardLayout = () => {
                         <span>Cerrar Sesión</span>
                     </button>
                     <div className="px-4 py-3 mt-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 font-medium">Ropa Maniaz System</div>
+                        <div className="text-xs text-slate-400 font-medium">Ropa Mania System</div>
                         <div className="text-[10px] text-slate-600">v2.0.0 Business Edition</div>
                     </div>
                 </div>
@@ -150,7 +153,7 @@ const DashboardLayout = () => {
                             <span className="text-xs font-bold text-orange-600 uppercase">Tasa: BS</span>
                             <input
                                 type="number"
-                                value={rate}
+                                value={parseFloat(rate || 0).toFixed(2)}
                                 onChange={(e) => setRate(e.target.value)}
                                 className="w-20 bg-transparent border-none focus:ring-0 text-right font-black text-orange-700 p-0 text-lg"
                                 step="0.01"

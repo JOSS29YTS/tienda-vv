@@ -1,0 +1,217 @@
+const pool = require('../database/db');
+
+const USD_KEYWORDS = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
+const isUsdMethod = (name) => USD_KEYWORDS.some(k => name.toUpperCase().includes(k));
+
+exports.getProfitLoss = async (req, res) => {
+    try {
+        const { period = 'month' } = req.query; // 'month', 'prev_month', 'year', 'custom'
+        const { startDate, endDate } = req.query;
+
+        // Build date filter
+        let dateFilter = '';
+        let dateParams = [];
+
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevMonth = prevMonthDate.getMonth() + 1;
+        const prevMonthYear = prevMonthDate.getFullYear();
+
+        if (period === 'month') {
+            dateFilter = 'MONTH({col}) = ? AND YEAR({col}) = ?';
+            dateParams = [currentMonth, currentYear];
+        } else if (period === 'prev_month') {
+            dateFilter = 'MONTH({col}) = ? AND YEAR({col}) = ?';
+            dateParams = [prevMonth, prevMonthYear];
+        } else if (period === 'year') {
+            dateFilter = 'YEAR({col}) = ?';
+            dateParams = [currentYear];
+        } else if (period === 'custom' && startDate && endDate) {
+            dateFilter = '{col} >= ? AND {col} <= ?';
+            dateParams = [startDate + ' 00:00:00', endDate + ' 23:59:59'];
+        } else {
+            // Default: current month
+            dateFilter = 'MONTH({col}) = ? AND YEAR({col}) = ?';
+            dateParams = [currentMonth, currentYear];
+        }
+
+        const applyFilter = (col) => dateFilter.replace(/\{col\}/g, col);
+
+        // ─────────────────────────────────────────────
+        // 1. INGRESOS: Ventas cobradas (sin pendiente por cobrar)
+        // ─────────────────────────────────────────────
+        const [salesRows] = await pool.query(`
+            SELECT COALESCE(SUM(dp.monto), 0) as total
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE ${applyFilter('v.fecha_venta')}
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+        `, dateParams);
+        const totalIngresos = parseFloat(salesRows[0].total);
+
+        // Desglose de ingresos por método de pago
+        const [salesBreakdown] = await pool.query(`
+            SELECT 
+                mp.nb_metodo_pago as metodo,
+                COALESCE(SUM(dp.monto), 0) as total
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE ${applyFilter('v.fecha_venta')}
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            GROUP BY mp.id_metodo_pago, mp.nb_metodo_pago
+            ORDER BY total DESC
+        `, dateParams);
+
+        // ─────────────────────────────────────────────
+        // 2. EGRESOS: Compras de mercancía
+        // ─────────────────────────────────────────────
+        const [purchaseRows] = await pool.query(`
+            SELECT COALESCE(SUM(total_compra), 0) as total
+            FROM compra
+            WHERE ${applyFilter('fecha_compra')}
+        `, dateParams);
+        const totalCompras = parseFloat(purchaseRows[0].total);
+
+        // ─────────────────────────────────────────────
+        // 3. EGRESOS: Pagos fijos (gastos operativos)
+        // ─────────────────────────────────────────────
+        const [fixedRows] = await pool.query(`
+            SELECT 
+                tpf.nb_tipo_pago_fijo as tipo,
+                COALESCE(SUM(pf.monto), 0) as total_usd
+            FROM pago_fijo pf
+            JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+            WHERE ${applyFilter('pf.fecha_pago_fijo')}
+            AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
+            GROUP BY tpf.id_tipo_pago_fijo, tpf.nb_tipo_pago_fijo
+            ORDER BY total_usd DESC
+        `, dateParams);
+
+        const [fixedTotalRows] = await pool.query(`
+            SELECT COALESCE(SUM(pf.monto), 0) as total
+            FROM pago_fijo pf
+            JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+            WHERE ${applyFilter('pf.fecha_pago_fijo')}
+            AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
+        `, dateParams);
+        const totalGastosOperativos = parseFloat(fixedTotalRows[0].total);
+
+        // ─────────────────────────────────────────────
+        // 4. EGRESOS: Pagos de facturas de proveedor
+        // ─────────────────────────────────────────────
+        const [invoicePayRows] = await pool.query(`
+            SELECT COALESCE(SUM(pfp.monto), 0) as total
+            FROM pago_factura_proveedor pfp
+            WHERE ${applyFilter('pfp.fecha_pago')}
+        `, dateParams);
+        const totalPagosFacturas = parseFloat(invoicePayRows[0].total);
+
+        // ─────────────────────────────────────────────
+        // 5. EGRESOS: Pagos de préstamos
+        // ─────────────────────────────────────────────
+        const [loanPayRows] = await pool.query(`
+            SELECT pp.monto, pp.tasa_dia, mp.nb_metodo_pago
+            FROM pago_prestamo pp
+            JOIN prestamo pr ON pp.id_prestamo = pr.id_prestamo
+            JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+            WHERE ${applyFilter('pp.fecha_pago')}
+        `, dateParams);
+
+        let totalPagosPrestamos = 0;
+        for (const p of loanPayRows) {
+            const amt = parseFloat(p.monto);
+            const rate = parseFloat(p.tasa_dia) || 1;
+            if (isUsdMethod(p.nb_metodo_pago)) {
+                totalPagosPrestamos += amt;
+            } else {
+                totalPagosPrestamos += amt / rate;
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // 6. Totales
+        // ─────────────────────────────────────────────
+        const totalEgresos = totalCompras + totalGastosOperativos + totalPagosPrestamos;
+        const balanceNeto = totalIngresos - totalEgresos;
+
+        // ─────────────────────────────────────────────
+        // 7. Resumen mensual para gráfico (últimos 6 meses)
+        // ─────────────────────────────────────────────
+        const [monthlyIncome] = await pool.query(`
+            SELECT 
+                DATE_FORMAT(v.fecha_venta, '%Y-%m') as mes,
+                DATE_FORMAT(MIN(v.fecha_venta), '%b %Y') as mes_label,
+                COALESCE(SUM(dp.monto), 0) as ingresos
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE v.fecha_venta >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m')
+            ORDER BY mes ASC
+        `);
+
+        const [monthlyExpenses] = await pool.query(`
+            SELECT 
+                DATE_FORMAT(fecha_compra, '%Y-%m') as mes,
+                COALESCE(SUM(total_compra), 0) as compras
+            FROM compra
+            WHERE fecha_compra >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            GROUP BY DATE_FORMAT(fecha_compra, '%Y-%m')
+        `);
+
+        // Merge monthly data
+        const monthlyMap = {};
+        for (const row of monthlyIncome) {
+            monthlyMap[row.mes] = { mes: row.mes_label, ingresos: parseFloat(row.ingresos), egresos: 0 };
+        }
+        for (const row of monthlyExpenses) {
+            if (monthlyMap[row.mes]) {
+                monthlyMap[row.mes].egresos += parseFloat(row.compras);
+            } else {
+                monthlyMap[row.mes] = { mes: row.mes, ingresos: 0, egresos: parseFloat(row.compras) };
+            }
+        }
+        const monthlyChart = Object.values(monthlyMap).map(m => ({
+            ...m,
+            balance: m.ingresos - m.egresos
+        }));
+
+        res.json({
+            resumen: {
+                totalIngresos: parseFloat(totalIngresos.toFixed(2)),
+                totalEgresos: parseFloat(totalEgresos.toFixed(2)),
+                balanceNeto: parseFloat(balanceNeto.toFixed(2)),
+                desglose: {
+                    compras: parseFloat(totalCompras.toFixed(2)),
+                    gastosOperativos: parseFloat(totalGastosOperativos.toFixed(2)),
+                    pagosPrestamos: parseFloat(totalPagosPrestamos.toFixed(2)),
+                    pagosFacturas: parseFloat(totalPagosFacturas.toFixed(2)),
+                }
+            },
+            ingresosDetalle: salesBreakdown.map(r => ({
+                metodo: r.metodo,
+                total: parseFloat(parseFloat(r.total).toFixed(2))
+            })),
+            gastosOperativosDetalle: fixedRows.map(r => ({
+                tipo: r.tipo,
+                total: parseFloat(parseFloat(r.total_usd).toFixed(2))
+            })),
+            monthlyChart
+        });
+
+    } catch (error) {
+        console.error('Error fetching profit/loss:', error);
+        res.status(500).json({ message: 'Error al obtener balance de ganancias/pérdidas' });
+    }
+};

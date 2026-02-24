@@ -694,7 +694,7 @@ const FinancesPage = () => {
                     gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
                 />
                 <StatCard
-                    title="Egresos Totales (Compras + Pagos)"
+                    title="Egresos Totales (Compras + Gastos)"
                     value={stats.expenses}
                     icon={FaShoppingCart}
                     gradient="bg-gradient-to-br from-red-600 to-rose-700"
@@ -886,7 +886,7 @@ const FinancesPage = () => {
                                         >
                                             <option value="">Seleccione cuenta...</option>
                                             {paymentMethods.filter(m =>
-                                                ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL', 'PAGO MOVIL', 'TRANSFERENCIA', 'EFECTIVO'].some(k => m.nb_metodo_pago.toUpperCase().includes(k)) &&
+                                                ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL', 'MOVIL', 'M\u00d3VIL', 'TRANSFERENCIA', 'EFECTIVO', 'PUNTO'].some(k => m.nb_metodo_pago.toUpperCase().includes(k)) &&
                                                 !m.nb_metodo_pago.toUpperCase().includes('PENDIENTE')
                                             ).map((method) => (
                                                 <option key={method.id_metodo_pago} value={method.id_metodo_pago}>

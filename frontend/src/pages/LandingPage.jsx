@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { FaBoxOpen, FaChartLine, FaUsers, FaArrowRight } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
+import logo from '../assets/logo.jpg';
+
 const LandingPage = () => {
     const { user } = useAuth();
     return (
@@ -17,13 +19,13 @@ const LandingPage = () => {
             {/* Navbar */}
             <nav className="relative z-10 flex justify-between items-center px-6 md:px-12 py-6 w-full max-w-7xl mx-auto">
                 <div className="flex items-center gap-3">
-                    {/* Logo - Ropa Maniaz Style */}
+                    {/* Logo - Ropa Mania Style */}
                     <div className="relative group cursor-pointer">
                         <div className="absolute -inset-1 bg-gradient-to-r from-orange-600 to-amber-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-200"></div>
                         <div className="relative px-4 py-2 bg-slate-950 ring-1 ring-white/10 rounded-lg leading-none flex items-center gap-2">
                             <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">RM</div>
                             <span className="text-xl font-bold font-heading tracking-wide text-white">
-                                Ropa <span className="text-orange-500">Maniaz</span>
+                                Ropa <span className="text-orange-500">Mania</span>
                             </span>
                         </div>
                     </div>
@@ -31,7 +33,7 @@ const LandingPage = () => {
                 <div className="flex gap-4 items-center">
                     {user ? (
                         <Link to="/dashboard" className="px-6 py-2.5 rounded-lg bg-white text-slate-950 hover:bg-slate-100 transition-all text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-orange-500/20">
-                            <span>Ir al Dashboard</span>
+                            <span>Ir al Perfil</span>
                             <FaArrowRight className="text-xs" />
                         </Link>
                     ) : (
@@ -55,10 +57,30 @@ const LandingPage = () => {
                     transition={{ duration: 0.8, ease: "easeOut" }}
                     className="flex-1 space-y-8 text-center lg:text-left z-20"
                 >
+                    {/* Centered Large Logo for Mobile, Left Aligned for Desktop */}
+                    <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.6, delay: 0.3 }}
+                        className="flex justify-center lg:justify-start"
+                    >
+                        <div className="relative group">
+                            <div className="absolute -inset-4 bg-orange-600/20 rounded-full blur-2xl group-hover:bg-orange-600/40 transition duration-500"></div>
+                            <img
+                                src={logo}
+                                alt="Ropa Mania Logo"
+                                className="relative w-32 md:w-48 lg:w-56 h-auto object-contain drop-shadow-2xl transform hover:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                }}
+                            />
+                        </div>
+                    </motion.div>
+
                     {/* Badge */}
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-900 border border-slate-800 text-orange-400 text-[10px] font-bold tracking-widest uppercase mx-auto lg:mx-0">
                         <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                        GESTIÓN & MODA V1.0
+                        SISTEMA DE GESTIÓN V2.0
                     </div>
 
                     <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold font-heading leading-tight text-white tracking-tight">
@@ -75,12 +97,9 @@ const LandingPage = () => {
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-2 justify-center lg:justify-start">
                         <Link to={user ? "/dashboard" : "/register"} className="px-8 py-3.5 rounded-lg bg-white text-slate-950 font-bold text-base hover:bg-slate-100 transition-transform hover:scale-105 flex items-center justify-center gap-2 shadow-xl shadow-white/5">
-                            {user ? "Ir al Dashboard" : "Comenzar Ahora"}
+                            {user ? "Ir al Perfil" : "Comenzar Ahora"}
                             <FaArrowRight className="text-sm" />
                         </Link>
-                        <button className="px-8 py-3.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-semibold text-base hover:bg-slate-800 transition-all">
-                            Más Información
-                        </button>
                     </div>
                 </motion.div>
 
@@ -117,7 +136,7 @@ const LandingPage = () => {
                                 <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></div>
                                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
                             </div>
-                            <div className="text-[10px] text-slate-500 font-mono">dashboard.maniaz.app</div>
+                            <div className="text-[10px] text-slate-500 font-mono">dashboard.mania.app</div>
                         </div>
 
                         {/* Dashboard Content Mockup */}

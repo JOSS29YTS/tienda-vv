@@ -125,9 +125,12 @@ exports.getDashboardStats = async (req, res) => {
         const [prodRows] = await pool.query("SELECT COUNT(*) as count FROM producto WHERE nb_producto != 'AVANCE DE EFECTIVO' AND id_estado = 1");
         const totalProducts = prodRows[0].count;
 
-        // 4. Clients (Total count)
-        const [clientRows] = await pool.query('SELECT COUNT(*) as count FROM cliente');
-        const totalClients = clientRows[0].count;
+        // 4. Clients (Total count) — safe fallback if table doesn't exist
+        let totalClients = 0;
+        try {
+            const [clientRows] = await pool.query('SELECT COUNT(*) as count FROM cliente');
+            totalClients = clientRows[0].count;
+        } catch (_) { totalClients = 0; }
 
         // 5. Sales Chart (Last 12 Months)
         // MODIFIED: Sum actual payments excluding "PENDIENTE POR COBRAR"
@@ -150,21 +153,18 @@ exports.getDashboardStats = async (req, res) => {
         const [chartData] = await pool.query(chartQuery);
         // Fill missing months? Maybe later. For now send what we have.
 
-        // 6. Purchases (Current Month vs Prev Month)
-        const getTotalPurchases = async (month, year) => {
-            const query = `
-                SELECT COALESCE(SUM(total_compra), 0) as total
-                FROM compra
-                WHERE MONTH(fecha_compra) = ? 
-                AND YEAR(fecha_compra) = ?
-            `;
-            const [rows] = await pool.query(query, [month, year]);
-            return parseFloat(rows[0].total);
-        };
-
-        const currentPurchases = await getTotalPurchases(currentMonth, currentYear);
-        const prevPurchases = await getTotalPurchases(prevMonth, prevMonthYear);
-        const purchasesTrend = prevPurchases === 0 ? 100 : ((currentPurchases - prevPurchases) / prevPurchases) * 100;
+        // 6. Ventas de Hoy (excluyendo PENDIENTE POR COBRAR)
+        const [todayRows] = await pool.query(`
+            SELECT COALESCE(SUM(dp.monto), 0) as total
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE DATE(v.fecha_venta) = CURDATE()
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+        `);
+        const todaySales = parseFloat(todayRows[0].total);
 
         // 7. Top Products
         const topProductsQuery = `
@@ -185,10 +185,10 @@ exports.getDashboardStats = async (req, res) => {
         res.json({
             stats: {
                 sales: { value: adjustedCurrentSales, trend: salesTrend },
-                purchases: { value: currentPurchases, trend: purchasesTrend },
+                todaySales: { value: todaySales },
                 pendingInvoices: { value: pendingInvoicesCount, trend: 0 },
-                products: { value: totalProducts, trend: 0 }, // Static for now
-                clients: { value: totalClients, trend: 0 }    // Static for now
+                products: { value: totalProducts, trend: 0 },
+                clients: { value: totalClients, trend: 0 }
             },
             chart: chartData,
             topProducts: topProducts

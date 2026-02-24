@@ -157,6 +157,9 @@ const PurchasesPage = () => {
         fetchPaymentMethods();
     }, []);
 
+    // Auto-select first payment method when methods load and there are empty rows
+    // (removed - handled directly in handleFinalizeClick)
+
     // Save state to localStorage
     useEffect(() => {
         localStorage.setItem('purchaseRows', JSON.stringify(rows));
@@ -179,14 +182,17 @@ const PurchasesPage = () => {
             });
             if (res.ok) {
                 const data = await res.json();
-                setPaymentMethods(data.filter(m => {
+                const filtered = data.filter(m => {
                     const name = m.nb_metodo_pago.toUpperCase();
                     return !name.includes('PENDIENTE') && !name.includes('MIXTO') && !name.includes('BIOPAGO');
-                }));
+                });
+                setPaymentMethods(filtered);
+                return filtered; // Return for immediate use
             }
         } catch (err) {
             console.error("Error fetching payment methods:", err);
         }
+        return [];
     };
 
     const fetchProviders = async () => {
@@ -392,13 +398,20 @@ const PurchasesPage = () => {
 
     const handleFinalizeClick = async () => {
         await fetchPaymentMethods();
-        // Initialize with one row covering total? Or empty?
-        // Let's initialize with empty amount so user enters it.
         setPayments([{ methodId: '', amount: '' }]);
         setIsPaymentModalOpen(true);
     };
 
     const handlePaymentSubmit = () => {
+        // Validate that every row with an amount also has a method
+        for (const p of payments) {
+            if (p.amount && !p.methodId) {
+                setError('Seleccione un método de pago para cada fila antes de continuar.');
+                setTimeout(() => setError(''), 5000);
+                return;
+            }
+        }
+
         // Calculate Total Paid in USD
         let totalPaidUsd = 0;
         const finalPayments = [];
@@ -418,11 +431,39 @@ const PurchasesPage = () => {
             finalPayments.push({ methodId: p.methodId, amount: amountUsd });
         }
 
-        // Validate Total
-        // Allow small tolerance
-        if (Math.abs(totalPaidUsd - totalCompasUsd) > 0.1) {
-            setError(`El monto total pagado ($${totalPaidUsd.toFixed(2)}) no coincide con el total de la compra ($${totalCompasUsd.toFixed(2)}). Diferencia: $${(totalPaidUsd - totalCompasUsd).toFixed(2)}`);
-            setTimeout(() => setError(''), 5000);
+        // Determine tolerance based on payment method types
+        // USD payments: exact to the cent ($0.005 for floating point safety)
+        // Bs payments: Bs 0.05 tolerance → converted to USD
+        const allUsd = finalPayments.every(fp => {
+            const method = paymentMethods.find(m => m.id_metodo_pago == fp.methodId);
+            return method && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => method.nb_metodo_pago.toUpperCase().includes(k));
+        });
+
+        const currentRate = parseFloat(rate);
+        // USD: $0.005 tolerance (half a cent, only for floating point errors)
+        // Bs: Bs 0.05 → in USD that's 0.05/rate (at Bs 405, ≈ $0.00012)
+        const toleranceUsd = allUsd ? 0.005 : (0.05 / currentRate);
+
+        const diff = totalPaidUsd - totalCompasUsd;
+        if (Math.abs(diff) > toleranceUsd) {
+            const diffBs = diff * currentRate;
+            const totalPaidBs = totalPaidUsd * currentRate;
+            const totalCompraBs = totalCompasUsd * currentRate;
+
+            if (allUsd) {
+                // Show USD-centered error with exact cents
+                const msg = totalPaidUsd > totalCompasUsd
+                    ? `El monto pagado ($${totalPaidUsd.toFixed(2)}) excede el total ($${totalCompasUsd.toFixed(2)}). Diferencia: $${diff.toFixed(2)}`
+                    : `El monto pagado ($${totalPaidUsd.toFixed(2)}) no alcanza el total ($${totalCompasUsd.toFixed(2)}). Faltan: $${Math.abs(diff).toFixed(2)}`;
+                setError(msg);
+            } else {
+                // Show Bs-centered error with 4 decimal places
+                const msg = totalPaidUsd > totalCompasUsd
+                    ? `El monto en Bs (${totalPaidBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}) excede el total (Bs ${totalCompraBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). Diferencia: Bs ${diffBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+                    : `El monto en Bs (${totalPaidBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}) no alcanza el total (Bs ${totalCompraBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). Faltan: Bs ${Math.abs(diffBs).toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
+                setError(msg);
+            }
+            setTimeout(() => setError(''), 3000);
             return;
         }
 

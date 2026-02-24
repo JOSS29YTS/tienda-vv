@@ -16,9 +16,9 @@ class ExchangeRateService {
         // Initial check on startup
         this.initializeRate();
 
-        // Schedule updates ONLY between 8:00 AM and 2:00 PM (Safe Window)
+        // Schedule updates ONLY between 5:00 AM and 2:00 PM (Safe Window)
         // This prevents capturing the "Next Day" rate published in the afternoon
-        cron.schedule('0 8-14 * * *', async () => {
+        cron.schedule('0 5-14 * * *', async () => {
             console.log('Hourly Safe-Window Exchange Rate Check...');
             await this.fetchRate();
         }, {
@@ -33,13 +33,13 @@ class ExchangeRateService {
         const hourString = new Date().toLocaleString('en-US', { timeZone: 'America/Caracas', hour: 'numeric', hour12: false });
         const hour = parseInt(hourString, 10);
 
-        // Define safe window: 6 AM to 2 PM (14:00)
+        // Define safe window: 5 AM to 2 PM (14:00)
         // Adjust logic: if we are in the morning/early afternoon, we want the latest rate.
         // If we are in late afternoon/evening, we want to KEEP the established rate for the day.
-        const isSafeWindow = hour >= 6 && hour < 15;
+        const isSafeWindow = hour >= 5 && hour < 14;
 
         if (isSafeWindow) {
-            console.log(`[EXCHANGE RATE] Startup inside safe window (${hour}:00 VET). Fetching fresh rate.`);
+            console.log(`[EXCHANGE RATE] Startup inside safe window 5AM-2PM (${hour}:00 VET). Fetching fresh rate.`);
             await this.fetchRate();
         } else {
             console.log(`[EXCHANGE RATE] Startup outside safe window (${hour}:00 VET). Attempting to load existing rate from DB.`);

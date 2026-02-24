@@ -187,6 +187,21 @@ const ClientsPage = () => {
             return;
         }
 
+        // Validación: no se puede pagar más de lo que se debe
+        const deuda = parseFloat(selectedClient.deuda_actual);
+        const exceso = totalPay - deuda;
+        if (exceso > 0.01) {
+            const excesoBs = exceso * parseFloat(rate);
+            const totalBs = totalPay * parseFloat(rate);
+            const deudaBs = deuda * parseFloat(rate);
+            setErrorMessage(
+                `El monto a pagar ($${totalPay.toFixed(2)} / Bs ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}) ` +
+                `excede la deuda del cliente ($${deuda.toFixed(2)} / Bs ${deudaBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}). ` +
+                `Exceso: $${exceso.toFixed(2)} / Bs ${excesoBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+            );
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/clients/pay`, {

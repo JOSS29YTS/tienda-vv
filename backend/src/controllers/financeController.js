@@ -870,11 +870,14 @@ exports.payLoan = async (req, res) => {
             }
         }
 
-        // Check if Exceeds (with slight tolerance)
-        if (newPaymentTotal > remainingBalance + 0.05) {
+        // Check if Exceeds (tolerancia máxima de 0.01 — exacto al centavo/bolívar)
+        if (newPaymentTotal > remainingBalance + 0.01) {
             await connection.rollback();
+            const currency = isLoanUSD ? '$' : 'Bs';
+            const altCurrency = isLoanUSD ? 'Bs' : '$';
+            const altRemaining = isLoanUSD ? (remainingBalance * currentRate) : (remainingBalance / currentRate);
             return res.status(400).json({
-                message: `El monto excede la deuda. Restante: ${isLoanUSD ? '$' : 'Bs'} ${remainingBalance.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                message: `El monto excede la deuda. Restante: ${currency} ${remainingBalance.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ≈ ${altCurrency} ${altRemaining.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
             });
         }
 

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCalendarAlt, FaMoneyBillWave, FaExchangeAlt, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaCalendarAlt, FaMoneyBillWave, FaExchangeAlt, FaChevronDown, FaChevronUp, FaFilePdf } from 'react-icons/fa';
 import API_URL from '../../config/api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import toast from 'react-hot-toast';
 
 const HistoryPage = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [expandedIndex, setExpandedIndex] = useState(null);
 
     useEffect(() => {
         fetchHistory();
@@ -30,21 +32,144 @@ const HistoryPage = () => {
     };
 
     const formatDate = (dateString) => {
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }; // Force UTC to avoid offset issues with simpler YYYY-MM-DD strings
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' };
         return new Date(dateString).toLocaleDateString('es-ES', options);
     };
 
-    const handleToggle = (index) => {
-        setExpandedIndex(expandedIndex === index ? null : index);
+    const handleGenerateReport = () => {
+        if (!history || history.length === 0) {
+            toast.error('No hay datos de historial para exportar');
+            return;
+        }
+
+        const doc = new jsPDF();
+        const slateColor = [15, 23, 42];
+        const primaryColor = [249, 115, 22];
+        const greenColor = [16, 185, 129];
+        const date = new Date().toLocaleDateString('es-VE');
+        const time = new Date().toLocaleTimeString('es-VE');
+
+        // ── Header ──
+        doc.setFillColor(...slateColor);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ROPA MANIA — HISTORIAL DE VENTAS', 15, 18);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generado: ${date} ${time}`, 15, 30);
+        doc.text(`Total de días: ${history.length}`, 150, 30);
+
+        // ── Resumen general ──
+        const totalUSDGlobal = history.reduce((sum, d) => sum + d.totalUSD + (d.totalBS / (parseFloat(d.tasa) || 1)), 0);
+        doc.setFillColor(...greenColor);
+        doc.roundedRect(15, 47, 180, 16, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`TOTAL GENERAL: $ ${totalUSDGlobal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 25, 57);
+
+        // ── Tabla principal ──
+        doc.setTextColor(...slateColor);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Resumen por Día', 15, 72);
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.line(15, 75, 195, 75);
+
+        const tableBody = history.map(day => {
+            const tasa = parseFloat(day.tasa) || 1;
+            const totalUsdEquiv = day.totalUSD + (day.totalBS / tasa);
+            return [
+                formatDate(day.date),
+                `${tasa.toFixed(2)} Bs/$`,
+                `Bs ${day.totalBS.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+                `$ ${day.totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+                `$ ${totalUsdEquiv.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            ];
+        });
+
+        autoTable(doc, {
+            startY: 78,
+            head: [['Fecha', 'Tasa', 'Venta (Bs)', 'Venta ($)', 'Total ($)']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: slateColor, textColor: 255, fontStyle: 'bold', fontSize: 8 },
+            styles: { fontSize: 8, cellPadding: 2.5 },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: {
+                4: { fontStyle: 'bold', textColor: [...greenColor] }
+            }
+        });
+
+        // ── Desglose por método (página nueva si hace falta) ──
+        let nextY = doc.lastAutoTable.finalY + 12;
+
+        history.forEach((day) => {
+            if (!day.breakdown || day.breakdown.length === 0) return;
+
+            // Check if we need a new page
+            if (nextY > 240) {
+                doc.addPage();
+                nextY = 20;
+            }
+
+            doc.setTextColor(...slateColor);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.text(formatDate(day.date), 15, nextY);
+
+            autoTable(doc, {
+                startY: nextY + 3,
+                head: [['Método de Pago', 'Monto']],
+                body: day.breakdown.map(item => [
+                    item.method,
+                    item.currency === 'USD'
+                        ? `$ ${item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                        : `Bs ${item.amount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: [100, 116, 139], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+                styles: { fontSize: 7, cellPadding: 2 },
+                margin: { left: 15, right: 15 },
+            });
+
+            nextY = doc.lastAutoTable.finalY + 8;
+        });
+
+        // ── Footer ──
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(7);
+            doc.setTextColor(150);
+            doc.text(
+                `Reporte generado automáticamente por Ropa Mania System — Pág. ${i} de ${pageCount}`,
+                105, doc.internal.pageSize.height - 6, { align: 'center' }
+            );
+        }
+
+        doc.save(`Historial_RopaMania_${date.replace(/\//g, '-')}.pdf`);
+        toast.success('Historial exportado exitosamente');
     };
 
     return (
         <div>
-            <div className="mb-8 flex justify-between items-end">
+            <div className="mb-8 flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800 font-heading">Historial de Ventas</h1>
                     <p className="text-slate-500 mt-1">Resumen diario de ingresos por método de pago.</p>
                 </div>
+                <button
+                    onClick={handleGenerateReport}
+                    disabled={loading || history.length === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition-all hover:shadow-xl active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    <FaFilePdf />
+                    Reporte
+                </button>
             </div>
 
             {loading ? (
@@ -61,8 +186,6 @@ const HistoryPage = () => {
                             key={index}
                             day={day}
                             formatDate={formatDate}
-                            isOpen={expandedIndex === index}
-                            onToggle={() => handleToggle(index)}
                         />
                     ))}
                 </div>
@@ -71,7 +194,9 @@ const HistoryPage = () => {
     );
 };
 
-const HistoryCard = ({ day, formatDate, isOpen, onToggle }) => {
+const HistoryCard = ({ day, formatDate }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -124,7 +249,7 @@ const HistoryCard = ({ day, formatDate, isOpen, onToggle }) => {
 
                 <div className="border-t border-slate-100 pt-4">
                     <button
-                        onClick={onToggle}
+                        onClick={() => setIsOpen(!isOpen)}
                         className="flex items-center justify-between w-full text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
                     >
                         <span>Desglose por Método</span>

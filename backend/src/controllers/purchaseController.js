@@ -22,13 +22,29 @@ exports.createPurchase = async (req, res) => {
         // VALIDATION: Check Sufficient Funds if Immediate Purchase (No Invoice Data, has Payments)
         if (!invoiceData && payments && payments.length > 0) {
 
-            // 1. Verify Total Payment covers Cost
+            // 2. Verify Total Payment covers Cost — strict tolerance by currency type
+            // Determine if all payments are USD-type
+            const USD_KEYWORDS = ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'];
+            let allUsd = true;
+            for (const p of payments) {
+                const [methodRows] = await connection.query('SELECT nb_metodo_pago FROM metodo_pago WHERE id_metodo_pago = ?', [p.methodId]);
+                if (methodRows.length === 0) { allUsd = false; break; }
+                const nm = methodRows[0].nb_metodo_pago.toUpperCase();
+                if (!USD_KEYWORDS.some(k => nm.includes(k))) { allUsd = false; break; }
+            }
+
+            // USD payments: $0.005 tolerance (floating point only)
+            // Bs payments: Bs 0.05 → in USD = 0.05 / rate
+            const toleranceUsd = allUsd ? 0.005 : (0.05 / parseFloat(rate));
+
             const totalPaidUsd = payments.reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
-            if (Math.abs(totalPaidUsd - totalPurchaseCost) > 0.1) { // 10 cents tolerance
+            if (Math.abs(totalPaidUsd - totalPurchaseCost) > toleranceUsd) {
                 await connection.rollback();
-                return res.status(400).json({
-                    message: `El monto total pagado ($${totalPaidUsd.toFixed(2)}) no coincide con el costo total de la compra ($${totalPurchaseCost.toFixed(2)})`
-                });
+                const diff = totalPaidUsd - totalPurchaseCost;
+                const msg = allUsd
+                    ? `El monto pagado ($${totalPaidUsd.toFixed(2)}) no coincide con el total ($${totalPurchaseCost.toFixed(2)}). Diferencia: $${diff.toFixed(2)}`
+                    : `El monto en Bs no coincide con el total. Diferencia equivalente: $${diff.toFixed(4)}`;
+                return res.status(400).json({ message: msg });
             }
 
             // 2. Verify Balances per Method
@@ -99,6 +115,10 @@ exports.createPurchase = async (req, res) => {
         // 2a. Record Payments (pago_compra) if immediate
         if (!invoiceData && payments) {
             for (const p of payments) {
+                if (!p.methodId) {
+                    await connection.rollback();
+                    return res.status(400).json({ message: 'Debe seleccionar un método de pago válido para cada pago.' });
+                }
                 await connection.query(
                     `INSERT INTO pago_compra (id_compra, id_metodo_pago, monto, tasa_dia)
                       VALUES (?, ?, ?, ?)`,
@@ -190,7 +210,19 @@ exports.createPurchase = async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error('Error creating purchase:', error);
-        res.status(500).json({ message: 'Error al registrar compra: ' + error.message });
+
+        // Map specific DB errors to user-friendly messages
+        if (error.code === 'ER_NO_DEFAULT_FOR_FIELD') {
+            return res.status(400).json({ message: 'Faltan datos requeridos. Asegúrese de seleccionar un método de pago válido.' });
+        }
+        if (error.code === 'ER_BAD_NULL_ERROR') {
+            return res.status(400).json({ message: 'Hay campos obligatorios sin completar. Verifique el formulario.' });
+        }
+        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+            return res.status(400).json({ message: 'Referencia inválida. Verifique los datos del formulario.' });
+        }
+
+        res.status(500).json({ message: 'Ocurrió un error al registrar la compra. Intente de nuevo.' });
     } finally {
         connection.release();
     }

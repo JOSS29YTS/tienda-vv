@@ -10,5 +10,6 @@ router.put('/:id/price', productController.updateProductPrice);
 router.put('/:id/category', productController.updateProductCategory);
 router.delete('/:id', productController.deleteProduct);
 router.put('/:id/barcode', productController.updateProductBarcode);
+router.put('/:id/name', productController.updateProductName);
 
 module.exports = router;

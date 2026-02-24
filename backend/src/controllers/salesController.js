@@ -265,41 +265,32 @@ exports.closeSales = async (req, res) => {
                     const batchId = row.mixedBatchId || 'default-batch';
                     const group = mixedGroups[batchId];
 
-                    if (group && row.paymentDetails && row.paymentDetails.length > 0) {
+                    // Only register payments ONCE per batch — on the first row of the group
+                    if (group && !group.paymentsRegistered && row.paymentDetails && row.paymentDetails.length > 0) {
                         const [pagoResult] = await connection.query(
                             'INSERT INTO pago (id_detalle_venta, tasa_dia, fecha_pago) VALUES (?, ?, NOW())',
                             [detailId, safeRate]
                         );
                         const pagoId = pagoResult.insertId;
 
-                        const isLastMixedInGroup = (i === group.rows[group.rows.length - 1]); // Index logic might be tricky across clients?
-                        // Actually, 'i' here is index in clientRows. 'group.rows' has index in original 'rows'.
-                        // This logic is fragile if we reordered rows.
-                        // Ideally we should calculate share solely on cost.
-
                         for (const pay of row.paymentDetails) {
-                            if (pay.method.toUpperCase() === 'PENDIENTE POR COBRAR') continue; // Skip debt
+                            if (pay.method.toUpperCase() === 'PENDIENTE POR COBRAR') continue;
 
                             const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
                             const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
 
                             if (subMethodId) {
-                                const tracker = group.trackers[pay.method];
-                                let amountToStore = 0;
-                                if (tracker) {
-                                    const fraction = group.totalCost > 0 ? (totalSaleUSD / group.totalCost) : 0;
-                                    amountToStore = tracker.total * fraction;
-                                    // (Simplified distribution logic)
-                                } else {
-                                    amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
-                                }
-
+                                // Store FULL amount per method, not fractioned
+                                const amountToStore = parseFloat(String(pay.amountInUSD).replace(',', '.'));
                                 await connection.query(
                                     'INSERT INTO detalle_pago (id_pago, id_metodo_pago, monto) VALUES (?, ?, ?)',
                                     [pagoId, subMethodId, amountToStore]
                                 );
                             }
                         }
+
+                        // Mark this batch as done so other rows in the same batch don't duplicate
+                        group.paymentsRegistered = true;
                     }
                 } else if (row.paymentMethod && row.paymentMethod !== 'PENDIENTE POR COBRAR') {
                     // Single Payment

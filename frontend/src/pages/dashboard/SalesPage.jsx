@@ -1268,7 +1268,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
             <div className="bg-slate-50 p-6 border-t border-slate-200">
                 <div className="flex justify-between items-center mb-6">
                     <div className="text-slate-600 font-bold">
-                        {remainingUSD > 0.01 ? 'Restante (Se registrará como Deuda):' : 'Completado:'}
+                        {remainingUSD > 0.01 ? 'Restante:' : 'Completado:'}
                     </div>
                     <div className={`text-right ${remainingUSD > 0.01 ? 'text-orange-500' : 'text-emerald-600'}`}>
                         <div className="font-mono text-2xl font-bold">
@@ -1286,21 +1286,9 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         Cancelar
                     </button>
                     <button
-                        onClick={() => {
-                            let finalPayments = [...payments];
-                            // Automatically register debt if there is a remaining amount
-                            if (remainingUSD > 0.01) {
-                                finalPayments.push({
-                                    id: Date.now(),
-                                    method: 'PENDIENTE POR COBRAR',
-                                    amount: parseFloat(remainingUSD.toFixed(3)), // Ensure precision
-                                    currency: 'USD',
-                                    amountInUSD: parseFloat(remainingUSD.toFixed(3))
-                                });
-                            }
-                            onConfirm(finalPayments);
-                        }}
-                        className="px-6 py-3 bg-[#0f172a] text-white font-bold rounded-xl hover:bg-slate-800 transition-colors"
+                        onClick={() => onConfirm([...payments])}
+                        disabled={!isComplete}
+                        className="px-6 py-3 bg-[#0f172a] text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Confirmar Pagos
                     </button>
@@ -1511,17 +1499,9 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
         } else {
             // Mixed Logic
             let details = [...mixedPayments];
-            // If there is a remaining balance, add it as debt
-            if (remainingUSD > 0.01) {
-                details.push({
-                    id: 'debt-' + Date.now() + Math.random(),
-                    method: 'PENDIENTE POR COBRAR',
-                    amount: parseFloat(remainingUSD.toFixed(3)),
-                    currency: 'USD',
-                    amountInUSD: parseFloat(remainingUSD.toFixed(3))
-                });
-            } else if (remainingUSD < -0.05) {
-                return; // Still block overpayments
+            // Block if not fully paid
+            if (Math.abs(remainingUSD) > 0.01) {
+                return;
             }
             finalPaymentData = { type: 'MIXED', details: details };
         }
@@ -1834,7 +1814,7 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
                             </button>
                             <button
                                 onClick={handleConfirm}
-                                disabled={items.length === 0 || (paymentType === 'SINGLE' && !singleMethod) || (paymentType === 'MIXED' && remainingUSD < -0.05)}
+                                disabled={items.length === 0 || (paymentType === 'SINGLE' && !singleMethod) || (paymentType === 'MIXED' && Math.abs(remainingUSD) > 0.01)}
                                 className="flex-1 py-3 bg-[#0f172a] text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                             >
                                 Confirmar Orden
