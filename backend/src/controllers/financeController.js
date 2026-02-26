@@ -783,6 +783,7 @@ exports.getPendingLoans = async (req, res) => {
                     total_pagado: totalPaid,
                     monto_pendiente: remaining, // This is in the LOAN's currency
                     fecha_prestamo: loan.fecha_prestamo,
+                    tasa_prestamo: parseFloat(loan.tasa_prestamo),
                     is_usd: isLoanUSD
                 });
             }

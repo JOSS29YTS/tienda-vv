@@ -143,7 +143,12 @@ const InvoicesPage = () => {
                     }
                 }
 
-                const remaining = parseFloat(selectedItem.monto_pendiente);
+                // Usar la deuda indexada en la nueva tasa para los préstamos en Bs
+                const baseRemaining = parseFloat(selectedItem.monto_pendiente);
+                const loanOriginalRate = parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2));
+                const roundedRate = parseFloat(parseFloat(rate).toFixed(2));
+                const remaining = loanIsUsd ? baseRemaining : ((baseRemaining / loanOriginalRate) * roundedRate);
+
                 // Validación exacta: tolerancia máxima de 0.01 en la moneda del préstamo
                 const loanDiff = totalNewPayment - remaining;
                 if (loanDiff > 0.01) {
@@ -311,93 +316,98 @@ const InvoicesPage = () => {
                     </header>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {pendingLoans.filter(l => l.nb_metodo_pago.toLowerCase().includes(searchTerm.toLowerCase()) || 'préstamo'.includes(searchTerm.toLowerCase())).map(loan => (
-                            <motion.div
-                                key={loan.id_prestamo}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between"
-                            >
-                                <div>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="text-xl font-black text-slate-800">Préstamo {loan.nb_metodo_pago}</h3>
-                                            <span className="text-xs font-bold text-slate-400 uppercase">ID #{loan.id_prestamo}</span>
-                                        </div>
-                                        <div className="bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-xs font-black uppercase">
-                                            Pendiente
-                                        </div>
-                                    </div>
+                        {pendingLoans.filter(l => l.nb_metodo_pago.toLowerCase().includes(searchTerm.toLowerCase()) || 'préstamo'.includes(searchTerm.toLowerCase())).map(loan => {
+                            const roundedRate = parseFloat(parseFloat(rate).toFixed(2));
+                            const roundedTasaPrestamo = parseFloat(parseFloat(loan.tasa_prestamo || rate).toFixed(2));
 
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500 font-bold text-sm">Fecha:</span>
-                                            <span className="font-mono font-bold text-slate-700">
-                                                {new Date(loan.fecha_prestamo).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-start">
-                                            <span className="text-slate-500 font-bold text-sm mt-1">Monto Original:</span>
-                                            <div className="text-right">
-                                                <div className="font-mono font-black text-slate-800">
-                                                    {loan.is_usd ? '$' : 'Bs'} {parseFloat(loan.monto_prestamo).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                </div>
-                                                {!loan.is_usd ? (
-                                                    <div className="text-xs font-bold text-slate-400">
-                                                        $ {(parseFloat(loan.monto_prestamo) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-xs font-bold text-slate-400">
-                                                        Bs {(parseFloat(loan.monto_prestamo) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between items-start">
-                                            <span className="text-slate-500 font-bold text-sm mt-1">Pagado:</span>
-                                            <div className="text-right">
-                                                <div className="font-mono font-bold text-emerald-600">
-                                                    {loan.is_usd ? '$' : 'Bs'} {parseFloat(loan.total_pagado).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                </div>
-                                                {!loan.is_usd ? (
-                                                    <div className="text-xs font-bold text-emerald-600/60">
-                                                        $ {(parseFloat(loan.total_pagado) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-xs font-bold text-emerald-600/60">
-                                                        Bs {(parseFloat(loan.total_pagado) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="pt-3 border-t border-slate-100 flex justify-between items-start">
-                                            <span className="text-slate-500 font-bold text-sm mt-2">Restante:</span>
-                                            <div className="text-right">
-                                                <div className="font-mono font-black text-2xl text-red-500">
-                                                    {loan.is_usd ? '$' : 'Bs'} {parseFloat(loan.monto_pendiente).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                </div>
-                                                {!loan.is_usd ? (
-                                                    <div className="text-sm font-bold text-red-400">
-                                                        $ {(parseFloat(loan.monto_pendiente) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-sm font-bold text-red-400">
-                                                        Bs {(parseFloat(loan.monto_pendiente) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={() => openPaymentModal(loan, 'loan')}
-                                    className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                            return (
+                                <motion.div
+                                    key={loan.id_prestamo}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between"
                                 >
-                                    <FaMoneyBillWave /> Pagar Préstamo
-                                </button>
-                            </motion.div>
-                        ))}
+                                    <div>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h3 className="text-xl font-black text-slate-800">Préstamo {loan.nb_metodo_pago}</h3>
+                                                <span className="text-xs font-bold text-slate-400 uppercase">ID #{loan.id_prestamo}</span>
+                                            </div>
+                                            <div className="bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-xs font-black uppercase">
+                                                Pendiente
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between">
+                                                <span className="text-slate-500 font-bold text-sm">Fecha:</span>
+                                                <span className="font-mono font-bold text-slate-700">
+                                                    {new Date(loan.fecha_prestamo).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-slate-500 font-bold text-sm mt-1">Monto Original:</span>
+                                                <div className="text-right">
+                                                    <div className="font-mono font-black text-slate-800">
+                                                        {loan.is_usd ? '$' : 'Bs'} {(!loan.is_usd ? ((parseFloat(loan.monto_prestamo) / roundedTasaPrestamo) * roundedTasaPrestamo) : parseFloat(loan.monto_prestamo)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    {!loan.is_usd ? (
+                                                        <div className="text-xs font-bold text-slate-400">
+                                                            $ {(parseFloat(loan.monto_prestamo) / roundedTasaPrestamo).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-xs font-bold text-slate-400">
+                                                            Bs {(parseFloat(loan.monto_prestamo) * roundedTasaPrestamo).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-slate-500 font-bold text-sm mt-1">Pagado:</span>
+                                                <div className="text-right">
+                                                    <div className="font-mono font-bold text-emerald-600">
+                                                        {loan.is_usd ? '$' : 'Bs'} {parseFloat(loan.total_pagado).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    {!loan.is_usd ? (
+                                                        <div className="text-xs font-bold text-emerald-600/60">
+                                                            $ {(parseFloat(loan.total_pagado) / roundedTasaPrestamo).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-xs font-bold text-emerald-600/60">
+                                                            Bs {(parseFloat(loan.total_pagado) * roundedTasaPrestamo).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="pt-3 border-t border-slate-100 flex justify-between items-start">
+                                                <span className="text-slate-500 font-bold text-sm mt-2">Restante:</span>
+                                                <div className="text-right">
+                                                    <div className="font-mono font-black text-2xl text-red-500">
+                                                        {loan.is_usd ? '$' : 'Bs'} {(!loan.is_usd ? ((parseFloat(loan.monto_pendiente) / roundedTasaPrestamo) * roundedRate) : parseFloat(loan.monto_pendiente)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    </div>
+                                                    {!loan.is_usd ? (
+                                                        <div className="text-sm font-bold text-red-400">
+                                                            $ {(parseFloat(loan.monto_pendiente) / roundedTasaPrestamo).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-sm font-bold text-red-400">
+                                                            Bs {(parseFloat(loan.monto_pendiente) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => openPaymentModal(loan, 'loan')}
+                                        className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                        <FaMoneyBillWave /> Pagar Préstamo
+                                    </button>
+                                </motion.div>
+                            )
+                        })}
                     </div>
                 </section>
             )}
@@ -449,21 +459,21 @@ const InvoicesPage = () => {
                                     <span className="text-slate-500 font-bold text-sm mt-1">Deuda Total:</span>
                                     <div className="text-right">
                                         <div className="font-mono font-black text-slate-800">$ {parseFloat(inv.monto_deuda).toFixed(2)}</div>
-                                        <div className="text-xs font-bold text-slate-400">Bs {(parseFloat(inv.monto_deuda) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-xs font-bold text-slate-400">Bs {(parseFloat(inv.monto_deuda) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-start">
                                     <span className="text-slate-500 font-bold text-sm mt-1">Pagado:</span>
                                     <div className="text-right">
                                         <div className="font-mono font-bold text-emerald-600">$ {parseFloat(inv.monto_pagado).toFixed(2)}</div>
-                                        <div className="text-xs font-bold text-emerald-700/60">Bs {(parseFloat(inv.monto_pagado) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-xs font-bold text-emerald-700/60">Bs {(parseFloat(inv.monto_pagado) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-slate-100 flex justify-between items-start">
                                     <span className="text-slate-500 font-bold text-sm mt-2">Restante:</span>
                                     <div className="text-right">
                                         <div className="font-mono font-black text-2xl text-red-500">$ {parseFloat(inv.monto_restante).toFixed(2)}</div>
-                                        <div className="text-sm font-bold text-red-400">Bs {(parseFloat(inv.monto_restante) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-sm font-bold text-red-400">Bs {(parseFloat(inv.monto_restante) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
@@ -513,19 +523,19 @@ const InvoicesPage = () => {
                                             {paymentType === 'loan' ? (
                                                 <>
                                                     <span className="block font-mono font-black text-xl text-slate-800">
-                                                        {selectedItem.is_usd ? '$' : 'Bs'} {parseFloat(selectedItem.monto_pendiente).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                        {selectedItem.is_usd ? '$' : 'Bs'} {(!selectedItem.is_usd ? ((parseFloat(selectedItem.monto_pendiente) / parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2))) * parseFloat(parseFloat(rate).toFixed(2))) : parseFloat(selectedItem.monto_pendiente)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                                     </span>
                                                     <span className="block text-xs font-bold text-slate-400">
                                                         ≈ {selectedItem.is_usd
-                                                            ? `Bs ${(parseFloat(selectedItem.monto_pendiente) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                            : `$ ${(parseFloat(selectedItem.monto_pendiente) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                            ? `Bs ${(parseFloat(selectedItem.monto_pendiente) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                            : `$ ${(parseFloat(selectedItem.monto_pendiente) / parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2))).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                                                         }
                                                     </span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <span className="block font-mono font-black text-xl text-slate-800">$ {parseFloat(selectedItem.monto_restante).toFixed(2)}</span>
-                                                    <span className="block text-xs font-bold text-slate-400">≈ Bs {(parseFloat(selectedItem.monto_restante) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                                    <span className="block text-xs font-bold text-slate-400">≈ Bs {(parseFloat(selectedItem.monto_restante) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
                                                 </>
                                             )}
                                         </div>
@@ -571,8 +581,8 @@ const InvoicesPage = () => {
                                                     {p.amount && (
                                                         <p className="text-[10px] font-bold text-slate-400 text-right mt-1">
                                                             ≈ {isUsd
-                                                                ? `Bs ${(parseFloat(p.amount) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                                : `$ ${(parseFloat(p.amount) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                                ? `Bs ${(parseFloat(p.amount) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                                : `$ ${(parseFloat(p.amount) / parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                                                             }
                                                         </p>
                                                     )}

@@ -44,7 +44,7 @@ const FinancesPage = () => {
         id_metodo_pago: '',
         monto: '',
         moneda: 'USD',
-        tasa_dia: rate,
+        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
         fecha: getLocalISODate()
     });
     const getLocalISOString = () => {
@@ -57,7 +57,7 @@ const FinancesPage = () => {
         id_metodo_origen: '',
         id_metodo_destino: '',
         monto: '',
-        tasa_dia: rate,
+        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
         fecha_traspaso: getLocalISODate()
     });
 
@@ -99,7 +99,7 @@ const FinancesPage = () => {
             id_metodo_origen: '',
             id_metodo_destino: '',
             monto: '',
-            tasa_dia: rate,
+            tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
             fecha_traspaso: new Date().toISOString().split('T')[0]
         });
         setIsTransferModalOpen(true);
@@ -180,7 +180,8 @@ const FinancesPage = () => {
     }, []);
 
     useEffect(() => {
-        setFormData(prev => ({ ...prev, tasa_dia: rate }));
+        setFormData(prev => ({ ...prev, tasa_dia: rate ? parseFloat(rate).toFixed(2) : '' }));
+        setTransferFormData(prev => ({ ...prev, tasa_dia: rate ? parseFloat(rate).toFixed(2) : '' }));
     }, [rate]);
 
     const fetchFinanceData = async () => {
@@ -242,9 +243,6 @@ const FinancesPage = () => {
             if (res.ok) {
                 const data = await res.json();
                 setFixedPaymentTypes(data);
-                if (data.length > 0) {
-                    setFormData(prev => ({ ...prev, id_tipo_pago_fijo: data[0].id_tipo_pago_fijo }));
-                }
             }
         } catch (error) {
             console.error("Error fetching types:", error);
@@ -265,10 +263,6 @@ const FinancesPage = () => {
             if (res.ok) {
                 const data = await res.json();
                 setPaymentMethods(data);
-                // Default to first method (or specific one if desired)
-                if (data.length > 0) {
-                    setFormData(prev => ({ ...prev, id_metodo_pago: data[0].id_metodo_pago }));
-                }
             }
         } catch (error) {
             console.error("Error fetching payment methods:", error);
@@ -436,7 +430,8 @@ const FinancesPage = () => {
                     monto: '',
                     id_metodo_origen: '',
                     id_metodo_destino: '',
-                    fecha_traspaso: getLocalISODate()
+                    fecha_traspaso: getLocalISODate(),
+                    tasa_dia: rate ? parseFloat(rate).toFixed(2) : ''
                 }));
                 toast.success('Traspaso realizado exitosamente', {
                     style: {
@@ -669,14 +664,24 @@ const FinancesPage = () => {
                         Préstamo
                     </button>
                     <button
-                        onClick={() => setIsTransferModalOpen(true)}
+                        onClick={handleTransferClick}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30"
                     >
                         <FaExchangeAlt />
                         Traspaso
                     </button>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => {
+                            setFormData({
+                                id_tipo_pago_fijo: '',
+                                id_metodo_pago: '',
+                                monto: '',
+                                moneda: 'USD',
+                                tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+                                fecha: getLocalISODate()
+                            });
+                            setIsModalOpen(true);
+                        }}
                         className="flex-1 lg:flex-none flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 justify-center"
                     >
                         <FaPlus />
