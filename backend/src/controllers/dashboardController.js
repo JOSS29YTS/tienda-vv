@@ -182,13 +182,23 @@ exports.getDashboardStats = async (req, res) => {
         `;
         const [topProducts] = await pool.query(topProductsQuery);
 
+        // 8. Total Products Sold
+        const [totalSoldRows] = await pool.query(`
+            SELECT COALESCE(SUM(dv.cantidad), 0) as total
+            FROM detalle_venta dv
+            JOIN producto p ON dv.id_producto = p.id_producto
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+        `);
+        const totalProductsSold = parseInt(totalSoldRows[0].total) || 0;
+
         res.json({
             stats: {
                 sales: { value: adjustedCurrentSales, trend: salesTrend },
                 todaySales: { value: todaySales },
                 pendingInvoices: { value: pendingInvoicesCount, trend: 0 },
                 products: { value: totalProducts, trend: 0 },
-                clients: { value: totalClients, trend: 0 }
+                clients: { value: totalClients, trend: 0 },
+                totalSold: { value: totalProductsSold, trend: 0 }
             },
             chart: chartData,
             topProducts: topProducts

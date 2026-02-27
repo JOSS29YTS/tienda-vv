@@ -34,12 +34,26 @@ const InventoryPage = () => {
         (product.codigo_de_barra && product.codigo_de_barra.includes(searchTerm))
     );
 
+    const totalDisponible = products.reduce((sum, product) => {
+        return sum + (parseInt(product.current_stock) || 0);
+    }, 0);
+
     return (
         <div>
-            <div className="mb-8 flex justify-between items-end">
+            <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800 font-heading">Inventario</h1>
                     <p className="text-slate-500 mt-1">Gestión y control de existencia de productos.</p>
+                </div>
+                
+                <div className="bg-emerald-50 rounded-2xl px-6 py-3 border border-emerald-100 flex items-center gap-4 shadow-sm">
+                    <div className="bg-emerald-500/10 p-3 rounded-xl text-emerald-600">
+                        <FaBox size={24} />
+                    </div>
+                    <div>
+                        <div className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-0.5">TOTAL DISPONIBLE</div>
+                        <div className="text-2xl font-black text-emerald-600 leading-none">{totalDisponible}</div>
+                    </div>
                 </div>
             </div>
 

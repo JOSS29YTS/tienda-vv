@@ -144,7 +144,7 @@ const DashboardHome = () => {
         const todaySalesVal = `$ ${stats.todaySales?.value?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
         drawStatBox(65, 65, 'Ventas de Hoy', todaySalesVal, [245, 158, 11]); // Amber
 
-        drawStatBox(110, 65, 'Facturas Pendientes', stats.pendingInvoices?.value || 0, [239, 68, 68]); // Red
+        drawStatBox(110, 65, 'Productos Vendidos', stats.totalSold?.value || 0, [239, 68, 68]); // Red
         drawStatBox(155, 65, 'Productos Activos', stats.products?.value || 0, [59, 130, 246]); // Blue
 
 
@@ -222,12 +222,13 @@ const DashboardHome = () => {
                     footerText="ventas del día actual"
                 />
                 <StatCard
-                    title="Facturas Pendientes"
-                    value={stats?.pendingInvoices?.value || 0}
-                    icon={FaReceipt}
-                    trend="down"
-                    trendValue={`0`}
+                    title="Productos Vendidos"
+                    value={stats?.totalSold?.value || 0}
+                    icon={FaShoppingCart}
+                    trend="up"
+                    trendValue={`total`}
                     gradient="bg-gradient-to-br from-red-500 to-rose-600"
+                    footerText="unidades vendidas"
                 />
                 <StatCard
                     title="Productos Activos"

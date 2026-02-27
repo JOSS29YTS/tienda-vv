@@ -32,6 +32,8 @@ const FinancesPage = () => {
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false); // New state for loan modal
     const [fixedPaymentTypes, setFixedPaymentTypes] = useState([]);
+    const [isVariableExpenseModalOpen, setIsVariableExpenseModalOpen] = useState(false);
+    const [variableExpenseTypes, setVariableExpenseTypes] = useState([]);
     const [paymentMethods, setPaymentMethods] = useState([]);
     const getLocalISODate = () => {
         const now = new Date();
@@ -65,6 +67,15 @@ const FinancesPage = () => {
         methodId: '',
         amount: '',
         date: getLocalISOString()
+    });
+    const [variableExpenseForm, setVariableExpenseForm] = useState({
+        id_tipo_gasto_variable: 'new',
+        nb_gasto_variable: '',
+        id_metodo_pago: '',
+        monto: '',
+        moneda: 'USD',
+        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+        fecha: getLocalISOString()
     });
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
@@ -176,12 +187,29 @@ const FinancesPage = () => {
     useEffect(() => {
         fetchFinanceData();
         fetchFixedPaymentTypes();
+        fetchVariableExpenseTypes();
         fetchPaymentMethods();
     }, []);
+
+    const fetchVariableExpenseTypes = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/finances/variable-expense-types`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setVariableExpenseTypes(data);
+            }
+        } catch (error) {
+            console.error("Error fetching variable expense types:", error);
+        }
+    };
 
     useEffect(() => {
         setFormData(prev => ({ ...prev, tasa_dia: rate ? parseFloat(rate).toFixed(2) : '' }));
         setTransferFormData(prev => ({ ...prev, tasa_dia: rate ? parseFloat(rate).toFixed(2) : '' }));
+        setVariableExpenseForm(prev => ({ ...prev, tasa_dia: rate ? parseFloat(rate).toFixed(2) : '' }));
     }, [rate]);
 
     const fetchFinanceData = async () => {
@@ -266,6 +294,91 @@ const FinancesPage = () => {
             }
         } catch (error) {
             console.error("Error fetching payment methods:", error);
+        }
+    };
+
+    const handleVariableExpenseInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'id_metodo_pago') {
+            const selectedMethod = paymentMethods.find(m => m.id_metodo_pago === parseInt(value));
+            let newCurrency = variableExpenseForm.moneda;
+            if (selectedMethod) {
+                const methodName = selectedMethod.nb_metodo_pago.toUpperCase();
+                if (methodName.includes('DIVISA') || methodName.includes('USD') || methodName.includes('ZELLE')) {
+                    newCurrency = 'USD';
+                } else {
+                    newCurrency = 'BS';
+                }
+            }
+            setVariableExpenseForm(prev => ({ ...prev, [name]: value, moneda: newCurrency }));
+        } else {
+            setVariableExpenseForm(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const handleVariableExpenseSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            const now = new Date();
+            const [year, month, day] = variableExpenseForm.fecha.split('-').map(Number);
+            const paymentDate = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
+
+            let finalAmount = parseFloat(variableExpenseForm.monto);
+            if (variableExpenseForm.moneda === 'BS') {
+                const rate = parseFloat(variableExpenseForm.tasa_dia);
+                if (rate > 0) {
+                    finalAmount = finalAmount / rate;
+                }
+            }
+
+            const pad = (n) => n.toString().padStart(2, '0');
+            const localDateString = `${paymentDate.getFullYear()}-${pad(paymentDate.getMonth() + 1)}-${pad(paymentDate.getDate())} ${pad(paymentDate.getHours())}:${pad(paymentDate.getMinutes())}:${pad(paymentDate.getSeconds())}`;
+
+            let finalTipoId = variableExpenseForm.id_tipo_gasto_variable;
+            if (finalTipoId === 'new') {
+                finalTipoId = null;
+            }
+
+            const payload = {
+                ...variableExpenseForm,
+                id_tipo_gasto_variable: finalTipoId,
+                monto: finalAmount,
+                fecha: localDateString
+            };
+            delete payload.moneda; // Keep clean
+
+            const res = await fetch(`${API_URL}/api/finances/variable-expenses`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                setIsVariableExpenseModalOpen(false);
+                fetchFinanceData();
+                fetchVariableExpenseTypes();
+                setVariableExpenseForm(prev => ({
+                    ...prev,
+                    id_tipo_gasto_variable: 'new',
+                    nb_gasto_variable: '',
+                    monto: '',
+                    fecha: getLocalISODate()
+                }));
+                toast.success('Gasto variable registrado exitosamente', {
+                    style: { background: '#10B981', color: '#fff' },
+                    iconTheme: { primary: '#fff', secondary: '#10B981' }
+                });
+            } else {
+                const errorData = await res.json();
+                toast.error(errorData.message || 'Error al registrar gasto variable');
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Error al registrar gasto variable');
         }
     };
 
@@ -648,24 +761,24 @@ const FinancesPage = () => {
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Finanzas</h2>
                     <p className="text-slate-500">Resumen financiero, ingresos, egresos y cuentas por cobrar.</p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap items-center lg:justify-end gap-3 w-full lg:w-auto mt-4 lg:mt-0">
                     <button
                         onClick={handleGenerateReport}
-                        className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg hover:shadow-xl"
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-slate-700 transition-colors shadow-lg hover:shadow-xl whitespace-nowrap"
                     >
                         <FaFileInvoiceDollar />
-                        Generar Reporte
+                        Reporte
                     </button>
                     <button
                         onClick={handleLoanClick}
-                        className="flex items-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/30"
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-amber-500 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/30 whitespace-nowrap"
                     >
                         <FaHandHoldingUsd />
                         Préstamo
                     </button>
                     <button
                         onClick={handleTransferClick}
-                        className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30"
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 whitespace-nowrap"
                     >
                         <FaExchangeAlt />
                         Traspaso
@@ -682,10 +795,28 @@ const FinancesPage = () => {
                             });
                             setIsModalOpen(true);
                         }}
-                        className="flex-1 lg:flex-none flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 justify-center"
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/30 whitespace-nowrap"
                     >
                         <FaPlus />
-                        Registrar Gasto Fijo
+                        Fijos
+                    </button>
+                    <button
+                        onClick={() => {
+                            setVariableExpenseForm({
+                                id_tipo_gasto_variable: 'new',
+                                nb_gasto_variable: '',
+                                id_metodo_pago: '',
+                                monto: '',
+                                moneda: 'USD',
+                                tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+                                fecha: getLocalISODate()
+                            });
+                            setIsVariableExpenseModalOpen(true);
+                        }}
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30 whitespace-nowrap"
+                    >
+                        <FaPlus />
+                        Variables
                     </button>
                 </div>
             </header>
@@ -1105,6 +1236,157 @@ const FinancesPage = () => {
                                         className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
                                     >
                                         Guardar Pago
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+                {isVariableExpenseModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+                        >
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <h3 className="text-xl font-bold text-slate-800">Registrar Gasto Variable</h3>
+                                <button
+                                    onClick={() => setIsVariableExpenseModalOpen(false)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <FaTimes size={20} />
+                                </button>
+                            </div>
+                            <form onSubmit={handleVariableExpenseSubmit} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Gasto</label>
+                                    <select
+                                        name="id_tipo_gasto_variable"
+                                        value={variableExpenseForm.id_tipo_gasto_variable}
+                                        onChange={handleVariableExpenseInputChange}
+                                        className="w-full px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                        required
+                                    >
+                                        <option value="new">+ Nuevo Tipo de Gasto</option>
+                                        {variableExpenseTypes.map(type => (
+                                            <option key={type.id_tipo_gasto_variable} value={type.id_tipo_gasto_variable}>
+                                                {type.nb_gasto_variable}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {variableExpenseForm.id_tipo_gasto_variable === 'new' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del Nuevo Gasto</label>
+                                        <input
+                                            type="text"
+                                            name="nb_gasto_variable"
+                                            value={variableExpenseForm.nb_gasto_variable}
+                                            onChange={handleVariableExpenseInputChange}
+                                            className="w-full px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                            placeholder="Ej: Internet, Papelería..."
+                                            required={variableExpenseForm.id_tipo_gasto_variable === 'new'}
+                                        />
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Método de Pago</label>
+                                    <select
+                                        name="id_metodo_pago"
+                                        value={variableExpenseForm.id_metodo_pago}
+                                        onChange={handleVariableExpenseInputChange}
+                                        className="w-full px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                        required
+                                    >
+                                        <option value="">Seleccione método...</option>
+                                        {paymentMethods
+                                            .filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO'].includes(m.nb_metodo_pago.toUpperCase()))
+                                            .map(method => (
+                                                <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
+                                                    {method.nb_metodo_pago}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            Monto {variableExpenseForm.moneda === 'BS' ? '(en Bolívares)' : '(en USD)'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="monto"
+                                            value={variableExpenseForm.monto}
+                                            onChange={handleVariableExpenseInputChange}
+                                            step="0.01"
+                                            min="0"
+                                            className="w-full px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono font-bold"
+                                            placeholder="0.00"
+                                            required
+                                        />
+                                        {variableExpenseForm.moneda === 'BS' && variableExpenseForm.monto && variableExpenseForm.tasa_dia > 0 && (
+                                            <p className="text-xs text-blue-600 mt-1 font-bold">
+                                                ≈ {formatCurrency(parseFloat(variableExpenseForm.monto) / parseFloat(variableExpenseForm.tasa_dia))} USD
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Moneda</label>
+                                        <select
+                                            name="moneda"
+                                            value={variableExpenseForm.moneda}
+                                            onChange={handleVariableExpenseInputChange}
+                                            className="w-full px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold text-slate-600"
+                                        >
+                                            <option value="USD">USD ($)</option>
+                                            <option value="BS">Bolívares (Bs)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Fecha</label>
+                                        <input
+                                            type="date"
+                                            name="fecha"
+                                            value={variableExpenseForm.fecha}
+                                            onChange={handleVariableExpenseInputChange}
+                                            className="w-full px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Tasa del Día</label>
+                                        <input
+                                            type="number"
+                                            name="tasa_dia"
+                                            value={variableExpenseForm.tasa_dia}
+                                            onChange={handleVariableExpenseInputChange}
+                                            step="0.01"
+                                            className="w-full px-4 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 focus:outline-none cursor-default font-mono font-bold"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsVariableExpenseModalOpen(false)}
+                                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:shadow-lg hover:shadow-blue-500/30 transition-all active:scale-95"
+                                    >
+                                        Guardar Gasto
                                     </button>
                                 </div>
                             </form>

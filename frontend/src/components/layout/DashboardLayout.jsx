@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale } from 'react-icons/fa';
+import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale, FaPercentage } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 
@@ -42,7 +42,6 @@ const DashboardLayout = () => {
 
         if (role === 'vendedor') {
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
-            navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
         } else if (role === 'gerente') {
             // Gerente sees everything EXCEPT History and Users
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
@@ -50,6 +49,7 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
+            navItems.push({ to: "/dashboard/commissions", icon: FaPercentage, label: "Comisión" });
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
@@ -60,6 +60,7 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
+            navItems.push({ to: "/dashboard/commissions", icon: FaPercentage, label: "Comisión" });
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
@@ -105,13 +106,7 @@ const DashboardLayout = () => {
                 </div>
 
                 <div className="p-4 border-t border-slate-800/50 space-y-2">
-                    <Link
-                        to="/"
-                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-slate-400 hover:bg-white/5 hover:text-white transition-all font-medium group"
-                    >
-                        <FaHome className="group-hover:text-amber-400 transition-colors" />
-                        <span>Volver al Inicio</span>
-                    </Link>
+
                     <button
                         onClick={handleLogout}
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all font-medium group"

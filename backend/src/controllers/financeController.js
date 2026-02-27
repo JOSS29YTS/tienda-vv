@@ -33,6 +33,18 @@ exports.getFinanceSummary = async (req, res) => {
             LEFT JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
         `);
 
+        // Create variable expense tables if they don't exist
+        await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
+        await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+
+        // Variable Payments (Recorded Expenses)
+        const [variableResult] = await pool.query(`
+            SELECT gv.monto_usd as monto, gv.tasa_dia, mp.nb_metodo_pago, tgv.nb_gasto_variable
+            FROM gasto_variable gv
+            LEFT JOIN metodo_pago mp ON gv.id_metodo_pago = mp.id_metodo_pago
+            LEFT JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable
+        `);
+
         let totalFixedPayments = 0; // Visual Expenses (excludes Avance)
         let totalFixedPaymentsForBalance = 0; // For Cash Balance (includes Avance)
         let deductions = { efectivo: 0, punto: 0, pagoMovil: 0, biopago: 0, transferencia: 0 };
@@ -53,6 +65,29 @@ exports.getFinanceSummary = async (req, res) => {
                 totalFixedPayments += monto; // Only add to Visual Expenses if not Avance
             }
             totalFixedPaymentsForBalance += monto; // Always subtract from cash balance
+
+            if (payment.nb_metodo_pago) {
+                const method = payment.nb_metodo_pago.toUpperCase();
+                if (usdKeywords.some(k => method.includes(k))) {
+                    incomeUSD_Only -= monto; // Subtract from USD Balance
+                } else {
+                    const amountInBs = monto * rate;
+                    if (method.includes('EFECTIVO')) deductions.efectivo += amountInBs;
+                    else if (method.includes('PUNTO')) deductions.punto += amountInBs;
+                    else if (method.includes('MOVIL') || method.includes('MÓVIL')) deductions.pagoMovil += amountInBs;
+                    else if (method.includes('BIOPAGO')) deductions.biopago += amountInBs;
+                    else if (method.includes('TRANSFERENCIA')) deductions.transferencia += amountInBs;
+                }
+            }
+        }
+
+        // Process Variable Payments
+        for (const payment of variableResult) {
+            const monto = parseFloat(payment.monto);
+            const rate = parseFloat(payment.tasa_dia);
+
+            totalFixedPayments += monto;
+            totalFixedPaymentsForBalance += monto;
 
             if (payment.nb_metodo_pago) {
                 const method = payment.nb_metodo_pago.toUpperCase();
@@ -377,6 +412,9 @@ exports.getRecentTransactions = async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit) : 50;
 
+        await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
+        await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+
         const query = `
             SELECT 
                 'Venta' as type,
@@ -429,6 +467,22 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN tipo_pago_fijo t ON p.id_tipo_pago_fijo = t.id_tipo_pago_fijo
             JOIN usuario u ON p.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+
+            UNION ALL
+
+            SELECT
+                tgv.nb_gasto_variable as type,
+                gv.id_gasto_variable as id,
+                gv.fecha_gasto_variable as date,
+                gv.monto_usd as amount,
+                u.nombre as user,
+                'Egreso' as category,
+                mp.nb_metodo_pago as payment_method,
+                gv.tasa_dia as exchange_rate
+            FROM gasto_variable gv
+            JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable
+            JOIN usuario u ON gv.id_usuario = u.id_usuario
+            JOIN metodo_pago mp ON gv.id_metodo_pago = mp.id_metodo_pago
 
             UNION ALL
 
@@ -980,5 +1034,143 @@ exports.buyCurrency = async (req, res) => {
     } catch (error) {
         console.error('Error buying currency:', error);
         res.status(500).json({ message: 'Error al registrar compra de divisas' });
+    }
+};
+
+// --- VARIABLE EXPENSES ---
+
+exports.getVariableExpenseTypes = async (req, res) => {
+    try {
+        await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
+        const [types] = await pool.query('SELECT * FROM tipo_gasto_variable ORDER BY nb_gasto_variable ASC');
+        res.json(types);
+    } catch (error) {
+        console.error('Error getting variable expense types:', error);
+        res.status(500).json({ message: 'Error al obtener tipos de gasto variable' });
+    }
+};
+
+exports.createVariableExpense = async (req, res) => {
+    try {
+        await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
+        await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+
+        const { nb_gasto_variable, id_tipo_gasto_variable, id_metodo_pago, monto, tasa_dia, fecha } = req.body;
+        const userId = req.user.id;
+
+        if (!id_metodo_pago || !monto || !tasa_dia) {
+            return res.status(400).json({ message: 'Campos requeridos faltantes' });
+        }
+
+        let finalTipoId = id_tipo_gasto_variable;
+
+        if (nb_gasto_variable) {
+            const [existing] = await pool.query('SELECT id_tipo_gasto_variable FROM tipo_gasto_variable WHERE nb_gasto_variable = ?', [nb_gasto_variable]);
+            if (existing.length > 0) {
+                finalTipoId = existing[0].id_tipo_gasto_variable;
+            } else {
+                const [result] = await pool.query('INSERT INTO tipo_gasto_variable (nb_gasto_variable) VALUES (?)', [nb_gasto_variable]);
+                finalTipoId = result.insertId;
+            }
+        }
+
+        if (!finalTipoId) {
+            return res.status(400).json({ message: 'Debe especificar el tipo de gasto' });
+        }
+
+        const amount = parseFloat(monto);
+        const rate = parseFloat(tasa_dia);
+        const methodId = parseInt(id_metodo_pago);
+
+        const balances = await balanceUtils.getMethodBalances();
+        const method = balances[methodId];
+
+        let requiredAmount = amount;
+        if (method && method.type === 'BS') {
+            requiredAmount = amount * rate;
+        }
+
+        const check = await balanceUtils.checkSufficientFunds(methodId, requiredAmount);
+        if (!check.ok) {
+            return res.status(400).json({ message: check.message + ` (Requerido: ${requiredAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })})` });
+        }
+
+        let dateObj = new Date();
+        dateObj.setHours(dateObj.getHours() - 4);
+        if (fecha) {
+            const datePart = fecha.split(' ')[0];
+            const [y, m, d] = datePart.split('-').map(Number);
+            if (y && m && d) {
+                dateObj.setFullYear(y);
+                dateObj.setMonth(m - 1);
+                dateObj.setDate(d);
+            }
+        }
+        dateObj.setHours(dateObj.getHours() + 4);
+
+        const formattedDate = dateObj.getFullYear() + "-" +
+            ("0" + (dateObj.getMonth() + 1)).slice(-2) + "-" +
+            ("0" + dateObj.getDate()).slice(-2) + " " +
+            ("0" + dateObj.getHours()).slice(-2) + ":" +
+            ("0" + dateObj.getMinutes()).slice(-2) + ":" +
+            ("0" + dateObj.getSeconds()).slice(-2);
+
+        await pool.query(
+            'INSERT INTO gasto_variable (id_usuario, id_tipo_gasto_variable, id_metodo_pago, monto_usd, tasa_dia, fecha_gasto_variable) VALUES (?, ?, ?, ?, ?, ?)',
+            [userId, finalTipoId, methodId, amount, rate, formattedDate]
+        );
+
+        res.json({ message: 'Gasto variable registrado exitosamente' });
+    } catch (error) {
+        console.error('Error creating variable expense:', error);
+        res.status(500).json({ message: 'Error al registrar gasto variable' });
+    }
+};
+
+// --- COMMISSIONS ---
+exports.getCommissions = async (req, res) => {
+    try {
+        const today = new Date();
+        const currentMonth = today.getMonth() + 1;
+        const currentYear = today.getFullYear();
+
+        // Calculate Total Sales for the Current Month
+        // Matches the logic from Dashboard's getTotalSales
+        const query = `
+            SELECT COALESCE(SUM(dp.monto), 0) as total
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE MONTH(v.fecha_venta) = ? 
+            AND YEAR(v.fecha_venta) = ?
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+        `;
+        const [rows] = await pool.query(query, [currentMonth, currentYear]);
+        const totalSales = parseFloat(rows[0].total) || 0;
+
+        const gerenteCommission = totalSales * 0.01;
+        const vendedorCommission = totalSales * 0.005;
+
+        const gerenteBonus = 20;
+        const vendedorBonus = 10;
+
+        res.json({
+            gerente: {
+                comision: gerenteCommission,
+                bonificacion: gerenteBonus,
+                total: gerenteCommission + gerenteBonus
+            },
+            vendedor: {
+                comision: vendedorCommission,
+                bonificacion: vendedorBonus,
+                total: vendedorCommission + vendedorBonus
+            },
+            totalSales
+        });
+    } catch (error) {
+        console.error('Error getting commissions:', error);
+        res.status(500).json({ message: 'Error al obtener comisiones' });
     }
 };
