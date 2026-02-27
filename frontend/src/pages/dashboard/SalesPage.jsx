@@ -755,9 +755,10 @@ const SalesPage = () => {
                             <span className="text-slate-400">Bs.</span>
                             <input
                                 type="number"
-                                value={rate}
+                                value={parseFloat(rate || 0).toFixed(2)}
                                 onChange={handleRateChange}
                                 className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-right w-32 text-white font-mono font-bold focus:outline-none focus:border-emerald-500 transition-colors"
+                                step="0.01"
                                 placeholder="0.00"
                             />
                         </div>

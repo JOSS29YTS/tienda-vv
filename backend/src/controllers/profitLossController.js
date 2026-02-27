@@ -81,27 +81,48 @@ exports.getProfitLoss = async (req, res) => {
         const totalCompras = parseFloat(purchaseRows[0].total);
 
         // ─────────────────────────────────────────────
-        // 3. EGRESOS: Pagos fijos (gastos operativos)
+        // 3. EGRESOS: Pagos fijos y Gastos variables (gastos operativos)
         // ─────────────────────────────────────────────
         const [fixedRows] = await pool.query(`
-            SELECT 
-                tpf.nb_tipo_pago_fijo as tipo,
-                COALESCE(SUM(pf.monto), 0) as total_usd
-            FROM pago_fijo pf
-            JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-            WHERE ${applyFilter('pf.fecha_pago_fijo')}
-            AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
-            GROUP BY tpf.id_tipo_pago_fijo, tpf.nb_tipo_pago_fijo
+            SELECT tipo, COALESCE(SUM(total_usd), 0) as total_usd
+            FROM (
+                SELECT 
+                    tpf.nb_tipo_pago_fijo as tipo,
+                    pf.monto as total_usd
+                FROM pago_fijo pf
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE ${applyFilter('pf.fecha_pago_fijo')}
+                AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
+
+                UNION ALL
+
+                SELECT 
+                    tgv.nb_gasto_variable as tipo,
+                    gv.monto_usd as total_usd
+                FROM gasto_variable gv
+                JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable
+                WHERE ${applyFilter('gv.fecha_gasto_variable')}
+            ) as combined_expenses
+            GROUP BY tipo
             ORDER BY total_usd DESC
-        `, dateParams);
+        `, [...dateParams, ...dateParams]);
 
         const [fixedTotalRows] = await pool.query(`
-            SELECT COALESCE(SUM(pf.monto), 0) as total
-            FROM pago_fijo pf
-            JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-            WHERE ${applyFilter('pf.fecha_pago_fijo')}
-            AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
-        `, dateParams);
+            SELECT COALESCE(SUM(total), 0) as total
+            FROM (
+                SELECT pf.monto as total
+                FROM pago_fijo pf
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE ${applyFilter('pf.fecha_pago_fijo')}
+                AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
+
+                UNION ALL
+
+                SELECT gv.monto_usd as total
+                FROM gasto_variable gv
+                WHERE ${applyFilter('gv.fecha_gasto_variable')}
+            ) as combined_totals
+        `, [...dateParams, ...dateParams]);
         const totalGastosOperativos = parseFloat(fixedTotalRows[0].total);
 
         // ─────────────────────────────────────────────
@@ -162,12 +183,52 @@ exports.getProfitLoss = async (req, res) => {
         `);
 
         const [monthlyExpenses] = await pool.query(`
-            SELECT 
-                DATE_FORMAT(fecha_compra, '%Y-%m') as mes,
-                COALESCE(SUM(total_compra), 0) as compras
-            FROM compra
-            WHERE fecha_compra >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-            GROUP BY DATE_FORMAT(fecha_compra, '%Y-%m')
+            SELECT mes, SUM(total) as compras
+            FROM (
+                SELECT 
+                    DATE_FORMAT(fecha_compra, '%Y-%m') as mes,
+                    total_compra as total
+                FROM compra
+                WHERE fecha_compra >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+
+                UNION ALL
+
+                SELECT 
+                    DATE_FORMAT(fecha_pago_fijo, '%Y-%m') as mes,
+                    monto as total
+                FROM pago_fijo pf
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE fecha_pago_fijo >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
+
+                UNION ALL
+
+                SELECT 
+                    DATE_FORMAT(fecha_gasto_variable, '%Y-%m') as mes,
+                    monto_usd as total
+                FROM gasto_variable
+                WHERE fecha_gasto_variable >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+
+                UNION ALL
+
+                SELECT 
+                    DATE_FORMAT(pp.fecha_pago, '%Y-%m') as mes,
+                    CASE 
+                        WHEN mp.nb_metodo_pago LIKE '%DIVISA%' 
+                          OR mp.nb_metodo_pago LIKE '%ZELLE%' 
+                          OR mp.nb_metodo_pago LIKE '%BINANCE%' 
+                          OR mp.nb_metodo_pago LIKE '%PAYPAL%' 
+                          OR mp.nb_metodo_pago LIKE '%USD%' 
+                          OR mp.nb_metodo_pago LIKE '%DOLAR%' 
+                          OR mp.nb_metodo_pago LIKE '%EFECTIVO ($)%' 
+                        THEN pp.monto
+                        ELSE (pp.monto / COALESCE(NULLIF(pp.tasa_dia, 0), 1))
+                    END as total
+                FROM pago_prestamo pp
+                JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+                WHERE pp.fecha_pago >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            ) as all_expenses
+            GROUP BY mes
         `);
 
         // Merge monthly data
@@ -179,7 +240,11 @@ exports.getProfitLoss = async (req, res) => {
             if (monthlyMap[row.mes]) {
                 monthlyMap[row.mes].egresos += parseFloat(row.compras);
             } else {
-                monthlyMap[row.mes] = { mes: row.mes, ingresos: 0, egresos: parseFloat(row.compras) };
+                // Formatting month label for expenses that don't have income in that month
+                const [y, m] = row.mes.split('-');
+                const dateObj = new Date(y, m - 1, 1);
+                const formatter = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
+                monthlyMap[row.mes] = { mes: formatter.format(dateObj), ingresos: 0, egresos: parseFloat(row.compras) };
             }
         }
         const monthlyChart = Object.values(monthlyMap).map(m => ({
