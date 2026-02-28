@@ -4,53 +4,64 @@ import { FaMoneyBillWave, FaUserTie, FaUserTag } from 'react-icons/fa';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import API_URL from '../../config/api';
+import { useRate } from '../../context/RateContext';
 
-const StatCard = ({ title, bgClass, textClass, icon: Icon, stats }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`relative p-6 rounded-3xl shadow-lg border-0 overflow-hidden group hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 ${bgClass}`}
-    >
-        <div className="absolute -right-6 -top-6 text-white opacity-10 group-hover:opacity-20 transition-all duration-500 transform group-hover:scale-110 rotate-12">
-            <Icon className="text-[10rem]" />
-        </div>
+const StatCard = ({ title, bgClass, textClass, icon: Icon, stats }) => {
+    const { rate } = useRate();
+    const totalBs = (stats.total * (parseFloat(rate) || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 });
 
-        <div className="relative z-10 flex flex-col h-full justify-between gap-6">
-            <div className="flex items-center gap-4">
-                <div className={`p-4 rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-inner border border-white/10`}>
-                    <Icon className="text-3xl" />
-                </div>
-                <h3 className="text-white font-black text-2xl tracking-wider uppercase">{title}</h3>
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`relative p-6 rounded-3xl shadow-lg border-0 overflow-hidden group hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 ${bgClass}`}
+        >
+            <div className="absolute -right-6 -top-6 text-white opacity-10 group-hover:opacity-20 transition-all duration-500 transform group-hover:scale-110 rotate-12">
+                <Icon className="text-[10rem]" />
             </div>
 
-            <div className="space-y-4">
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
-                    <div className="text-white/80 font-bold text-sm mb-1 uppercase tracking-wider">Comisión Ganada</div>
-                    <div className="text-3xl font-black text-white tracking-tight">
-                        ${stats.comision.toFixed(2)}
+            <div className="relative z-10 flex flex-col h-full justify-between gap-6">
+                <div className="flex items-center gap-4">
+                    <div className={`p-4 rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-inner border border-white/10`}>
+                        <Icon className="text-3xl" />
                     </div>
+                    <h3 className="text-white font-black text-2xl tracking-wider uppercase">{title}</h3>
                 </div>
 
-                <div className="bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
-                    <div className="text-white/80 font-bold text-sm mb-1 uppercase tracking-wider">Bonificación Fija</div>
-                    <div className="text-3xl font-black text-white tracking-tight">
-                        ${stats.bonificacion.toFixed(2)}
+                <div className="space-y-4">
+                    <div className="bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
+                        <div className="text-white/80 font-bold text-sm mb-1 uppercase tracking-wider">Comisión Ganada</div>
+                        <div className="text-3xl font-black text-white tracking-tight">
+                            ${stats.comision.toFixed(2)}
+                        </div>
                     </div>
-                </div>
 
-                <div className="bg-white/20 p-4 rounded-2xl border border-white/20 backdrop-blur-md shadow-lg mt-4">
-                    <div className="text-white/90 font-bold text-sm mb-1 uppercase tracking-wider flex items-center gap-2">
-                        <FaMoneyBillWave />
-                        Total A Pagar
+                    <div className="bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
+                        <div className="text-white/80 font-bold text-sm mb-1 uppercase tracking-wider">Bonificación Fija</div>
+                        <div className="text-3xl font-black text-white tracking-tight">
+                            ${stats.bonificacion.toFixed(2)}
+                        </div>
                     </div>
-                    <div className="text-5xl font-black text-white tracking-tighter">
-                        ${stats.total.toFixed(2)}
+
+                    <div className="bg-white/20 p-4 rounded-2xl border border-white/20 backdrop-blur-md shadow-lg mt-4">
+                        <div className="text-white/90 font-bold text-sm mb-1 uppercase tracking-wider flex items-center gap-2">
+                            <FaMoneyBillWave />
+                            Total A Pagar
+                        </div>
+                        <div className="flex flex-col">
+                            <div className="text-5xl font-black text-white tracking-tighter">
+                                ${stats.total.toFixed(2)}
+                            </div>
+                            <div className="text-white/80 font-bold text-lg mt-1 tracking-tight">
+                                ≈ {totalBs} Bs.
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </motion.div>
-);
+        </motion.div>
+    );
+};
 
 
 const CommissionsPage = () => {

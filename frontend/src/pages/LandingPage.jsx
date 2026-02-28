@@ -57,25 +57,7 @@ const LandingPage = () => {
                     transition={{ duration: 0.8, ease: "easeOut" }}
                     className="flex-1 space-y-8 text-center lg:text-left z-20"
                 >
-                    {/* Centered Large Logo for Mobile, Left Aligned for Desktop */}
-                    <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ duration: 0.6, delay: 0.3 }}
-                        className="flex justify-center lg:justify-start"
-                    >
-                        <div className="relative group">
-                            <div className="absolute -inset-4 bg-orange-600/20 rounded-full blur-2xl group-hover:bg-orange-600/40 transition duration-500"></div>
-                            <img
-                                src={logo}
-                                alt="Ropa Mania Logo"
-                                className="relative w-32 md:w-48 lg:w-56 h-auto object-contain drop-shadow-2xl transform hover:scale-105 transition-transform duration-500"
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                }}
-                            />
-                        </div>
-                    </motion.div>
+
 
                     {/* Badge */}
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-900 border border-slate-800 text-orange-400 text-[10px] font-bold tracking-widest uppercase mx-auto lg:mx-0">
@@ -128,44 +110,12 @@ const LandingPage = () => {
                         </div>
                     </motion.div>
 
-                    <div className="bg-slate-900 rounded-2xl p-2 border border-slate-800 shadow-2xl shadow-black/50 overflow-hidden transform rotate-y-6 rotate-x-6 hover:rotate-0 transition-all duration-700 ease-out">
-                        {/* Dashboard Header Mockup */}
-                        <div className="bg-slate-800 rounded-t-xl px-4 py-3 flex items-center justify-between border-b border-slate-700/50">
-                            <div className="flex gap-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
-                                <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></div>
-                                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
-                            </div>
-                            <div className="text-[10px] text-slate-500 font-mono">dashboard.mania.app</div>
-                        </div>
-
-                        {/* Dashboard Content Mockup */}
-                        <div className="p-6 grid grid-cols-2 gap-4">
-                            {/* Card 1 */}
-                            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                                <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500 mb-3">
-                                    <FaBoxOpen />
-                                </div>
-                                <div className="text-2xl font-bold text-white mb-1">24</div>
-                                <div className="text-xs text-slate-500">Ventas Hoy</div>
-                            </div>
-
-                            {/* Card 2 */}
-                            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 mb-3">
-                                    <FaChartLine />
-                                </div>
-                                <div className="text-2xl font-bold text-white mb-1">$450.00</div>
-                                <div className="text-xs text-slate-500">Ingresos</div>
-                            </div>
-
-                            {/* Chart Area */}
-                            <div className="col-span-2 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 h-32 flex items-end justify-between px-2 gap-2">
-                                {[40, 70, 45, 90, 60, 80, 50].map((h, i) => (
-                                    <div key={i} className="flex-1 bg-gradient-to-t from-orange-600 to-amber-500 rounded-sm opacity-90 hover:opacity-100 transition-all hover:scale-y-110 origin-bottom" style={{ height: `${h}%` }}></div>
-                                ))}
-                            </div>
-                        </div>
+                    <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-2xl shadow-black/50 overflow-hidden transform rotate-y-6 rotate-x-6 hover:rotate-0 transition-all duration-700 ease-out flex items-center justify-center">
+                        <img
+                            src={logo}
+                            alt="Ropa Mania Dashboard Logo"
+                            className="w-full h-auto rounded-xl object-contain drop-shadow-2xl"
+                        />
                     </div>
                 </motion.div>
             </main>
