@@ -559,7 +559,7 @@ const SalesPage = () => {
     const handleGenerateReport = () => {
         const doc = new jsPDF();
         const secondaryColor = [15, 23, 42]; // Slate 900
-        const primaryColor = [16, 185, 129]; // Emerald 500
+        const primaryColor = [15, 23, 42];   // Changed from emerald to slate
 
         // Header
         doc.setFillColor(...primaryColor);
