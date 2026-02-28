@@ -18,6 +18,7 @@ const FinancesPage = () => {
         receivables: 0,
         incomeBs: 0,
         incomeUSD: 0,
+        totalZelleUSD: 0,
         totalEfectivoBs: 0,
         totalPunto: 0,
         totalPagoMovil: 0,
@@ -238,6 +239,7 @@ const FinancesPage = () => {
                     receivables: parseFloat(summaryData.stats.receivables),
                     incomeBs: parseFloat(summaryData.stats.incomeBs),
                     incomeUSD: parseFloat(summaryData.stats.incomeUSD),
+                    totalZelleUSD: parseFloat(summaryData.stats.totalZelleUSD || 0),
                     totalEfectivoBs: parseFloat(summaryData.stats.totalEfectivoBs || 0),
                     totalPunto: parseFloat(summaryData.stats.totalPunto || 0),
                     totalPagoMovil: parseFloat(summaryData.stats.totalPagoMovil || 0),
@@ -637,7 +639,8 @@ const FinancesPage = () => {
             ['Balance Neto', `$ ${stats.balance.toFixed(2)}`],
             ['Cuentas por Cobrar', `$ ${stats.receivables.toFixed(2)}`],
             ['Total General Bs', `Bs. ${stats.incomeBs.toFixed(2)}`],
-            ['DIVISAS USD', `$ ${stats.incomeUSD.toFixed(2)}`]
+            ['DIVISAS USD', `$ ${stats.incomeUSD.toFixed(2)}`],
+            ['ZELLE USD', `$ ${stats.totalZelleUSD.toFixed(2)}`]
         ];
 
         autoTable(doc, {
@@ -880,6 +883,12 @@ const FinancesPage = () => {
                 />
 
                 {/* Currency Totals - Moved to End */}
+                <StatCard
+                    title="ZELLE USD"
+                    value={stats.totalZelleUSD}
+                    icon={FaDollarSign}
+                    gradient="bg-gradient-to-br from-purple-600 to-indigo-700"
+                />
                 <StatCard
                     title="DIVISAS USD"
                     value={stats.incomeUSD}
@@ -1421,7 +1430,7 @@ const FinancesPage = () => {
                                         required
                                     >
                                         <option value="">Seleccione cuenta...</option>
-                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
+                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS', 'ZELLE'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
                                             <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
                                                 {method.nb_metodo_pago}
                                             </option>
@@ -1445,7 +1454,7 @@ const FinancesPage = () => {
                                         required
                                     >
                                         <option value="">Seleccione cuenta...</option>
-                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS', 'BIOPAGO'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
+                                        {paymentMethods.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'DIVISAS', 'BIOPAGO', 'ZELLE'].includes(m.nb_metodo_pago.toUpperCase())).map(method => (
                                             <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
                                                 {method.nb_metodo_pago}
                                             </option>

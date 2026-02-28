@@ -53,7 +53,8 @@ exports.getFinanceSummary = async (req, res) => {
         let collectedIncomeUSD = 0; // Logic for Gross Income (Revenue)
         let totalLoansUSD = 0; // Logic for Loans (Capital)
         let incomeBs = 0;
-        let incomeUSD_Only = 0; // Logic for Net USD Balance (Divisas)
+        let incomeUSD_Only = 0; // Logic for Net USD Balance (Other Divisas)
+        let totalZelleUSD = 0; // Logic for Net Zelle Balance
 
         // Process Fixed Payments
         for (const payment of fixedResult) {
@@ -68,7 +69,9 @@ exports.getFinanceSummary = async (req, res) => {
 
             if (payment.nb_metodo_pago) {
                 const method = payment.nb_metodo_pago.toUpperCase();
-                if (usdKeywords.some(k => method.includes(k))) {
+                if (method.includes('ZELLE')) {
+                    totalZelleUSD -= monto;
+                } else if (usdKeywords.some(k => method.includes(k))) {
                     incomeUSD_Only -= monto; // Subtract from USD Balance
                 } else {
                     const amountInBs = monto * rate;
@@ -91,7 +94,9 @@ exports.getFinanceSummary = async (req, res) => {
 
             if (payment.nb_metodo_pago) {
                 const method = payment.nb_metodo_pago.toUpperCase();
-                if (usdKeywords.some(k => method.includes(k))) {
+                if (method.includes('ZELLE')) {
+                    totalZelleUSD -= monto;
+                } else if (usdKeywords.some(k => method.includes(k))) {
                     incomeUSD_Only -= monto; // Subtract from USD Balance
                 } else {
                     const amountInBs = monto * rate;
@@ -134,7 +139,9 @@ exports.getFinanceSummary = async (req, res) => {
 
             collectedIncomeUSD += amount; // Add to Gross Income
 
-            if (usdKeywords.some(k => method.includes(k))) {
+            if (method.includes('ZELLE')) {
+                totalZelleUSD += amount;
+            } else if (usdKeywords.some(k => method.includes(k))) {
                 incomeUSD_Only += amount; // Add to USD Balance
             } else {
                 const amountInBs = amount * rate;
@@ -159,7 +166,10 @@ exports.getFinanceSummary = async (req, res) => {
             const amount = parseFloat(loan.monto_prestamo);
             const rate = parseFloat(loan.tasa_dia) || 1;
 
-            if (usdKeywords.some(k => method.includes(k))) {
+            if (method.includes('ZELLE')) {
+                totalLoansUSD += amount; // Add to Loans Capital (Not Revenue)
+                totalZelleUSD += amount;
+            } else if (usdKeywords.some(k => method.includes(k))) {
                 totalLoansUSD += amount; // Add to Loans Capital (Not Revenue)
                 incomeUSD_Only += amount;
             } else {
@@ -198,21 +208,31 @@ exports.getFinanceSummary = async (req, res) => {
                 else if (m.includes('TRANSFERENCIA')) totalTransferenciaBs += val;
             };
 
-            if (!isOriginUSD && !isDestUSD) {
-                updateBsMethod(origin, -amount);
-                updateBsMethod(dest, amount);
+            const updateUsdMethod = (methodName, val) => {
+                const m = methodName.toUpperCase();
+                if (m.includes('ZELLE')) totalZelleUSD += val;
+                else if (usdKeywords.some(k => m.includes(k))) incomeUSD_Only += val;
+            };
+
+            if (isOriginUSD && isDestUSD) {
+                // Internal USD Transfer (e.g. Divisas -> Zelle)
+                updateUsdMethod(origin, -amount);
+                updateUsdMethod(dest, amount);
             } else if (isOriginUSD && !isDestUSD) {
                 // USD -> Bs (Selling)
                 const amountBs = amount * rate;
                 updateBsMethod(dest, amountBs);
-                incomeUSD_Only -= amount; // Deduct from USD Balance
+                updateUsdMethod(origin, -amount);
             } else if (!isOriginUSD && isDestUSD) {
                 // Bs -> USD (Buying)
                 const amountBs = amount * rate;
                 updateBsMethod(origin, -amountBs);
-                incomeUSD_Only += amount; // Add to USD Balance
+                updateUsdMethod(dest, amount);
+            } else {
+                // Bs -> Bs
+                updateBsMethod(origin, -amount);
+                updateBsMethod(dest, amount);
             }
-            // USD -> USD: No change to Balance (Internal)
         }
 
         // 8. Subtract Purchases (Immediate) from Method Balances
@@ -226,7 +246,9 @@ exports.getFinanceSummary = async (req, res) => {
             const amount = parseFloat(pp.monto);
             const rate = parseFloat(pp.tasa_dia) || 1;
 
-            if (usdKeywords.some(k => method.includes(k))) {
+            if (method.includes('ZELLE')) {
+                totalZelleUSD -= amount;
+            } else if (usdKeywords.some(k => method.includes(k))) {
                 incomeUSD_Only -= amount;
             } else {
                 const amountBs = amount * rate;
@@ -254,7 +276,11 @@ exports.getFinanceSummary = async (req, res) => {
             let amountUSD = 0;
             let amountBs = 0;
 
-            if (usdKeywords.some(k => method.includes(k))) {
+            if (method.includes('ZELLE')) {
+                amountUSD = amount;
+                amountBs = amount * rate;
+                totalZelleUSD -= amountUSD;
+            } else if (usdKeywords.some(k => method.includes(k))) {
                 // Payment in USD
                 amountUSD = amount;
                 amountBs = amount * rate;
@@ -359,7 +385,9 @@ exports.getFinanceSummary = async (req, res) => {
             const rate = parseFloat(payment.tasa_dia);
             const method = payment.nb_metodo_pago.toUpperCase();
 
-            if (usdKeywords.some(k => method.includes(k))) {
+            if (method.includes('ZELLE')) {
+                totalZelleUSD -= monto;
+            } else if (usdKeywords.some(k => method.includes(k))) {
                 incomeUSD_Only -= monto; // Subtract from USD Balance
             } else {
                 const deductionBs = monto * rate;
@@ -392,6 +420,7 @@ exports.getFinanceSummary = async (req, res) => {
                 receivables: parseFloat(currentReceivables.toFixed(2)),
                 incomeBs: parseFloat((totalEfectivoBs + totalPuntoBs + totalPagoMovilBs + totalBiopagoBs + totalTransferenciaBs).toFixed(2)),
                 incomeUSD: parseFloat(incomeUSD_Only.toFixed(2)), // Already Net
+                totalZelleUSD: parseFloat(totalZelleUSD.toFixed(2)),
                 pendingInvoiceCount,
                 pendingInvoiceTotal: parseFloat(pendingInvoiceTotal.toFixed(2)),
                 totalEfectivoBs: parseFloat(totalEfectivoBs.toFixed(2)), // Already Net (deductions applied)
@@ -968,7 +997,7 @@ exports.payLoan = async (req, res) => {
 };
 exports.buyCurrency = async (req, res) => {
     try {
-        const { amountUSD, methodId, rate, date } = req.body;
+        const { amountUSD, methodId, destinationId, rate, date } = req.body;
         const userId = req.user.id;
 
         if (!amountUSD || !methodId || !rate) {
@@ -978,20 +1007,21 @@ exports.buyCurrency = async (req, res) => {
         const amount = parseFloat(amountUSD); // This is USD
         const rateVal = parseFloat(rate);
         const originId = parseInt(methodId);
+        let finalDestinationId = destinationId ? parseInt(destinationId) : null;
 
-        // 1. Find Destination Method (USD Account)
-        // Prefer 'DIVISAS' or 'EFECTIVO ($)'
-        const [methods] = await pool.query("SELECT id_metodo_pago, nb_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE '%DIVISA%' OR nb_metodo_pago LIKE '%USD%' OR nb_metodo_pago LIKE '%EFECTIVO ($)%' LIMIT 1");
+        // 1. Find Destination Method (USD Account) if not provided
+        if (!finalDestinationId) {
+            // Prefer 'DIVISAS' or 'EFECTIVO ($)'
+            const [methods] = await pool.query("SELECT id_metodo_pago, nb_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE '%DIVISA%' OR nb_metodo_pago LIKE '%USD%' OR nb_metodo_pago LIKE '%EFECTIVO ($)%' LIMIT 1");
 
-        if (methods.length === 0) {
-            // Create it if not exists? Or Error?
-            // Safer to Error or fallback. Let's error.
-            return res.status(400).json({ message: 'No se encontró una cuenta de destino para Divisas (ej. DIVISAS, EFECTIVO $)' });
+            if (methods.length === 0) {
+                return res.status(400).json({ message: 'No se encontró una cuenta de destino para Divisas (ej. DIVISAS, EFECTIVO $)' });
+            }
+            finalDestinationId = methods[0].id_metodo_pago;
         }
-        const destinationId = methods[0].id_metodo_pago;
 
-        if (originId === destinationId) {
-            return res.status(400).json({ message: 'El método de origen no puede ser igual al destino (Divisas)' });
+        if (originId === finalDestinationId) {
+            return res.status(400).json({ message: 'El método de origen no puede ser igual al destino' });
         }
 
         // 2. Check Funds in Origin (Bs)
@@ -1026,7 +1056,7 @@ exports.buyCurrency = async (req, res) => {
 
         await pool.query(
             'INSERT INTO traspaso (id_usuario, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, originId, destinationId, amount, rateVal, formattedDate]
+            [userId, originId, finalDestinationId, amount, rateVal, formattedDate]
         );
 
         res.json({ message: 'Compra de Divisas registrada exitosamente' });

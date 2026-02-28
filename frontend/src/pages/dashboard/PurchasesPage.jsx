@@ -46,7 +46,7 @@ const PurchasesPage = () => {
 
     // Buy Currency State
     const [isBuyCurrencyModalOpen, setIsBuyCurrencyModalOpen] = useState(false);
-    const [buyCurrencyData, setBuyCurrencyData] = useState({ amountUSD: '', amountBs: '', methodId: '' });
+    const [buyCurrencyData, setBuyCurrencyData] = useState({ amountUSD: '', amountBs: '', methodId: '', destMethodId: '' });
 
     // Receipt Upload State
     const [isProcessingImage, setIsProcessingImage] = useState(false);
@@ -134,6 +134,7 @@ const PurchasesPage = () => {
                 body: JSON.stringify({
                     amountUSD: buyCurrencyData.amountUSD,
                     methodId: buyCurrencyData.methodId,
+                    destinationId: buyCurrencyData.destMethodId, // Send destination method
                     rate: effectiveRate, // Use calculated rate
                     date: date
                 })
@@ -144,7 +145,7 @@ const PurchasesPage = () => {
 
             setSuccess(data.message);
             setIsBuyCurrencyModalOpen(false);
-            setBuyCurrencyData({ amountUSD: '', amountBs: '', methodId: '' });
+            setBuyCurrencyData({ amountUSD: '', amountBs: '', methodId: '', destMethodId: '' });
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
             setError(err.message);
@@ -1136,6 +1137,26 @@ const PurchasesPage = () => {
                                 </div>
 
                                 <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cuenta de Destino ($ USD)</label>
+                                    <select
+                                        value={buyCurrencyData.destMethodId}
+                                        onChange={e => setBuyCurrencyData({ ...buyCurrencyData, destMethodId: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold mb-3 border-l-4 border-l-cyan-500"
+                                    >
+                                        <option value="">-- Seleccionar --</option>
+                                        {paymentMethods
+                                            .filter(m => {
+                                                const name = m.nb_metodo_pago.toUpperCase();
+                                                return name.includes('DIVISA') || name.includes('ZELLE') || name.includes('USD') || name.includes('EFECTIVO ($)');
+                                            })
+                                            .map(m => (
+                                                <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nb_metodo_pago}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
+                                <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Método de Pago (Origen Bs)</label>
                                     <select
                                         value={buyCurrencyData.methodId}
@@ -1178,7 +1199,7 @@ const PurchasesPage = () => {
 
                                 <button
                                     onClick={handleBuyCurrencySubmit}
-                                    disabled={!buyCurrencyData.amountUSD || !buyCurrencyData.methodId || !buyCurrencyData.amountBs}
+                                    disabled={!buyCurrencyData.amountUSD || !buyCurrencyData.methodId || !buyCurrencyData.destMethodId || !buyCurrencyData.amountBs}
                                     className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl shadow-lg shadow-cyan-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Confirmar Compra

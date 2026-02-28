@@ -293,7 +293,19 @@ const SalesPage = () => {
         try {
             const response = await fetch(`${API_URL}/api/sales/payment-methods`);
             const data = await response.json();
-            setPaymentMethods(data);
+
+            // Reorder: Put ZELLE before MIXTO if both exist
+            const sortedData = [...data].sort((a, b) => {
+                const nameA = a.nb_metodo_pago.toUpperCase();
+                const nameB = b.nb_metodo_pago.toUpperCase();
+
+                if (nameA === 'ZELLE' && nameB === 'MIXTO') return -1;
+                if (nameA === 'MIXTO' && nameB === 'ZELLE') return 1;
+
+                return 0; // Maintain original database order for others
+            });
+
+            setPaymentMethods(sortedData);
         } catch (err) {
             console.error(err);
             setError('Error al cargar métodos de pago');
@@ -1173,7 +1185,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                                 const method = e.target.value;
                                 setCurrentMethod(method);
                                 // Auto-set currency based on method
-                                if (method === 'DIVISAS') {
+                                if (method === 'DIVISAS' || method === 'ZELLE') {
                                     setCurrency('USD');
                                 } else if (method !== '') {
                                     setCurrency('BS');
@@ -1722,7 +1734,7 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
                                                 value={mixedMethodInput}
                                                 onChange={(e) => {
                                                     setMixedMethodInput(e.target.value);
-                                                    if (e.target.value === 'DIVISAS') setMixedCurrencyInput('USD');
+                                                    if (e.target.value === 'DIVISAS' || e.target.value === 'ZELLE') setMixedCurrencyInput('USD');
                                                     else if (e.target.value) setMixedCurrencyInput('BS');
                                                 }}
                                                 className="flex-1 text-xs border rounded p-1"
