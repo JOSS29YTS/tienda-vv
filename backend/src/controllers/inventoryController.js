@@ -47,41 +47,76 @@ exports.getInventory = async (req, res) => {
 };
 
 exports.getInventoryReport = async (req, res) => {
-    const { month, year } = req.query;
+    let { month, year } = req.query;
+    month = parseInt(month);
+    year = parseInt(year);
+
     try {
+        // First day of current report month
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
+
+        // First day of next month
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01 00:00:00`;
+
         const query = `
             SELECT 
                 p.id_producto, 
                 p.nb_producto, 
                 p.precio, 
                 p.codigo_de_barra,
-                COALESCE(purchased.bought_in_period, 0) as bought_in_period,
-                COALESCE(sold.sold_in_period, 0) as sold_in_period
+                -- Initial Inventory (Balance strictly before startDate)
+                (COALESCE(purchased_before.total, 0) - COALESCE(sold_before.total, 0)) as inv_inicial,
+                -- Moves during the month
+                COALESCE(purchased_period.total, 0) as compras_periodo,
+                COALESCE(sold_period.total, 0) as ventas_periodo,
+                -- Final Inventory (Balance strictly before endDate)
+                (COALESCE(purchased_before.total, 0) - COALESCE(sold_before.total, 0) + 
+                 COALESCE(purchased_period.total, 0) - COALESCE(sold_period.total, 0)) as inv_final
             FROM producto p
+            -- Sub-query for total bought BEFORE period
             LEFT JOIN (
-                SELECT dc.id_producto, SUM(dc.cantidad) as bought_in_period
+                SELECT dc.id_producto, SUM(dc.cantidad) as total
                 FROM detalle_compra dc
                 JOIN compra c ON dc.id_compra = c.id_compra
-                WHERE MONTH(c.fecha_compra) = ? AND YEAR(c.fecha_compra) = ?
+                WHERE c.fecha_compra < ?
                 GROUP BY dc.id_producto
-            ) purchased ON p.id_producto = purchased.id_producto
+            ) purchased_before ON p.id_producto = purchased_before.id_producto
+            -- Sub-query for total sold BEFORE period
             LEFT JOIN (
-                SELECT dv.id_producto, SUM(dv.cantidad) as sold_in_period
+                SELECT dv.id_producto, SUM(dv.cantidad) as total
                 FROM detalle_venta dv
                 JOIN venta v ON dv.id_venta = v.id_venta
-                WHERE MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+                WHERE v.fecha_venta < ?
                 GROUP BY dv.id_producto
-            ) sold ON p.id_producto = sold.id_producto
+            ) sold_before ON p.id_producto = sold_before.id_producto
+            -- Sub-query for total bought DURING period
+            LEFT JOIN (
+                SELECT dc.id_producto, SUM(dc.cantidad) as total
+                FROM detalle_compra dc
+                JOIN compra c ON dc.id_compra = c.id_compra
+                WHERE c.fecha_compra >= ? AND c.fecha_compra < ?
+                GROUP BY dc.id_producto
+            ) purchased_period ON p.id_producto = purchased_period.id_producto
+            -- Sub-query for total sold DURING period
+            LEFT JOIN (
+                SELECT dv.id_producto, SUM(dv.cantidad) as total
+                FROM detalle_venta dv
+                JOIN venta v ON dv.id_venta = v.id_venta
+                WHERE v.fecha_venta >= ? AND v.fecha_venta < ?
+                GROUP BY dv.id_producto
+            ) sold_period ON p.id_producto = sold_period.id_producto
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             ORDER BY p.nb_producto ASC
         `;
 
-        const [rows] = await pool.query(query, [month, year, month, year]);
-
+        const [rows] = await pool.query(query, [startDate, startDate, startDate, endDate, startDate, endDate]);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching inventory report:', error);
         res.status(500).json({ message: 'Error al obtener reporte de inventario' });
     }
 };
+
 

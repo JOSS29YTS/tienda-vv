@@ -73,21 +73,25 @@ const InventoryPage = () => {
             const tableData = data.map(item => [
                 item.nb_producto,
                 `$${parseFloat(item.precio).toFixed(2)}`,
-                item.bought_in_period,
-                item.sold_in_period
+                item.inv_inicial,
+                item.compras_periodo,
+                item.ventas_periodo,
+                item.inv_final
             ]);
 
             autoTable(doc, {
                 startY: 40,
-                head: [['Producto', 'Precio', 'Comprado', 'Vendido']],
+                head: [['Producto', 'Precio', 'Inv. Inicial', 'Compras', 'Ventas', 'Inv. Final']],
                 body: tableData,
                 theme: 'striped',
                 headStyles: { fillColor: [15, 23, 42] }, // Slate 900
-                styles: { fontSize: 9, cellPadding: 3 },
+                styles: { fontSize: 8, cellPadding: 2 },
                 columnStyles: {
                     1: { halign: 'right' },
                     2: { halign: 'center' },
-                    3: { halign: 'center' }
+                    3: { halign: 'center' },
+                    4: { halign: 'center' },
+                    5: { halign: 'center', fontStyle: 'bold' }
                 }
             });
 
