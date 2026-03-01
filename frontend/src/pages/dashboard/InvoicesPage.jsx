@@ -123,6 +123,7 @@ const InvoicesPage = () => {
             if (paymentType === 'loan') {
                 // Client-side Overpayment Validation
                 let totalNewPayment = 0;
+                const roundedRate = parseFloat(parseFloat(rate).toFixed(2));
                 const loanIsUsd = selectedItem.is_usd;
 
                 for (const p of payments) {
@@ -133,12 +134,12 @@ const InvoicesPage = () => {
                     const methodIsUsd = ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => method.nb_metodo_pago.toUpperCase().includes(k));
                     const amount = parseFloat(p.amount);
 
-                    // Normalize to Loan Currency
+                    // Normalize to Loan Currency (rounding intermediate values to avoid float trash)
                     if (loanIsUsd) {
                         if (methodIsUsd) totalNewPayment += amount;
-                        else totalNewPayment += (amount / rate);
+                        else totalNewPayment += (amount / roundedRate);
                     } else {
-                        if (methodIsUsd) totalNewPayment += (amount * rate);
+                        if (methodIsUsd) totalNewPayment += (amount * roundedRate);
                         else totalNewPayment += amount;
                     }
                 }
@@ -146,21 +147,34 @@ const InvoicesPage = () => {
                 // Usar la deuda indexada en la nueva tasa para los préstamos en Bs
                 const baseRemaining = parseFloat(selectedItem.monto_pendiente);
                 const loanOriginalRate = parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2));
-                const roundedRate = parseFloat(parseFloat(rate).toFixed(2));
                 const remaining = loanIsUsd ? baseRemaining : ((baseRemaining / loanOriginalRate) * roundedRate);
 
-                // Validación exacta: tolerancia máxima de 0.01 en la moneda del préstamo
-                const loanDiff = totalNewPayment - remaining;
-                if (loanDiff > 0.01) {
+                // VALIDACIÓN DUAL (USD vs Bs)
+                const isUsdContext = loanIsUsd;
+                let isValid = true;
+
+                if (isUsdContext) {
+                    // Exacto al centavo en USD
+                    const finalPay = Math.round(totalNewPayment * 100) / 100;
+                    const finalRem = Math.round(remaining * 100) / 100;
+                    if (finalPay > finalRem) isValid = false;
+                } else {
+                    // Precisión de 4 decimales con tolerancia de 0.05 Bs para Bolívares
+                    const finalPay = Math.round(totalNewPayment * 10000) / 10000;
+                    const finalRem = Math.round(remaining * 10000) / 10000;
+                    if (finalPay > (finalRem + 0.05)) isValid = false;
+                }
+
+                if (!isValid) {
                     const currency = loanIsUsd ? '$' : 'Bs';
                     const altCurrency = loanIsUsd ? 'Bs' : '$';
-                    const altRemaining = loanIsUsd ? (remaining * rate) : (remaining / rate);
-                    const altPaid = loanIsUsd ? (totalNewPayment * rate) : (totalNewPayment / rate);
-                    const altDiff = loanIsUsd ? (loanDiff * rate) : (loanDiff / rate);
+                    const altRemaining = loanIsUsd ? (remaining * roundedRate) : (remaining / roundedRate);
+                    const altPaid = loanIsUsd ? (totalNewPayment * roundedRate) : (totalNewPayment / roundedRate);
+                    const loanDiff = totalNewPayment - remaining;
                     setError(
                         `El monto pagado (${currency} ${totalNewPayment.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ≈ ${altCurrency} ${altPaid.toLocaleString('es-VE', { minimumFractionDigits: 2 })}) ` +
                         `excede la deuda restante (${currency} ${remaining.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ≈ ${altCurrency} ${altRemaining.toLocaleString('es-VE', { minimumFractionDigits: 2 })}). ` +
-                        `Exceso: ${currency} ${loanDiff.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ≈ ${altCurrency} ${altDiff.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                        `Exceso: ${currency} ${loanDiff.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                     );
                     setTimeout(() => setError(''), 6000);
                     return;
@@ -192,51 +206,38 @@ const InvoicesPage = () => {
 
             } else {
                 // INVOICE PAYMENT LOGIC (USD Normalized)
-                // Primero calcular el total a pagar normalizado en USD
+                const currentRate = parseFloat(parseFloat(rate).toFixed(2));
                 let totalInvoicePayUsd = 0;
                 for (const p of payments) {
                     if (!p.methodId || !p.amount) continue;
                     const method = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
                     const isUsd = method && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => method.nb_metodo_pago.toUpperCase().includes(k));
                     let amt = parseFloat(p.amount);
-                    if (!isUsd) amt = amt / parseFloat(rate);
+                    if (!isUsd) amt = amt / currentRate;
                     totalInvoicePayUsd += amt;
                 }
 
                 const invoiceRemaining = parseFloat(selectedItem.monto_restante);
 
-                // Strict tolerance by currency type (same logic as purchases)
-                const USD_KEYS = ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'];
-                const allUsd = payments.filter(p => p.methodId && p.amount).every(p => {
-                    const method = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
-                    return method && USD_KEYS.some(k => method.nb_metodo_pago.toUpperCase().includes(k));
-                });
-                const currentRate = parseFloat(rate);
-                // USD: $0.005 tolerance (floating point only)
-                // Bs: Bs 0.05 → in USD = 0.05 / rate
-                const toleranceUsd = allUsd ? 0.005 : (0.05 / currentRate);
+                // VALIDACIÓN DUAL (USD vs Bs) para Facturas
+                // Ya que las facturas son USD base, pero aceptan pagos en Bs
+                const finalPayUsd = Math.round(totalInvoicePayUsd * 10000) / 10000;
+                const finalRemUsd = Math.round(invoiceRemaining * 10000) / 10000;
 
-                const invoiceDiff = totalInvoicePayUsd - invoiceRemaining;
-                if (Math.abs(invoiceDiff) > toleranceUsd) {
-                    if (allUsd) {
-                        const msg = invoiceDiff > 0
-                            ? `El monto pagado ($${totalInvoicePayUsd.toFixed(2)}) excede la deuda ($${invoiceRemaining.toFixed(2)}). Exceso: $${invoiceDiff.toFixed(2)}`
-                            : `El monto pagado ($${totalInvoicePayUsd.toFixed(2)}) no alcanza la deuda ($${invoiceRemaining.toFixed(2)}). Faltan: $${Math.abs(invoiceDiff).toFixed(2)}`;
-                        setError(msg);
-                    } else {
-                        const diffBs = invoiceDiff * currentRate;
-                        const paidBs = totalInvoicePayUsd * currentRate;
-                        const remainBs = invoiceRemaining * currentRate;
-                        const msg = invoiceDiff > 0
-                            ? `El monto en Bs (${paidBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}) excede la deuda (Bs ${remainBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). Exceso: Bs ${diffBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
-                            : `El monto en Bs (${paidBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}) no alcanza la deuda (Bs ${remainBs.toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). Faltan: Bs ${Math.abs(diffBs).toLocaleString('es-VE', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
-                        setError(msg);
-                    }
-                    setTimeout(() => setError(''), 3000);
+                // Convertir la tolerancia de 0.05 Bs a USD para la comparación
+                const toleranceUsd = 0.05 / currentRate;
+
+                if (finalPayUsd > (finalRemUsd + toleranceUsd)) {
+                    const diff = totalInvoicePayUsd - invoiceRemaining;
+                    const paidBs = totalInvoicePayUsd * currentRate;
+                    const remainBs = invoiceRemaining * currentRate;
+                    const msg = `El monto total ($${totalInvoicePayUsd.toFixed(2)} / Bs ${paidBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}) excede la deuda ($${invoiceRemaining.toFixed(2)} / Bs ${remainBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}). Exceso detectado en Bs.`;
+                    setError(msg);
+                    setTimeout(() => setError(''), 5000);
                     return;
                 }
 
-                // Procesar pagos uno por uno
+                // Procesar pagos uno por uno (ya validados)
                 for (const p of payments) {
                     if (!p.methodId || !p.amount) continue;
 

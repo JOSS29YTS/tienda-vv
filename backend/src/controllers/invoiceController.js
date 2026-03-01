@@ -57,14 +57,17 @@ exports.payInvoice = async (req, res) => {
         const paymentAmount = parseFloat(monto);
         const purchaseId = invoice[0].id_compra;
 
-        // VALIDATION: Prevent Overpayment — tolerancia máxima $0.01
-        if (paymentAmount > (remainingDebt + 0.01)) {
+        // VALIDACIÓN DUAL (Facturas son USD, pero se valida el excedente en Bs)
+        const finalPaymentUsd = Math.round(paymentAmount * 10000) / 10000;
+        const finalRemainingUsd = Math.round(remainingDebt * 10000) / 10000;
+        const toleranceInUsd = 0.05 / roundedRate;
+
+        if (finalPaymentUsd > (finalRemainingUsd + toleranceInUsd)) {
             await connection.rollback();
-            const rate = parseFloat(tasa_dia);
-            const paidBs = (paymentAmount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
-            const remainBs = (remainingDebt * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+            const paidBs = (paymentAmount * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+            const remainBs = (remainingDebt * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
             return res.status(400).json({
-                message: `El monto a pagar ($${paymentAmount.toFixed(2)} / Bs ${paidBs}) excede la deuda restante ($${remainingDebt.toFixed(2)} / Bs ${remainBs})`
+                message: `El monto a pagar exceden los bolívares restantes. Deuda: Bs ${remainBs} / Pago: Bs ${paidBs}`
             });
         }
 

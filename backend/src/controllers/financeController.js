@@ -893,7 +893,7 @@ exports.payLoan = async (req, res) => {
 
         // VALIDATION: Check Overpayment
         const [loanRows] = await connection.query(`
-            SELECT p.monto_prestamo, mp.nb_metodo_pago 
+            SELECT p.id_prestamo, p.monto_prestamo, p.tasa_dia as tasa_prestamo, mp.nb_metodo_pago 
             FROM prestamo p 
             JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago 
             WHERE p.id_prestamo = ?
@@ -907,8 +907,12 @@ exports.payLoan = async (req, res) => {
         const loan = loanRows[0];
         const usdKeywords = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
         const isLoanUSD = usdKeywords.some(k => loan.nb_metodo_pago.toUpperCase().includes(k));
+        const currentRate = parseFloat(parseFloat(rate).toFixed(2));
 
-        // Calculate Amount Already Paid
+        // Use USD-normalized tracking for consistent indexing (rounding rate to 2 decimals as per user preference)
+        const loanTotalUsd = isLoanUSD ? parseFloat(loan.monto_prestamo) : (parseFloat(loan.monto_prestamo) / parseFloat(parseFloat(loan.tasa_prestamo).toFixed(2)));
+
+        // Calculate Existing Payments in USD
         const [existingPayments] = await connection.query(`
             SELECT pp.monto, pp.tasa_dia, mp.nb_metodo_pago
             FROM pago_prestamo pp
@@ -916,27 +920,23 @@ exports.payLoan = async (req, res) => {
             WHERE pp.id_prestamo = ?
         `, [loanId]);
 
-        let totalPaidSoFar = 0;
+        let totalPaidUsdSoFar = 0;
         for (const p of existingPayments) {
             const isPayUSD = usdKeywords.some(k => p.nb_metodo_pago.toUpperCase().includes(k));
             const payAmount = parseFloat(p.monto);
-            const payRate = parseFloat(p.tasa_dia);
+            const payRate = parseFloat(parseFloat(p.tasa_dia).toFixed(2));
 
-            if (isLoanUSD) {
-                if (isPayUSD) totalPaidSoFar += payAmount;
-                else totalPaidSoFar += (payAmount / payRate);
-            } else {
-                if (isPayUSD) totalPaidSoFar += (payAmount * payRate);
-                else totalPaidSoFar += payAmount;
-            }
+            if (isPayUSD) totalPaidUsdSoFar += payAmount;
+            else totalPaidUsdSoFar += (payAmount / payRate);
         }
 
-        const remainingBalance = parseFloat(loan.monto_prestamo) - totalPaidSoFar;
+        const remainingUsd = loanTotalUsd - totalPaidUsdSoFar;
 
-        // Calculate New Payment Amount (Normalized)
-        let newPaymentTotal = 0;
-        const currentRate = parseFloat(rate);
+        // Calculate theoretical remaining in loan currency (indexed if Bs)
+        const effectiveRemainingNative = isLoanUSD ? remainingUsd : (remainingUsd * currentRate);
 
+        // Normalize New Payments to Loan Currency for comparison
+        let newPaymentNative = 0;
         for (const p of payments) {
             const [mRows] = await connection.query('SELECT nb_metodo_pago FROM metodo_pago WHERE id_metodo_pago = ?', [p.methodId]);
             if (mRows.length === 0) continue;
@@ -946,22 +946,31 @@ exports.payLoan = async (req, res) => {
             const amount = parseFloat(p.amount);
 
             if (isLoanUSD) {
-                if (isNewPayUSD) newPaymentTotal += amount;
-                else newPaymentTotal += (amount / currentRate);
+                if (isNewPayUSD) newPaymentNative += amount;
+                else newPaymentNative += (amount / currentRate);
             } else {
-                if (isNewPayUSD) newPaymentTotal += (amount * currentRate);
-                else newPaymentTotal += amount;
+                if (isNewPayUSD) newPaymentNative += (amount * currentRate);
+                else newPaymentNative += amount;
             }
         }
 
-        // Check if Exceeds (tolerancia máxima de 0.01 — exacto al centavo/bolívar)
-        if (newPaymentTotal > remainingBalance + 0.01) {
+        // VALIDACIÓN DUAL (USD vs Bs) - Backend
+        let isValid = true;
+        if (isLoanUSD) {
+            // Estricto a 2 decimales para Dólares
+            if (Math.round(newPaymentNative * 100) / 100 > Math.round(effectiveRemainingNative * 100) / 100) isValid = false;
+        } else {
+            // 4 decimales con 0.05 Bs de tolerancia para Bolívares
+            if (Math.round(newPaymentNative * 10000) / 10000 > (Math.round(effectiveRemainingNative * 10000) / 10000 + 0.05)) isValid = false;
+        }
+
+        if (!isValid) {
             await connection.rollback();
             const currency = isLoanUSD ? '$' : 'Bs';
             const altCurrency = isLoanUSD ? 'Bs' : '$';
-            const altRemaining = isLoanUSD ? (remainingBalance * currentRate) : (remainingBalance / currentRate);
+            const altRemainingValue = isLoanUSD ? (effectiveRemainingNative * currentRate) : (effectiveRemainingNative / currentRate);
             return res.status(400).json({
-                message: `El monto excede la deuda. Restante: ${currency} ${remainingBalance.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ≈ ${altCurrency} ${altRemaining.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                message: `El monto excede la deuda. Restante: ${currency} ${effectiveRemainingNative.toLocaleString('es-VE', { minimumFractionDigits: 2 })} ≈ ${altCurrency} ${altRemainingValue.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
             });
         }
 
@@ -1083,7 +1092,7 @@ exports.getVariableExpenseTypes = async (req, res) => {
 exports.createVariableExpense = async (req, res) => {
     try {
         await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
-        await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+        await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(16,6), tasa_dia DECIMAL(16,6), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
 
         const { nb_gasto_variable, id_tipo_gasto_variable, id_metodo_pago, monto, tasa_dia, fecha } = req.body;
         const userId = req.user.id;
