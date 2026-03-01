@@ -3,7 +3,7 @@ const pool = require('../database/db');
 exports.getAllUsers = async (req, res) => {
     try {
         const [users] = await pool.query(`
-            SELECT u.id_usuario, u.nombre, u.apellido, u.email, r.nb_rol as rol 
+            SELECT u.id_usuario, u.nombre, u.apellido, u.email, r.nb_rol as rol, u.activo 
             FROM usuario u 
             LEFT JOIN rol r ON u.id_rol = r.id_rol
         `);
@@ -43,15 +43,33 @@ exports.updateUserRole = async (req, res) => {
 exports.deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const [result] = await pool.query('DELETE FROM usuario WHERE id_usuario = ?', [id]);
+
+        // Usamos Soft Delete para evitar errores de restricción de llave foránea if the user has sales/history
+        const [result] = await pool.query('UPDATE usuario SET activo = 0 WHERE id_usuario = ?', [id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
-        res.json({ message: 'Usuario eliminado exitosamente' });
+        res.json({ message: 'Usuario desactivado exitosamente' });
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ message: 'Error al eliminar usuario' });
+    }
+};
+
+exports.activateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [result] = await pool.query('UPDATE usuario SET activo = 1 WHERE id_usuario = ?', [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        res.json({ message: 'Usuario reactivado exitosamente' });
+    } catch (error) {
+        console.error('Error activating user:', error);
+        res.status(500).json({ message: 'Error al reactivar usuario' });
     }
 };

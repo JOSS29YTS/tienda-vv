@@ -13,6 +13,15 @@ const UsersPage = () => {
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    const [showInactive, setShowInactive] = useState(false);
+
+    // Notification State
+    const [notification, setNotification] = useState({ show: false, message: '', type: 'error' });
+
+    const showNotification = (message, type = 'success') => {
+        setNotification({ show: true, message, type });
+        setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 3000);
+    };
 
     useEffect(() => {
         fetchUsers();
@@ -48,7 +57,7 @@ const UsersPage = () => {
         } catch (err) {
             // Revert on error
             setUsers(originalUsers);
-            alert('Error al actualizar el rol: ' + err.message);
+            showNotification('Error al actualizar el rol: ' + err.message, 'error');
         }
     };
 
@@ -67,19 +76,38 @@ const UsersPage = () => {
 
             if (!response.ok) throw new Error('Error al eliminar usuario');
 
-            setUsers(users.filter(u => u.id_usuario !== userToDelete.id_usuario));
+            setUsers(users.map(u => u.id_usuario === userToDelete.id_usuario ? { ...u, activo: 0 } : u));
             setDeleteModalOpen(false);
             setUserToDelete(null);
+            showNotification('Usuario eliminado exitosamente', 'success');
         } catch (err) {
             console.error(err);
-            alert('Error: ' + err.message);
+            showNotification('Error: ' + err.message, 'error');
+        }
+    };
+
+    const handleActivateUser = async (user) => {
+        try {
+            const response = await fetch(`${API_URL}/api/users/${user.id_usuario}/activate`, {
+                method: 'PATCH'
+            });
+
+            if (!response.ok) throw new Error('Error al reactivar usuario');
+
+            setUsers(users.map(u => u.id_usuario === user.id_usuario ? { ...u, activo: 1 } : u));
+            showNotification('Usuario reactivado exitosamente', 'success');
+        } catch (err) {
+            console.error(err);
+            showNotification('Error: ' + err.message, 'error');
         }
     };
 
     const filteredUsers = users.filter(user =>
-        user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (showInactive || user.activo !== 0) && (
+            user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email.toLowerCase().includes(searchTerm.toLowerCase())
+        )
     );
 
     if (loading) return (
@@ -96,15 +124,27 @@ const UsersPage = () => {
                     <p className="text-slate-500">Administra los usuarios y asigna sus roles correspondientes.</p>
                 </div>
 
-                <div className="relative w-full md:w-64">
-                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar usuario..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
-                    />
+                <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                    <button
+                        onClick={() => setShowInactive(!showInactive)}
+                        className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all ${showInactive
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            }`}
+                    >
+                        {showInactive ? 'Ocultar Inactivos' : 'Ver Inactivos'}
+                    </button>
+
+                    <div className="relative w-full md:w-64">
+                        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar usuario..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all"
+                        />
+                    </div>
                 </div>
             </header>
 
@@ -163,19 +203,35 @@ const UsersPage = () => {
                                         </div>
                                     </td>
                                     <td className="p-4 text-center">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-600">
-                                            <FaCheckCircle /> Activo
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${user.activo !== 0
+                                            ? 'bg-emerald-100 text-emerald-600'
+                                            : 'bg-red-100 text-red-600'
+                                            }`}>
+                                            {user.activo !== 0 ? <FaCheckCircle /> : <FaExclamationCircle />}
+                                            {user.activo !== 0 ? 'Activo' : 'Inactivo'}
                                         </span>
                                     </td>
                                     <td className="p-4 text-center">
-                                        <button
-                                            onClick={() => handleDeleteUser(user)}
-                                            disabled={currentUser && user.id_usuario === currentUser.id_usuario}
-                                            className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30 disabled:hover:text-slate-400"
-                                            title="Eliminar Usuario"
-                                        >
-                                            <FaTrash size={16} />
-                                        </button>
+                                        <div className="flex justify-center gap-2">
+                                            {user.activo === 0 ? (
+                                                <button
+                                                    onClick={() => handleActivateUser(user)}
+                                                    className="text-emerald-500 hover:text-emerald-700 transition-colors"
+                                                    title="Reactivar Usuario"
+                                                >
+                                                    <FaCheckCircle size={18} />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleDeleteUser(user)}
+                                                    disabled={currentUser && user.id_usuario === currentUser.id_usuario}
+                                                    className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30 disabled:hover:text-slate-400"
+                                                    title="Eliminar Usuario"
+                                                >
+                                                    <FaTrash size={16} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             )) : (
@@ -233,6 +289,24 @@ const UsersPage = () => {
                                 </div>
                             </div>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Notification */}
+            <AnimatePresence>
+                {notification.show && (
+                    <motion.div
+                        initial={{ opacity: 0, x: 100 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 100 }}
+                        className={`fixed top-4 right-4 z-[9999] px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 font-bold text-white border-2
+                            ${notification.type === 'error'
+                                ? 'bg-red-500 border-red-400'
+                                : 'bg-emerald-500 border-emerald-400'}`}
+                    >
+                        {notification.type === 'error' ? <FaExclamationCircle className="text-xl" /> : <FaCheckCircle className="text-xl" />}
+                        <span className="tracking-wide">{notification.message}</span>
                     </motion.div>
                 )}
             </AnimatePresence>

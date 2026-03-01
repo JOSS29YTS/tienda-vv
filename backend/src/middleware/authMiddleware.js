@@ -23,7 +23,7 @@ exports.verifyToken = async (req, res, next) => {
                 r.nb_rol as rol
             FROM usuario u
             LEFT JOIN rol r ON u.id_rol = r.id_rol
-            WHERE u.id_usuario = ?
+            WHERE u.id_usuario = ? AND u.activo = 1
         `, [decoded.id]);
 
         if (users.length === 0) {

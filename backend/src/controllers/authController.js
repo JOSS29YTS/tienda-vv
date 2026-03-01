@@ -16,7 +16,7 @@ exports.login = async (req, res) => {
             SELECT u.*, r.nb_rol as rol 
             FROM usuario u 
             LEFT JOIN rol r ON u.id_rol = r.id_rol 
-            WHERE u.email = ?
+            WHERE u.email = ? AND u.activo = 1
         `, [email]);
 
         if (users.length === 0) {
@@ -172,9 +172,9 @@ exports.registerComplete = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
     try {
-        const [users] = await pool.query('SELECT * FROM usuario WHERE email = ?', [email]);
+        const [users] = await pool.query('SELECT * FROM usuario WHERE email = ? AND activo = 1', [email]);
         if (users.length === 0) {
-            return res.status(404).json({ message: 'El correo electrónico no está registrado.' });
+            return res.status(404).json({ message: 'El correo electrónico no está registrado o la cuenta está inactiva.' });
         }
 
         const user = users[0];
