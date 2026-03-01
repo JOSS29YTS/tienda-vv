@@ -99,9 +99,10 @@ const InventoryPage = () => {
                     3: { halign: 'center' },
                     4: { halign: 'center' },
                     5: { halign: 'center', fontStyle: 'bold' }
-                }
+                },
+                showFoot: 'lastPage', // Solo mostrar totales al final del reporte
+                showHead: 'firstPage', // Solo mostrar encabezado en la primera página
             });
-
 
             doc.save(`Reporte_Inventario_${monthNames[parseInt(reportMonth) - 1]}_${reportYear}.pdf`);
             toast.success('Reporte generado correctamente');
