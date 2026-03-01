@@ -769,9 +769,6 @@ const FinancesPage = () => {
                     <div className="text-4xl font-black text-white tracking-tight">
                         {isBs ? formatBs(value) : formatCurrency(value)}
                     </div>
-                    <p className="text-white/60 text-xs mt-2 font-medium flex items-center gap-1">
-                        <FaChartLine /> vs mes anterior (Demo)
-                    </p>
                 </div>
             </div>
         </motion.div>

@@ -608,7 +608,7 @@ const ProfitLossPage = () => {
                         <div className="flex justify-between items-center mb-4">
                             <div>
                                 <h3 className="font-black text-slate-800">Tendencia Mensual</h3>
-                                <p className="text-xs text-slate-400">Últimos 6 meses — Ingresos vs Egresos</p>
+                                <p className="text-xs text-slate-400">Año {new Date().getFullYear()} — Ingresos vs Egresos</p>
                             </div>
                             <div className="flex items-center gap-4 text-xs font-bold">
                                 <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" /> Ingresos</span>

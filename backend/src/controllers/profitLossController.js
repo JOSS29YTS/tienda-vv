@@ -180,7 +180,7 @@ exports.getProfitLoss = async (req, res) => {
         const balanceNeto = totalIngresos - totalEgresos;
 
         // ─────────────────────────────────────────────
-        // 7. Resumen mensual para gráfico (últimos 6 meses)
+        // 7. Resumen mensual para gráfico (Año Actual)
         // ─────────────────────────────────────────────
         const [monthlyIncome] = await pool.query(`
             SELECT 
@@ -192,12 +192,11 @@ exports.getProfitLoss = async (req, res) => {
             JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
             JOIN detalle_pago dp ON p.id_pago = dp.id_pago
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE v.fecha_venta >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+            WHERE YEAR(v.fecha_venta) = YEAR(NOW())
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m')
             ORDER BY mes ASC
         `);
-
         const [monthlyExpenses] = await pool.query(`
             SELECT mes, SUM(total) as compras
             FROM (
@@ -205,7 +204,7 @@ exports.getProfitLoss = async (req, res) => {
                     DATE_FORMAT(fecha_compra, '%Y-%m') as mes,
                     total_compra as total
                 FROM compra
-                WHERE fecha_compra >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                WHERE YEAR(fecha_compra) = YEAR(NOW())
 
                 UNION ALL
 
@@ -214,7 +213,7 @@ exports.getProfitLoss = async (req, res) => {
                     monto as total
                 FROM pago_fijo pf
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-                WHERE fecha_pago_fijo >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                WHERE YEAR(fecha_pago_fijo) = YEAR(NOW())
                 AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
 
                 UNION ALL
@@ -223,7 +222,7 @@ exports.getProfitLoss = async (req, res) => {
                     DATE_FORMAT(fecha_gasto_variable, '%Y-%m') as mes,
                     monto_usd as total
                 FROM gasto_variable
-                WHERE fecha_gasto_variable >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                WHERE YEAR(fecha_gasto_variable) = YEAR(NOW())
 
                 UNION ALL
 
@@ -242,14 +241,14 @@ exports.getProfitLoss = async (req, res) => {
                     END as total
                 FROM pago_prestamo pp
                 JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
-                WHERE pp.fecha_pago >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                WHERE YEAR(pp.fecha_pago) = YEAR(NOW())
                 UNION ALL
 
                 SELECT 
                     DATE_FORMAT(fecha_pago, '%Y-%m') as mes,
                     monto_usd as total
                 FROM pago_comision
-                WHERE fecha_pago >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                WHERE YEAR(fecha_pago) = YEAR(NOW())
             ) as all_expenses
             GROUP BY mes
         `);

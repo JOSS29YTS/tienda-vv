@@ -30,9 +30,6 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, gradient, foote
                 <div>
                     <h3 className="text-white/80 font-bold text-xs mb-1 uppercase tracking-wider">{title}</h3>
                     <div className="text-4xl font-black text-white tracking-tight">{value}</div>
-                    <p className="text-white/60 text-xs mt-2 font-medium flex items-center gap-1">
-                        <FaChartLine /> {footerText || 'vs mes anterior'}
-                    </p>
                 </div>
             </div>
         </motion.div>
@@ -219,7 +216,6 @@ const DashboardHome = () => {
                     trend="up"
                     trendValue="hoy"
                     gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-                    footerText="ventas del día actual"
                 />
                 <StatCard
                     title="Productos Vendidos"
@@ -228,7 +224,6 @@ const DashboardHome = () => {
                     trend="up"
                     trendValue={`total`}
                     gradient="bg-gradient-to-br from-red-500 to-rose-600"
-                    footerText="unidades vendidas"
                 />
                 <StatCard
                     title="Productos Activos"

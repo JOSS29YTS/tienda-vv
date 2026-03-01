@@ -520,7 +520,7 @@ const ProductsPage = () => {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="p-4 text-slate-800 font-bold font-mono text-lg">
+                                        <td className="p-4 text-slate-800 font-bold font-mono">
                                             {editingProduct === product.id_producto ? (
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-slate-400 text-sm">$</span>
@@ -540,10 +540,11 @@ const ProductsPage = () => {
                                                     <button onClick={() => setEditingProduct(null)} className="text-red-400 hover:text-red-500"><FaTimesCircle /></button>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center gap-3 group/price cursor-pointer p-1 -ml-1 rounded-lg hover:bg-slate-50 transition-colors" onClick={() => handleEditPriceClick(product)}>
-                                                    <span className="font-black text-slate-900">$ {parseFloat(product.precio).toFixed(2)}</span>
-                                                    <span className="opacity-0 group-hover/price:opacity-100 transition-all duration-200 text-emerald-500 bg-emerald-50 p-1.5 rounded-md">
-                                                        <FaPen size={12} />
+                                                <div className="flex items-center gap-2 group/price cursor-pointer p-1 -ml-1 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap" onClick={() => handleEditPriceClick(product)}>
+                                                    <span className="text-slate-400 text-xs font-sans">$</span>
+                                                    <span className="font-black text-slate-900 text-base">{parseFloat(product.precio).toFixed(2)}</span>
+                                                    <span className="opacity-0 group-hover/price:opacity-100 transition-all duration-200 text-emerald-500 bg-emerald-50 p-1 rounded-md">
+                                                        <FaPen size={10} />
                                                     </span>
                                                 </div>
                                             )}

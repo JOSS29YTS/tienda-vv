@@ -495,6 +495,7 @@ exports.getRecentTransactions = async (req, res) => {
             FROM venta v
             JOIN detalle_venta dv ON v.id_venta = dv.id_venta
             JOIN usuario u ON v.id_usuario = u.id_usuario
+            WHERE YEAR(v.fecha_venta) = YEAR(NOW()) AND MONTH(v.fecha_venta) = MONTH(NOW())
             GROUP BY v.id_venta, v.fecha_venta, u.nombre
             
             UNION ALL
@@ -511,6 +512,7 @@ exports.getRecentTransactions = async (req, res) => {
             FROM compra c
             JOIN usuario u ON c.id_usuario = u.id_usuario
             LEFT JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
+            WHERE YEAR(c.fecha_compra) = YEAR(NOW()) AND MONTH(c.fecha_compra) = MONTH(NOW())
 
             UNION ALL
 
@@ -527,6 +529,7 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN tipo_pago_fijo t ON p.id_tipo_pago_fijo = t.id_tipo_pago_fijo
             JOIN usuario u ON p.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE YEAR(p.fecha_pago_fijo) = YEAR(NOW()) AND MONTH(p.fecha_pago_fijo) = MONTH(NOW())
 
             UNION ALL
 
@@ -543,6 +546,7 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable
             JOIN usuario u ON gv.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON gv.id_metodo_pago = mp.id_metodo_pago
+            WHERE YEAR(gv.fecha_gasto_variable) = YEAR(NOW()) AND MONTH(gv.fecha_gasto_variable) = MONTH(NOW())
 
             UNION ALL
 
@@ -559,6 +563,7 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN usuario u ON tr.id_usuario = u.id_usuario
             JOIN metodo_pago mo ON tr.id_metodo_origen = mo.id_metodo_pago
             JOIN metodo_pago md ON tr.id_metodo_destino = md.id_metodo_pago
+            WHERE YEAR(tr.fecha_traspaso) = YEAR(NOW()) AND MONTH(tr.fecha_traspaso) = MONTH(NOW())
             
             UNION ALL
 
@@ -574,6 +579,7 @@ exports.getRecentTransactions = async (req, res) => {
             FROM prestamo p
             JOIN usuario u ON p.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE YEAR(p.fecha_prestamo) = YEAR(NOW()) AND MONTH(p.fecha_prestamo) = MONTH(NOW())
 
             UNION ALL
 
@@ -590,6 +596,7 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN prestamo p ON pp.id_prestamo = p.id_prestamo
             JOIN usuario u ON p.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+            WHERE YEAR(pp.fecha_pago) = YEAR(NOW()) AND MONTH(pp.fecha_pago) = MONTH(NOW())
             UNION ALL
 
             SELECT
@@ -604,6 +611,7 @@ exports.getRecentTransactions = async (req, res) => {
             FROM pago_comision pc
             JOIN usuario u ON pc.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON pc.id_metodo_pago = mp.id_metodo_pago
+            WHERE YEAR(pc.fecha_pago) = YEAR(NOW()) AND MONTH(pc.fecha_pago) = MONTH(NOW())
             
             ORDER BY date DESC, id DESC
             LIMIT ?
