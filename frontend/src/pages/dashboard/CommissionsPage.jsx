@@ -79,6 +79,9 @@ const CommissionsPage = () => {
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+    const [methods, setMethods] = useState([]);
+    const [selectedMethod, setSelectedMethod] = useState('');
+
     const [loading, setLoading] = useState(true);
     const [isPayModalOpen, setIsPayModalOpen] = useState(false);
     const [payInfo, setPayInfo] = useState({ recipient: '', amount: 0 });
@@ -89,27 +92,26 @@ const CommissionsPage = () => {
         totalSales: 0
     });
 
-    const months = [
-        { value: 1, label: 'Enero' },
-        { value: 2, label: 'Febrero' },
-        { value: 3, label: 'Marzo' },
-        { value: 4, label: 'Abril' },
-        { value: 5, label: 'Mayo' },
-        { value: 6, label: 'Junio' },
-        { value: 7, label: 'Julio' },
-        { value: 8, label: 'Agosto' },
-        { value: 9, label: 'Septiembre' },
-        { value: 10, label: 'Octubre' },
-        { value: 11, label: 'Noviembre' },
-        { value: 12, label: 'Diciembre' }
-    ];
-
-    const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
     useEffect(() => {
         fetchCommissions();
+        fetchMethods();
     }, [selectedMonth, selectedYear]);
+
+    const fetchMethods = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/finances/methods`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const methodsData = await res.json();
+                setMethods(methodsData);
+                if (methodsData.length > 0) setSelectedMethod(methodsData[0].id_metodo_pago);
+            }
+        } catch (error) {
+            console.error('Error fetching methods:', error);
+        }
+    };
 
     const fetchCommissions = async () => {
         try {
@@ -145,6 +147,7 @@ const CommissionsPage = () => {
                 style: {
                     background: '#EF4444',
                     color: '#fff',
+                    zIndex: 9999
                 },
                 iconTheme: {
                     primary: '#fff',
@@ -162,6 +165,11 @@ const CommissionsPage = () => {
     };
 
     const handlePaySubmit = async () => {
+        if (!selectedMethod) {
+            toast.error('Por favor selecciona un método de pago');
+            return;
+        }
+
         try {
             setIsPaying(true);
             const token = localStorage.getItem('token');
@@ -172,9 +180,10 @@ const CommissionsPage = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    recipient: payInfo.recipient.toLowerCase(),
-                    amount: Math.round(payInfo.amount * 100) / 100,
-                    rate: Math.round((parseFloat(rate) || 0) * 100) / 100,
+                    nb_beneficiario: payInfo.recipient,
+                    id_metodo_pago: selectedMethod,
+                    monto_usd: Math.round(payInfo.amount * 100) / 100,
+                    tasa_dia: Math.round((parseFloat(rate) || 0) * 100) / 100,
                     month: selectedMonth,
                     year: selectedYear
                 })
@@ -208,16 +217,7 @@ const CommissionsPage = () => {
             }
         } catch (error) {
             console.error(error);
-            toast.error('Error de conexión al procesar el pago', {
-                style: {
-                    background: '#EF4444',
-                    color: '#fff',
-                },
-                iconTheme: {
-                    primary: '#fff',
-                    secondary: '#EF4444',
-                },
-            });
+            toast.error('Error de conexión al procesar el pago');
         } finally {
             setIsPaying(false);
         }
@@ -295,27 +295,45 @@ const CommissionsPage = () => {
                     >
                         <div className="bg-slate-900 text-white p-6 relative">
                             <h3 className="text-2xl font-black">Confirmar Pago</h3>
-                            <p className="text-slate-400 text-sm mt-1 uppercase tracking-widest font-bold">Transferencia Bancaria</p>
+                            <p className="text-slate-400 text-sm mt-1 uppercase tracking-widest font-bold">Procesar Comisión</p>
                         </div>
 
                         <div className="p-8 space-y-6">
-                            <div className="flex flex-col items-center gap-2 p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                                <span className="text-slate-500 font-bold uppercase text-xs tracking-tighter">Beneficiario</span>
-                                <span className="text-2xl font-black text-slate-800 uppercase tracking-tight">{payInfo.recipient}</span>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <span className="text-slate-500 font-bold uppercase text-[10px] tracking-tighter">Beneficiario</span>
+                                    <span className="text-xl font-black text-slate-800 uppercase tracking-tight">{payInfo.recipient}</span>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-slate-500 font-bold text-xs uppercase ml-1">Método de Pago</label>
+                                    <select
+                                        value={selectedMethod}
+                                        onChange={(e) => setSelectedMethod(e.target.value)}
+                                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+                                    >
+                                        <option value="">Selecciona Método</option>
+                                        {methods.map(m => (
+                                            <option key={m.id_metodo_pago} value={m.id_metodo_pago}>
+                                                {m.nb_metodo_pago}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center py-3 border-b border-slate-50">
-                                    <span className="text-slate-500 font-bold">Monto en Divisas</span>
-                                    <span className="text-xl font-black text-slate-800">${payInfo.amount.toFixed(2)}</span>
+                                <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                    <span className="text-slate-500 font-bold text-sm">Monto en Divisas</span>
+                                    <span className="text-lg font-black text-slate-800">${payInfo.amount.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between items-center py-3 border-b border-slate-50">
-                                    <span className="text-slate-500 font-bold">Tasa Aplicada</span>
-                                    <span className="font-mono font-bold text-slate-800">{roundedRate.toFixed(2)} Bs/$</span>
+                                <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                    <span className="text-slate-500 font-bold text-sm">Tasa Aplicada</span>
+                                    <span className="font-mono font-bold text-slate-700 text-sm">{roundedRate.toFixed(2)} Bs/$</span>
                                 </div>
-                                <div className="flex justify-between items-center py-4 bg-emerald-50/50 px-4 rounded-xl border border-emerald-100">
-                                    <span className="text-emerald-700 font-black uppercase text-sm">Total en Bolívares</span>
-                                    <span className="text-2xl font-black text-emerald-600">
+                                <div className="flex justify-between items-center py-4 bg-emerald-50 px-4 rounded-xl border border-emerald-100">
+                                    <span className="text-emerald-700 font-black uppercase text-xs">Total Bolívares</span>
+                                    <span className="text-xl font-black text-emerald-600">
                                         {(Math.round(payInfo.amount * 100) / 100 * (Math.round((parseFloat(rate) || 0) * 100) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
                                     </span>
                                 </div>
@@ -330,7 +348,7 @@ const CommissionsPage = () => {
                                 </button>
                                 <button
                                     onClick={handlePaySubmit}
-                                    disabled={isPaying}
+                                    disabled={isPaying || !selectedMethod}
                                     className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                                 >
                                     {isPaying ? 'Procesando...' : 'Confirmar'}
@@ -341,6 +359,7 @@ const CommissionsPage = () => {
                     </motion.div>
                 </div>
             )}
+
         </div>
     );
 };

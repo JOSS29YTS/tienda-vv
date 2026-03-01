@@ -646,29 +646,78 @@ exports.createVariableExpense = async (req, res) => {
 
 exports.getCommissions = async (req, res) => {
     try {
-        const [users] = await pool.query("SELECT id_usuario, nombre, rol FROM usuario WHERE rol IN ('vendedor', 'gerente')");
-        const month = new Date().getMonth() + 1;
-        const year = new Date().getFullYear();
-        for (let u of users) {
-            const [sales] = await pool.query("SELECT SUM(dv.cantidad * dv.precio_unitario) as total FROM detalle_venta dv JOIN venta v ON dv.id_venta = v.id_venta WHERE v.id_usuario = ? AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?", [u.id_usuario, month, year]);
-            u.total_ventas = parseFloat(sales[0].total || 0);
-            const percent = u.rol === 'gerente' ? 0.01 : 0.005;
-            const bonus = u.rol === 'gerente' ? 20 : 10;
-            u.comision = (u.total_ventas * percent) + bonus;
-        }
-        res.json(users);
+        const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
+        const year = parseInt(req.query.year) || new Date().getFullYear();
+
+        // Total base sales for the month
+        const [salesResult] = await pool.query(`
+            SELECT COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) as total
+            FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
+            WHERE MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+        `, [month, year]);
+
+        const totalSales = parseFloat(salesResult[0].total || 0);
+
+        // Commissions logic (aggregated for the UI)
+        // Gerente: 1% + $20
+        // Vendedor: 0.5% + $10
+        // (This is what the UI shows as single cards)
+        const response = {
+            gerente: {
+                comision: totalSales * 0.01,
+                bonificacion: 20,
+                total: (totalSales * 0.01) + 20
+            },
+            vendedor: {
+                comision: totalSales * 0.005,
+                bonificacion: 10,
+                total: (totalSales * 0.005) + 10
+            },
+            totalSales: totalSales
+        };
+
+        res.json(response);
     } catch (error) {
+        console.error('Error in getCommissions:', error);
         res.status(500).json({ message: 'Error al obtener comisiones' });
     }
 };
+
 
 exports.payCommission = async (req, res) => {
     try {
         const { nb_beneficiario, id_metodo_pago, monto_usd, tasa_dia } = req.body;
         const userId = req.user.id;
+
+        if (!nb_beneficiario || !id_metodo_pago || !monto_usd || !tasa_dia) {
+            return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+        }
+
+        const methodId = parseInt(id_metodo_pago);
+        const amountUsd = parseFloat(monto_usd);
+        const rate = parseFloat(tasa_dia);
+
+        // Check sufficient funds
+        const balances = await balanceUtils.getMethodBalances();
+        const method = balances[methodId];
+
+        let requiredAmount = amountUsd;
+        if (method && method.type === 'BS') {
+            requiredAmount = amountUsd * rate;
+        }
+
+        const check = await balanceUtils.checkSufficientFunds(methodId, requiredAmount);
+        if (!check.ok) {
+            return res.status(400).json({ message: check.message });
+        }
+
         await pool.query('INSERT INTO pago_comision (id_usuario, nb_beneficiario, id_metodo_pago, monto_usd, tasa_dia, fecha_pago) VALUES (?, ?, ?, ?, ?, NOW())', [userId, nb_beneficiario, id_metodo_pago, monto_usd, tasa_dia]);
-        res.json({ message: 'Pago de comisión realizado' });
+
+        res.json({ message: 'Pago de comisión realizado exitosamente' });
     } catch (error) {
+        console.error('Error paying commission:', error);
         res.status(500).json({ message: 'Error al pagar comisión' });
     }
 };
+
