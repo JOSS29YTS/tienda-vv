@@ -12,6 +12,7 @@ import API_URL from '../../config/api';
 const PurchasesPage = () => {
     // Load initial state from localStorage if available
     const { rate, setRate } = useRate();
+    const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const { user } = useAuth();
     const [date, setDate] = useState(() => {
         const d = new Date();
@@ -135,7 +136,7 @@ const PurchasesPage = () => {
                     amountUSD: buyCurrencyData.amountUSD,
                     methodId: buyCurrencyData.methodId,
                     destinationId: buyCurrencyData.destMethodId, // Send destination method
-                    rate: effectiveRate, // Use calculated rate
+                    rate: roundedRate, // Use rounded rate
                     date: date
                 })
             });
@@ -300,10 +301,10 @@ const PurchasesPage = () => {
                 // Conversiones automáticas según tasa
                 if (rate > 0) {
                     if (field === 'costBultoBs' && updated.currency === 'BS') {
-                        updated.costBultoUsd = (parseFloat(value || 0) / parseFloat(rate)).toFixed(2);
+                        updated.costBultoUsd = (parseFloat(value || 0) / roundedRate).toFixed(2);
                     }
                     if (field === 'costBultoUsd' && updated.currency === 'USD') {
-                        updated.costBultoBs = (parseFloat(value || 0) * parseFloat(rate)).toFixed(2);
+                        updated.costBultoBs = (parseFloat(value || 0) * roundedRate).toFixed(2);
                     }
                 }
                 return updated;
@@ -343,14 +344,14 @@ const PurchasesPage = () => {
             const token = localStorage.getItem('token');
             const dataToSave = {
                 date,
-                rate: parseFloat(rate),
+                rate: roundedRate,
                 rows: rows.filter(r => r.productId && r.quantity && r.pvp).map(r => ({
                     productId: r.productId,
                     profitPercent: r.profitPercent,
                     quantity: r.quantity,
                     currency: r.currency,
                     costBultoBs: r.costBultoBs,
-                    costBultoUsd: r.currency === 'BS' ? (parseFloat(r.costBultoBs) / rate) : r.costBultoUsd,
+                    costBultoUsd: r.currency === 'BS' ? (parseFloat(r.costBultoBs) / roundedRate) : r.costBultoUsd,
                     pvp: r.pvp
                 })),
                 invoiceData,
@@ -425,7 +426,7 @@ const PurchasesPage = () => {
 
             let amountUsd = parseFloat(p.amount);
             if (!isUsd) {
-                amountUsd = amountUsd / parseFloat(rate);
+                amountUsd = amountUsd / roundedRate;
             }
 
             totalPaidUsd += amountUsd;
@@ -447,9 +448,9 @@ const PurchasesPage = () => {
 
         const diff = totalPaidUsd - totalCompasUsd;
         if (Math.abs(diff) > toleranceUsd) {
-            const diffBs = diff * currentRate;
-            const totalPaidBs = totalPaidUsd * currentRate;
-            const totalCompraBs = totalCompasUsd * currentRate;
+            const diffBs = diff * roundedRate;
+            const totalPaidBs = totalPaidUsd * roundedRate;
+            const totalCompraBs = totalCompasUsd * roundedRate;
 
             if (allUsd) {
                 // Show USD-centered error with exact cents
@@ -630,7 +631,7 @@ const PurchasesPage = () => {
         doc.setFontSize(10);
         doc.text(`Fecha: ${dateStr} ${time}`, 220, 20);
         doc.text(`Generado por: ${user ? user.nombre + ' ' + user.apellido : 'Usuario'}`, 220, 28);
-        doc.text(`Tasa: Bs. ${rate}`, 220, 36);
+        doc.text(`Tasa: Bs. ${roundedRate.toFixed(2)}`, 220, 36);
 
         // Table
         const validRows = rows.filter(r => r.productId && r.productId !== '');
@@ -679,7 +680,7 @@ const PurchasesPage = () => {
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.text(`TOTAL COMPRA $: $ ${totalCompasUsd.toFixed(2)}`, 20, finalY);
-        doc.text(`TOTAL COMPRA BS: Bs ${(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 20, finalY + 8);
+        doc.text(`TOTAL COMPRA BS: Bs ${(totalCompasUsd * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 20, finalY + 8);
 
         doc.save(`Compras_${date.replace(/-/g, '')}.pdf`);
     };
@@ -744,7 +745,7 @@ const PurchasesPage = () => {
                     <div className="flex items-center justify-between pt-2">
                         <span className="text-slate-300 font-bold tracking-wider">TOTAL COMPRA BS</span>
                         <div className="flex items-center gap-2 text-2xl font-bold text-emerald-400 font-mono">
-                            Bs {(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            Bs {(totalCompasUsd * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                         </div>
                     </div>
                 </div>
@@ -1026,7 +1027,7 @@ const PurchasesPage = () => {
                             <div className="bg-emerald-600 text-white p-4 flex justify-between items-center shrink-0">
                                 <div>
                                     <h3 className="font-bold text-lg">Métodos de Pago</h3>
-                                    <p className="text-white text-lg font-black">Total a Pagar: $ {totalCompasUsd.toFixed(2)} <span className="text-base font-bold opacity-90">(Bs {(totalCompasUsd * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })})</span></p>
+                                    <p className="text-white text-lg font-black">Total a Pagar: $ {totalCompasUsd.toFixed(2)} <span className="text-base font-bold opacity-90">(Bs {(totalCompasUsd * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })})</span></p>
                                 </div>
                                 <button onClick={() => setIsPaymentModalOpen(false)} className="text-emerald-200 hover:text-white"><FaTimes /></button>
                             </div>
@@ -1069,8 +1070,8 @@ const PurchasesPage = () => {
                                                 <div className="text-right mt-1">
                                                     <span className="text-xs font-bold text-slate-400">
                                                         {isUsd
-                                                            ? `Bs ${(parseFloat(p.amount || 0) * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                            : `$ ${(parseFloat(p.amount || 0) / rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                            ? `Bs ${(parseFloat(p.amount || 0) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                            : `$ ${(parseFloat(p.amount || 0) / roundedRate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                                                         }
                                                     </span>
                                                 </div>
@@ -1127,7 +1128,7 @@ const PurchasesPage = () => {
                                         value={buyCurrencyData.amountUSD}
                                         onChange={e => {
                                             const val = e.target.value;
-                                            const bsVal = val ? (parseFloat(val) * parseFloat(rate)).toFixed(2) : '';
+                                            const bsVal = val ? (parseFloat(val) * roundedRate).toFixed(2) : '';
                                             setBuyCurrencyData({ ...buyCurrencyData, amountUSD: val, amountBs: bsVal });
                                         }}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-bold text-2xl text-center text-cyan-600"
@@ -1183,7 +1184,7 @@ const PurchasesPage = () => {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-500 font-bold">Tasa Referencia:</span>
-                                        <span className="font-mono font-bold">Bs. {rate}</span>
+                                        <span className="font-mono font-bold">Bs. {roundedRate.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between border-t border-slate-200 pt-2 mt-2 items-center">
                                         <span className="text-slate-500 font-bold text-base">Total a Pagar (Bs):</span>

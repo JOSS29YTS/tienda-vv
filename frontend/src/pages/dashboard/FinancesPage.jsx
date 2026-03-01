@@ -10,12 +10,12 @@ import API_URL from '../../config/api';
 
 const FinancesPage = () => {
     const { rate } = useRate();
+    const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const { user, logout } = useAuth();
     const [stats, setStats] = useState({
         income: 0,
         expenses: 0,
         balance: 0,
-        receivables: 0,
         incomeBs: 0,
         incomeUSD: 0,
         totalZelleUSD: 0,
@@ -60,7 +60,7 @@ const FinancesPage = () => {
         id_metodo_origen: '',
         id_metodo_destino: '',
         monto: '',
-        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+        tasa_dia: roundedRate ? roundedRate.toFixed(2) : '',
         fecha_traspaso: getLocalISODate()
     });
 
@@ -111,7 +111,7 @@ const FinancesPage = () => {
             id_metodo_origen: '',
             id_metodo_destino: '',
             monto: '',
-            tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+            tasa_dia: roundedRate ? roundedRate.toFixed(2) : '',
             fecha_traspaso: new Date().toISOString().split('T')[0]
         });
         setIsTransferModalOpen(true);
@@ -138,7 +138,7 @@ const FinancesPage = () => {
                 },
                 body: JSON.stringify({
                     ...loanForm,
-                    rate: parseFloat(rate),
+                    rate: roundedRate,
                     date: loanForm.date
                 })
             });
@@ -236,7 +236,6 @@ const FinancesPage = () => {
                     income: parseFloat(summaryData.stats.income),
                     expenses: parseFloat(summaryData.stats.expenses),
                     balance: parseFloat(summaryData.stats.balance),
-                    receivables: parseFloat(summaryData.stats.receivables),
                     incomeBs: parseFloat(summaryData.stats.incomeBs),
                     incomeUSD: parseFloat(summaryData.stats.incomeUSD),
                     totalZelleUSD: parseFloat(summaryData.stats.totalZelleUSD || 0),
@@ -546,7 +545,7 @@ const FinancesPage = () => {
                     id_metodo_origen: '',
                     id_metodo_destino: '',
                     fecha_traspaso: getLocalISODate(),
-                    tasa_dia: rate ? parseFloat(rate).toFixed(2) : ''
+                    tasa_dia: roundedRate ? roundedRate.toFixed(2) : ''
                 }));
                 toast.success('Traspaso realizado exitosamente', {
                     style: {
@@ -634,13 +633,12 @@ const FinancesPage = () => {
 
         const summaryData = [
             ['Concepto', 'Monto'],
-            ['Ingresos Totales (Recaudado)', `$ ${stats.income.toFixed(2)}`],
-            ['Egresos Totales', `$ ${stats.expenses.toFixed(2)}`],
-            ['Balance Neto', `$ ${stats.balance.toFixed(2)}`],
-            ['Cuentas por Cobrar', `$ ${stats.receivables.toFixed(2)}`],
-            ['Total General Bs', `Bs. ${stats.incomeBs.toFixed(2)}`],
-            ['DIVISAS USD', `$ ${stats.incomeUSD.toFixed(2)}`],
-            ['ZELLE USD', `$ ${stats.totalZelleUSD.toFixed(2)}`]
+            ['Ingresos Totales (Recaudado)', formatCurrency(stats.income)],
+            ['Egresos Totales', formatCurrency(stats.expenses)],
+            ['Balance Neto', formatCurrency(stats.balance)],
+            ['Total General Bs', formatBs(stats.incomeBs)],
+            ['DIVISAS USD', formatCurrency(stats.incomeUSD)],
+            ['ZELLE USD', formatCurrency(stats.totalZelleUSD)]
         ];
 
         autoTable(doc, {
@@ -658,10 +656,10 @@ const FinancesPage = () => {
         doc.line(20, doc.lastAutoTable.finalY + 18, 190, doc.lastAutoTable.finalY + 18);
 
         const paymentData = [
-            ['Efectivo (Bs)', `Bs. ${stats.totalEfectivoBs.toFixed(2)}`],
-            ['Punto de Venta', `Bs. ${stats.totalPunto.toFixed(2)}`],
-            ['Pago Móvil', `Bs. ${stats.totalPagoMovil.toFixed(2)}`],
-            ['Transferencia', `Bs. ${stats.totalTransferencia.toFixed(2)}`]
+            ['Efectivo (Bs)', formatBs(stats.totalEfectivoBs)],
+            ['Punto de Venta', formatBs(stats.totalPunto)],
+            ['Pago Móvil', formatBs(stats.totalPagoMovil)],
+            ['Transferencia', formatBs(stats.totalTransferencia)]
         ];
 
         autoTable(doc, {
@@ -681,13 +679,30 @@ const FinancesPage = () => {
         doc.text('Transacciones Recientes (Últimas 20)', 20, 20);
         doc.line(20, 23, 190, 23);
 
-        const txData = transactions.slice(0, 20).map(tx => [
-            tx.date ? new Date(tx.date).toLocaleDateString() : '-',
-            tx.type,
-            tx.category,
-            tx.user,
-            (tx.category === 'Egreso' ? '-' : '+') + `$ ${parseFloat(tx.amount).toFixed(2)}`
-        ]);
+        const txData = transactions.slice(0, 20).map(tx => {
+            const isUSDMethod = (tx.payment_method || '').toUpperCase().includes('DIVISA') ||
+                (tx.payment_method || '').toUpperCase().includes('USD') ||
+                (tx.payment_method || '').toUpperCase().includes('EFECTIVO ($)') ||
+                (tx.payment_method || '').toUpperCase().includes('ZELLE') ||
+                (tx.payment_method || '').toUpperCase().includes('BINANCE');
+
+            let formattedAmount = '';
+            const prefix = tx.category === 'Egreso' ? '-' : (tx.category === 'Ingreso' ? '+' : '');
+
+            if ((tx.category === 'Traspaso' || tx.type === 'Préstamo' || tx.type === 'Pago Préstamo') && !isUSDMethod) {
+                formattedAmount = `${prefix} ${formatBs(tx.amount)}`;
+            } else {
+                formattedAmount = `${prefix} ${formatCurrency(tx.amount)}`;
+            }
+
+            return [
+                tx.date ? new Date(tx.date).toLocaleDateString() : '-',
+                tx.type,
+                tx.category,
+                tx.user,
+                formattedAmount
+            ];
+        });
 
         autoTable(doc, {
             startY: 30,
@@ -762,7 +777,7 @@ const FinancesPage = () => {
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Finanzas</h2>
-                    <p className="text-slate-500">Resumen financiero, ingresos, egresos y cuentas por cobrar.</p>
+                    <p className="text-slate-500">Resumen financiero, ingresos y egresos.</p>
                 </div>
                 <div className="flex flex-wrap items-center lg:justify-end gap-3 w-full lg:w-auto mt-4 lg:mt-0">
                     <button

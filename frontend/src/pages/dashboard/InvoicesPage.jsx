@@ -6,6 +6,7 @@ import API_URL from '../../config/api';
 
 const InvoicesPage = () => {
     const { rate } = useRate();
+    const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const [invoices, setInvoices] = useState([]);
     const [pendingLoans, setPendingLoans] = useState([]); // New state
     const [searchTerm, setSearchTerm] = useState('');
@@ -123,7 +124,6 @@ const InvoicesPage = () => {
             if (paymentType === 'loan') {
                 // Client-side Overpayment Validation
                 let totalNewPayment = 0;
-                const roundedRate = parseFloat(parseFloat(rate).toFixed(2));
                 const loanIsUsd = selectedItem.is_usd;
 
                 for (const p of payments) {
@@ -187,7 +187,7 @@ const InvoicesPage = () => {
                         methodId: p.methodId,
                         amount: parseFloat(p.amount) // Native amount
                     })),
-                    rate: parseFloat(rate)
+                    rate: roundedRate
                 };
 
                 const res = await fetch(`${API_URL}/api/finances/loans/pay`, {
@@ -206,14 +206,13 @@ const InvoicesPage = () => {
 
             } else {
                 // INVOICE PAYMENT LOGIC (USD Normalized)
-                const currentRate = parseFloat(parseFloat(rate).toFixed(2));
                 let totalInvoicePayUsd = 0;
                 for (const p of payments) {
                     if (!p.methodId || !p.amount) continue;
                     const method = paymentMethods.find(m => m.id_metodo_pago == p.methodId);
                     const isUsd = method && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => method.nb_metodo_pago.toUpperCase().includes(k));
                     let amt = parseFloat(p.amount);
-                    if (!isUsd) amt = amt / currentRate;
+                    if (!isUsd) amt = amt / roundedRate;
                     totalInvoicePayUsd += amt;
                 }
 
@@ -225,12 +224,12 @@ const InvoicesPage = () => {
                 const finalRemUsd = Math.round(invoiceRemaining * 10000) / 10000;
 
                 // Convertir la tolerancia de 0.05 Bs a USD para la comparación
-                const toleranceUsd = 0.05 / currentRate;
+                const toleranceUsd = 0.05 / roundedRate;
 
                 if (finalPayUsd > (finalRemUsd + toleranceUsd)) {
                     const diff = totalInvoicePayUsd - invoiceRemaining;
-                    const paidBs = totalInvoicePayUsd * currentRate;
-                    const remainBs = invoiceRemaining * currentRate;
+                    const paidBs = totalInvoicePayUsd * roundedRate;
+                    const remainBs = invoiceRemaining * roundedRate;
                     const msg = `El monto total ($${totalInvoicePayUsd.toFixed(2)} / Bs ${paidBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}) excede la deuda ($${invoiceRemaining.toFixed(2)} / Bs ${remainBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}). Exceso detectado en Bs.`;
                     setError(msg);
                     setTimeout(() => setError(''), 5000);
@@ -246,14 +245,14 @@ const InvoicesPage = () => {
 
                     let finalAmount = parseFloat(p.amount);
                     if (!isUsd) {
-                        finalAmount = finalAmount / parseFloat(rate);
+                        finalAmount = finalAmount / roundedRate;
                     }
 
                     const payload = {
                         id_factura_proveedor: selectedItem.id_factura_proveedor,
                         id_metodo_pago: p.methodId,
                         monto: finalAmount, // All stored payments normalized to USD for debt checking
-                        tasa_dia: parseFloat(rate),
+                        tasa_dia: roundedRate,
                         fecha_pago: new Date().toISOString().slice(0, 19).replace('T', ' ')
                     };
 
@@ -318,8 +317,7 @@ const InvoicesPage = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {pendingLoans.filter(l => l.nb_metodo_pago.toLowerCase().includes(searchTerm.toLowerCase()) || 'préstamo'.includes(searchTerm.toLowerCase())).map(loan => {
-                            const roundedRate = parseFloat(parseFloat(rate).toFixed(2));
-                            const roundedTasaPrestamo = parseFloat(parseFloat(loan.tasa_prestamo || rate).toFixed(2));
+                            const roundedTasaPrestamo = parseFloat(parseFloat(loan.tasa_prestamo || roundedRate).toFixed(2));
 
                             return (
                                 <motion.div
@@ -460,21 +458,21 @@ const InvoicesPage = () => {
                                     <span className="text-slate-500 font-bold text-sm mt-1">Deuda Total:</span>
                                     <div className="text-right">
                                         <div className="font-mono font-black text-slate-800">$ {parseFloat(inv.monto_deuda).toFixed(2)}</div>
-                                        <div className="text-xs font-bold text-slate-400">Bs {(parseFloat(inv.monto_deuda) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-xs font-bold text-slate-400">Bs {(parseFloat(inv.monto_deuda) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-start">
                                     <span className="text-slate-500 font-bold text-sm mt-1">Pagado:</span>
                                     <div className="text-right">
                                         <div className="font-mono font-bold text-emerald-600">$ {parseFloat(inv.monto_pagado).toFixed(2)}</div>
-                                        <div className="text-xs font-bold text-emerald-700/60">Bs {(parseFloat(inv.monto_pagado) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-xs font-bold text-emerald-700/60">Bs {(parseFloat(inv.monto_pagado) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                                 <div className="pt-3 border-t border-slate-100 flex justify-between items-start">
                                     <span className="text-slate-500 font-bold text-sm mt-2">Restante:</span>
                                     <div className="text-right">
                                         <div className="font-mono font-black text-2xl text-red-500">$ {parseFloat(inv.monto_restante).toFixed(2)}</div>
-                                        <div className="text-sm font-bold text-red-400">Bs {(parseFloat(inv.monto_restante) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-sm font-bold text-red-400">Bs {(parseFloat(inv.monto_restante) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
@@ -524,11 +522,11 @@ const InvoicesPage = () => {
                                             {paymentType === 'loan' ? (
                                                 <>
                                                     <span className="block font-mono font-black text-xl text-slate-800">
-                                                        {selectedItem.is_usd ? '$' : 'Bs'} {(!selectedItem.is_usd ? ((parseFloat(selectedItem.monto_pendiente) / parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2))) * parseFloat(parseFloat(rate).toFixed(2))) : parseFloat(selectedItem.monto_pendiente)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                        {selectedItem.is_usd ? '$' : 'Bs'} {(!selectedItem.is_usd ? ((parseFloat(selectedItem.monto_pendiente) / parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2))) * roundedRate) : parseFloat(selectedItem.monto_pendiente)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                                     </span>
                                                     <span className="block text-xs font-bold text-slate-400">
                                                         ≈ {selectedItem.is_usd
-                                                            ? `Bs ${(parseFloat(selectedItem.monto_pendiente) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                            ? `Bs ${(parseFloat(selectedItem.monto_pendiente) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
                                                             : `$ ${(parseFloat(selectedItem.monto_pendiente) / parseFloat(parseFloat(selectedItem.tasa_prestamo || rate).toFixed(2))).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                                                         }
                                                     </span>
@@ -536,7 +534,7 @@ const InvoicesPage = () => {
                                             ) : (
                                                 <>
                                                     <span className="block font-mono font-black text-xl text-slate-800">$ {parseFloat(selectedItem.monto_restante).toFixed(2)}</span>
-                                                    <span className="block text-xs font-bold text-slate-400">≈ Bs {(parseFloat(selectedItem.monto_restante) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                                                    <span className="block text-xs font-bold text-slate-400">≈ Bs {(parseFloat(selectedItem.monto_restante) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
                                                 </>
                                             )}
                                         </div>
@@ -582,8 +580,8 @@ const InvoicesPage = () => {
                                                     {p.amount && (
                                                         <p className="text-[10px] font-bold text-slate-400 text-right mt-1">
                                                             ≈ {isUsd
-                                                                ? `Bs ${(parseFloat(p.amount) * parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
-                                                                : `$ ${(parseFloat(p.amount) / parseFloat(parseFloat(rate).toFixed(2))).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                                                                ? `Bs ${(parseFloat(p.amount) * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                                                                : `$ ${(parseFloat(p.amount) / roundedRate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                                                             }
                                                         </p>
                                                     )}
