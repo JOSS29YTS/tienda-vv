@@ -70,6 +70,11 @@ const InventoryPage = () => {
             doc.setFontSize(10);
             doc.text(`Generado el: ${new Date().toLocaleDateString()}`, 105, 30, { align: 'center' });
 
+            const totalInvInicial = data.reduce((sum, item) => sum + (parseInt(item.inv_inicial) || 0), 0);
+            const totalCompras = data.reduce((sum, item) => sum + (parseInt(item.compras_periodo) || 0), 0);
+            const totalVentas = data.reduce((sum, item) => sum + (parseInt(item.ventas_periodo) || 0), 0);
+            const totalInvFinal = data.reduce((sum, item) => sum + (parseInt(item.inv_final) || 0), 0);
+
             const tableData = data.map(item => [
                 item.nb_producto,
                 `$${parseFloat(item.precio).toFixed(2)}`,
@@ -83,8 +88,10 @@ const InventoryPage = () => {
                 startY: 40,
                 head: [['Producto', 'Precio', 'Inv. Inicial', 'Compras', 'Ventas', 'Inv. Final']],
                 body: tableData,
+                foot: [['TOTALES', '', totalInvInicial, totalCompras, totalVentas, totalInvFinal]],
                 theme: 'striped',
                 headStyles: { fillColor: [15, 23, 42] }, // Slate 900
+                footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
                 styles: { fontSize: 8, cellPadding: 2 },
                 columnStyles: {
                     1: { halign: 'right' },
@@ -94,6 +101,7 @@ const InventoryPage = () => {
                     5: { halign: 'center', fontStyle: 'bold' }
                 }
             });
+
 
             doc.save(`Reporte_Inventario_${monthNames[parseInt(reportMonth) - 1]}_${reportYear}.pdf`);
             toast.success('Reporte generado correctamente');
