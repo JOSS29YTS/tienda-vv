@@ -11,5 +11,7 @@ router.put('/:id/category', productController.updateProductCategory);
 router.delete('/:id', productController.deleteProduct);
 router.put('/:id/barcode', productController.updateProductBarcode);
 router.put('/:id/name', productController.updateProductName);
+router.get('/:id/history', productController.getProductPriceHistory);
+
 
 module.exports = router;

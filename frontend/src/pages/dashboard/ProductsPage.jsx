@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash, FaBarcode } from 'react-icons/fa';
+import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash, FaBarcode, FaHistory, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import API_URL from '../../config/api';
 
 const ProductsPage = () => {
@@ -30,6 +30,12 @@ const ProductsPage = () => {
     const [editingNameProduct, setEditingNameProduct] = useState(null);
     const [editNameValue, setEditNameValue] = useState('');
     const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+
+    // History Modal State
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [priceHistory, setPriceHistory] = useState([]);
+    const [historyProduct, setHistoryProduct] = useState(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -235,6 +241,24 @@ const ProductsPage = () => {
             // Revert on error
             setProducts(originalProducts);
             alert('Error al actualizar el estado: ' + err.message);
+        }
+    };
+
+    const handleViewHistory = async (product) => {
+        setHistoryProduct(product);
+        setIsHistoryModalOpen(true);
+        setHistoryLoading(true);
+        setPriceHistory([]);
+        try {
+            const response = await fetch(`${API_URL}/api/products/${product.id_producto}/history`);
+            if (response.ok) {
+                const data = await response.json();
+                setPriceHistory(data);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -572,6 +596,14 @@ const ProductsPage = () => {
                                                 >
                                                     <FaTrash size={14} />
                                                 </button>
+                                                <button
+                                                    onClick={() => handleViewHistory(product)}
+                                                    className="text-slate-400 hover:text-indigo-500 transition-colors p-1"
+                                                    title="Ver historial de precios"
+                                                >
+                                                    <FaHistory size={14} />
+                                                </button>
+
                                             </div>
                                         </td>
                                     </tr>
@@ -705,6 +737,111 @@ const ProductsPage = () => {
                             </form>
                         </motion.div>
                     </motion.div>
+                )}
+
+                {isHistoryModalOpen && historyProduct && (
+                    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setIsHistoryModalOpen(false)}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-xl font-black flex items-center gap-2">
+                                        <FaHistory className="text-indigo-400" />
+                                        Historial de Precios
+                                    </h3>
+                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{historyProduct.nombre}</p>
+                                </div>
+                                <button onClick={() => setIsHistoryModalOpen(false)} className="bg-white/10 p-2 rounded-xl hover:bg-white/20 transition-all">
+                                    <FaTimesCircle className="text-xl" />
+                                </button>
+                            </div>
+
+                            <div className="p-8">
+                                {historyLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <p className="text-slate-500 font-bold animate-pulse">Consultando base de datos...</p>
+                                    </div>
+                                ) : priceHistory.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-200">
+                                            <FaBox size={40} />
+                                        </div>
+                                        <p className="text-slate-500 font-medium">No hay registros de compras para este producto aún.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-8">
+                                        <div className="h-64 flex items-end justify-between gap-2 px-4 border-b border-slate-100 pb-2">
+                                            {priceHistory.map((entry, idx) => {
+                                                const maxCost = Math.max(...priceHistory.map(e => parseFloat(e.precio_costo)));
+                                                const height = maxCost > 0 ? (parseFloat(entry.precio_costo) / maxCost) * 100 : 0;
+
+                                                return (
+                                                    <div key={idx} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                                                        <div className="absolute -top-10 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-10 whitespace-nowrap">
+                                                            Costo: ${parseFloat(entry.precio_costo).toFixed(2)}
+                                                        </div>
+                                                        <motion.div
+                                                            initial={{ height: 0 }}
+                                                            animate={{ height: `${height}%` }}
+                                                            className="w-full bg-indigo-500 rounded-t-lg opacity-70 group-hover:opacity-100 transition-all shadow-lg shadow-indigo-100"
+                                                        />
+                                                        <div className="mt-2 text-[8px] font-bold text-slate-400 rotate-45 origin-left whitespace-nowrap">
+                                                            {new Date(entry.fecha).toLocaleDateString('es-VE', { month: 'short', day: 'numeric' })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                                <div className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Precio Costo Inicial</div>
+                                                <div className="text-xl font-black text-slate-800">${parseFloat(priceHistory[0].precio_costo).toFixed(2)}</div>
+                                            </div>
+                                            <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                                                <div className="text-indigo-600 text-[10px] font-bold uppercase tracking-widest mb-1">Último Precio Costo</div>
+                                                <div className="text-xl font-black text-indigo-700 font-heading">
+                                                    ${parseFloat(priceHistory[priceHistory.length - 1].precio_costo).toFixed(2)}
+                                                    {priceHistory.length > 1 && (
+                                                        <span className={`ml-2 text-xs flex inline-items items-center gap-0.5 ${parseFloat(priceHistory[priceHistory.length - 1].precio_costo) >= parseFloat(priceHistory[priceHistory.length - 2].precio_costo) ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                            {parseFloat(priceHistory[priceHistory.length - 1].precio_costo) >= parseFloat(priceHistory[priceHistory.length - 2].precio_costo) ? <FaArrowUp size={8} /> : <FaArrowDown size={8} />}
+                                                            {Math.abs(((parseFloat(priceHistory[priceHistory.length - 1].precio_costo) - parseFloat(priceHistory[priceHistory.length - 2].precio_costo)) / parseFloat(priceHistory[priceHistory.length - 2].precio_costo)) * 100).toFixed(1)}%
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                            <table className="w-full text-xs">
+                                                <thead className="sticky top-0 bg-white">
+                                                    <tr className="text-slate-400 font-bold uppercase border-b border-slate-50 text-left">
+                                                        <th className="pb-2">Fecha</th>
+                                                        <th className="pb-2">Costo ($)</th>
+                                                        <th className="pb-1 text-right">PVP ($)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {[...priceHistory].reverse().map((entry, i) => (
+                                                        <tr key={i} className="hover:bg-slate-50">
+                                                            <td className="py-2 text-slate-600 font-medium">{new Date(entry.fecha).toLocaleDateString('es-VE')}</td>
+                                                            <td className="py-2 font-bold text-slate-800">${parseFloat(entry.precio_costo).toFixed(2)}</td>
+                                                            <td className="py-2 text-right font-black text-indigo-600">${parseFloat(entry.precio_venta).toFixed(2)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
 
                 {deleteModalOpen && productToDelete && (

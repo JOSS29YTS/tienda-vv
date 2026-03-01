@@ -92,6 +92,25 @@ const CommissionsPage = () => {
         totalSales: 0
     });
 
+    const months = [
+        { value: 1, label: 'Enero' },
+        { value: 2, label: 'Febrero' },
+        { value: 3, label: 'Marzo' },
+        { value: 4, label: 'Abril' },
+        { value: 5, label: 'Mayo' },
+        { value: 6, label: 'Junio' },
+        { value: 7, label: 'Julio' },
+        { value: 8, label: 'Agosto' },
+        { value: 9, label: 'Septiembre' },
+        { value: 10, label: 'Octubre' },
+        { value: 11, label: 'Noviembre' },
+        { value: 12, label: 'Diciembre' }
+    ];
+
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
+
     useEffect(() => {
         fetchCommissions();
         fetchMethods();
@@ -100,7 +119,7 @@ const CommissionsPage = () => {
     const fetchMethods = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/methods`, {
+            const res = await fetch(`${API_URL}/api/finances/payment-methods`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -112,6 +131,7 @@ const CommissionsPage = () => {
             console.error('Error fetching methods:', error);
         }
     };
+
 
     const fetchCommissions = async () => {
         try {

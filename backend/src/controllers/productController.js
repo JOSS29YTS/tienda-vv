@@ -254,3 +254,26 @@ exports.updateProductBarcode = async (req, res) => {
         res.status(500).json({ message: 'Error al actualizar código de barra' });
     }
 };
+
+exports.getProductPriceHistory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT 
+                dc.costo as precio_costo,
+                dc.precio_venta,
+                c.fecha_compra as fecha
+            FROM detalle_compra dc
+            JOIN compra c ON dc.id_compra = c.id_compra
+            WHERE dc.id_producto = ?
+            ORDER BY c.fecha_compra ASC
+        `;
+
+        const [history] = await pool.query(query, [id]);
+        res.json(history);
+    } catch (error) {
+        console.error('Error getting product price history:', error);
+        res.status(500).json({ message: 'Error al obtener historial de precios' });
+    }
+};
+
