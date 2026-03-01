@@ -15,10 +15,11 @@ exports.getMethodBalances = async () => {
             balances[m.id_metodo_pago] = {
                 id: m.id_metodo_pago,
                 name: m.nb_metodo_pago,
-                balance: 0,
+                balance: parseFloat(m.saldo_inicial) || 0,
                 type
             };
         });
+
 
         // 1. Sales Income (Payments)
         const [sales] = await pool.query(`
