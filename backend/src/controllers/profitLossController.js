@@ -39,6 +39,8 @@ exports.getProfitLoss = async (req, res) => {
 
         const applyFilter = (col) => dateFilter.replace(/\{col\}/g, col);
 
+        await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+
         // ─────────────────────────────────────────────
         // 1. INGRESOS: Ventas cobradas (sin pendiente por cobrar)
         // ─────────────────────────────────────────────
@@ -102,10 +104,18 @@ exports.getProfitLoss = async (req, res) => {
                 FROM gasto_variable gv
                 JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable
                 WHERE ${applyFilter('gv.fecha_gasto_variable')}
+
+                UNION ALL
+
+                SELECT 
+                    'PAGO COMISION' as tipo,
+                    monto_usd as total_usd
+                FROM pago_comision
+                WHERE ${applyFilter('fecha_pago')}
             ) as combined_expenses
             GROUP BY tipo
             ORDER BY total_usd DESC
-        `, [...dateParams, ...dateParams]);
+        `, [...dateParams, ...dateParams, ...dateParams]);
 
         const [fixedTotalRows] = await pool.query(`
             SELECT COALESCE(SUM(total), 0) as total
@@ -121,8 +131,14 @@ exports.getProfitLoss = async (req, res) => {
                 SELECT gv.monto_usd as total
                 FROM gasto_variable gv
                 WHERE ${applyFilter('gv.fecha_gasto_variable')}
+
+                UNION ALL
+
+                SELECT monto_usd as total
+                FROM pago_comision
+                WHERE ${applyFilter('fecha_pago')}
             ) as combined_totals
-        `, [...dateParams, ...dateParams]);
+        `, [...dateParams, ...dateParams, ...dateParams]);
         const totalGastosOperativos = parseFloat(fixedTotalRows[0].total);
 
         // ─────────────────────────────────────────────
@@ -227,6 +243,13 @@ exports.getProfitLoss = async (req, res) => {
                 FROM pago_prestamo pp
                 JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
                 WHERE pp.fecha_pago >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                UNION ALL
+
+                SELECT 
+                    DATE_FORMAT(fecha_pago, '%Y-%m') as mes,
+                    monto_usd as total
+                FROM pago_comision
+                WHERE fecha_pago >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
             ) as all_expenses
             GROUP BY mes
         `);

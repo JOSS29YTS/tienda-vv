@@ -6,6 +6,7 @@ const { verifyToken, isAdminOrManager } = require('../middleware/authMiddleware'
 
 router.get('/summary', verifyToken, isAdminOrManager, financeController.getFinanceSummary);
 router.get('/commissions', verifyToken, isAdminOrManager, financeController.getCommissions);
+router.post('/commissions/pay', verifyToken, isAdminOrManager, financeController.payCommission);
 router.get('/transactions', verifyToken, isAdminOrManager, financeController.getRecentTransactions);
 router.get('/fixed-payment-types', verifyToken, isAdminOrManager, financeController.getFixedPaymentTypes);
 router.get('/payment-methods', verifyToken, isAdminOrManager, financeController.getPaymentMethods);

@@ -33,9 +33,11 @@ exports.getFinanceSummary = async (req, res) => {
             LEFT JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
         `);
 
-        // Create variable expense tables if they don't exist
+        // Create variable expense and commission tables if they don't exist
         await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
         await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+        await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+        try { await pool.query('ALTER TABLE pago_comision ADD COLUMN nb_beneficiario VARCHAR(100) AFTER id_usuario'); } catch (e) { }
 
         // Variable Payments (Recorded Expenses)
         const [variableResult] = await pool.query(`
@@ -110,6 +112,7 @@ exports.getFinanceSummary = async (req, res) => {
         }
 
         const totalExpensesCalculated = totalPurchases + totalFixedPayments;
+        const totalAvance = totalFixedPaymentsForBalance - totalFixedPayments;
         // We will add Loan Repayments to this later
 
 
@@ -301,8 +304,6 @@ exports.getFinanceSummary = async (req, res) => {
             totalLoanRepayments += amountUSD;
         }
 
-        const totalExpenses = totalExpensesCalculated + totalLoanRepayments;
-        const totalExpensesForBalance = totalPurchases + totalFixedPaymentsForBalance + totalLoanRepayments;
 
         // 10. Supplier Invoice Stats & Payments
         const [pendingInvoices] = await pool.query(`
@@ -406,11 +407,40 @@ exports.getFinanceSummary = async (req, res) => {
         totalBiopagoBs -= deductions.biopago;
         totalTransferenciaBs -= deductions.transferencia;
 
-        const netBalance = collectedIncomeUSD + totalLoansUSD - totalExpensesForBalance;
+        // 12. Add Commission Payments to Expenses and Balance
+        const [commissionPayments] = await pool.query(`
+            SELECT pc.monto_usd, pc.tasa_dia, mp.nb_metodo_pago
+            FROM pago_comision pc
+            JOIN metodo_pago mp ON pc.id_metodo_pago = mp.id_metodo_pago
+        `);
 
-        // Apply Deductions to Display Totals (Net Income as per User Request)
-        const totalAvance = totalFixedPaymentsForBalance - totalFixedPayments;
+        let totalCommissionUSD = 0;
+        for (const cp of commissionPayments) {
+            const method = cp.nb_metodo_pago.toUpperCase();
+            const amount = parseFloat(cp.monto_usd);
+            const rate = parseFloat(cp.tasa_dia) || 1;
+
+            totalCommissionUSD += amount;
+
+            if (method.includes('ZELLE')) {
+                totalZelleUSD -= amount;
+            } else if (usdKeywords.some(k => method.includes(k))) {
+                incomeUSD_Only -= amount;
+            } else {
+                const amountBs = amount * rate;
+                if (method.includes('EFECTIVO')) totalEfectivoBs -= amountBs;
+                else if (method.includes('PUNTO')) totalPuntoBs -= amountBs;
+                else if (method.includes('MOVIL') || method.includes('MÓVIL')) totalPagoMovilBs -= amountBs;
+                else if (method.includes('BIOPAGO')) totalBiopagoBs -= amountBs;
+                else if (method.includes('TRANSFERENCIA')) totalTransferenciaBs -= amountBs;
+            }
+        }
+
+        const totalExpenses = totalExpensesCalculated + totalLoanRepayments + totalCommissionUSD;
+        const totalExpensesForBalance = totalPurchases + totalFixedPaymentsForBalance + totalLoanRepayments + totalCommissionUSD;
+
         const netIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD;
+        const netBalance = netIncomeUSD - totalExpensesForBalance;
 
         res.json({
             stats: {
@@ -443,6 +473,7 @@ exports.getRecentTransactions = async (req, res) => {
 
         await pool.query('CREATE TABLE IF NOT EXISTS tipo_gasto_variable (id_tipo_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, nb_gasto_variable VARCHAR(100) UNIQUE NOT NULL)');
         await pool.query('CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+        await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
 
         const query = `
             SELECT 
@@ -559,6 +590,20 @@ exports.getRecentTransactions = async (req, res) => {
             JOIN prestamo p ON pp.id_prestamo = p.id_prestamo
             JOIN usuario u ON p.id_usuario = u.id_usuario
             JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+            UNION ALL
+
+            SELECT
+                'Pago Comisión' as type,
+                pc.id_pago_comision as id,
+                pc.fecha_pago as date,
+                pc.monto_usd as amount,
+                u.nombre as user,
+                'Egreso' as category,
+                mp.nb_metodo_pago as payment_method,
+                pc.tasa_dia as exchange_rate
+            FROM pago_comision pc
+            JOIN usuario u ON pc.id_usuario = u.id_usuario
+            JOIN metodo_pago mp ON pc.id_metodo_pago = mp.id_metodo_pago
             
             ORDER BY date DESC, id DESC
             LIMIT ?
@@ -576,7 +621,12 @@ exports.getRecentTransactions = async (req, res) => {
 
 exports.getFixedPaymentTypes = async (req, res) => {
     try {
-        const [types] = await pool.query('SELECT * FROM tipo_pago_fijo ORDER BY nb_tipo_pago_fijo ASC');
+        const [types] = await pool.query(`
+            SELECT * FROM tipo_pago_fijo 
+            WHERE nb_tipo_pago_fijo NOT LIKE '%COMISIONES POR VENTA%'
+            AND nb_tipo_pago_fijo NOT LIKE '%PAGO DE COMISIONES%'
+            ORDER BY nb_tipo_pago_fijo ASC
+        `);
         res.json(types);
     } catch (error) {
         console.error('Error getting fixed payment types:', error);
@@ -1170,8 +1220,21 @@ exports.createVariableExpense = async (req, res) => {
 exports.getCommissions = async (req, res) => {
     try {
         const today = new Date();
-        const currentMonth = today.getMonth() + 1;
-        const currentYear = today.getFullYear();
+        const currentMonth = req.query.month ? parseInt(req.query.month) : (today.getMonth() + 1);
+        const currentYear = req.query.year ? parseInt(req.query.year) : today.getFullYear();
+
+        await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, mes_referencia INT, ano_referencia INT, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
+
+        // Ensure columns exist for month/year tracking
+        try { await pool.query('ALTER TABLE pago_comision ADD COLUMN nb_beneficiario VARCHAR(100) AFTER id_usuario'); } catch (e) { }
+        try { await pool.query('ALTER TABLE pago_comision ADD COLUMN mes_referencia INT AFTER fecha_pago'); } catch (e) { }
+        try { await pool.query('ALTER TABLE pago_comision ADD COLUMN ano_referencia INT AFTER mes_referencia'); } catch (e) { }
+
+        // Migration: If mes_referencia is NULL, assume it was for the month of payment
+        await pool.query('UPDATE pago_comision SET mes_referencia = MONTH(fecha_pago), ano_referencia = YEAR(fecha_pago) WHERE mes_referencia IS NULL');
+
+        // Temporary fix for payments made today (01/March/2026) that should have been for February 2026
+        try { await pool.query("UPDATE pago_comision SET mes_referencia = 2 WHERE DATE(fecha_pago) = '2026-03-01' AND mes_referencia = 3 AND ano_referencia = 2026"); } catch (e) { }
 
         // Calculate Total Sales for the Current Month
         // Matches the logic from Dashboard's getTotalSales
@@ -1189,27 +1252,76 @@ exports.getCommissions = async (req, res) => {
         const [rows] = await pool.query(query, [currentMonth, currentYear]);
         const totalSales = parseFloat(rows[0].total) || 0;
 
-        const gerenteCommission = totalSales * 0.01;
-        const vendedorCommission = totalSales * 0.005;
+        const [paidRows] = await pool.query(`
+            SELECT nb_beneficiario, COALESCE(SUM(monto_usd), 0) as paid 
+            FROM pago_comision 
+            WHERE mes_referencia = ? AND ano_referencia = ? 
+            GROUP BY nb_beneficiario
+        `, [currentMonth, currentYear]);
 
-        const gerenteBonus = 20;
-        const vendedorBonus = 10;
+        let paidByRole = { GERENTE: 0, VENDEDOR: 0 };
+        paidRows.forEach(r => {
+            paidByRole[r.nb_beneficiario.toUpperCase()] = parseFloat(r.paid);
+        });
+
+        const gerenteCommission = (totalSales * 0.01) + 20 - paidByRole.GERENTE;
+        const vendedorCommission = (totalSales * 0.005) + 10 - paidByRole.VENDEDOR;
 
         res.json({
             gerente: {
-                comision: gerenteCommission,
-                bonificacion: gerenteBonus,
-                total: gerenteCommission + gerenteBonus
+                comision: Math.max(0, totalSales * 0.01),
+                bonificacion: 20,
+                total: Math.max(0, gerenteCommission)
             },
             vendedor: {
-                comision: vendedorCommission,
-                bonificacion: vendedorBonus,
-                total: vendedorCommission + vendedorBonus
+                comision: Math.max(0, totalSales * 0.005),
+                bonificacion: 10,
+                total: Math.max(0, vendedorCommission)
             },
             totalSales
         });
     } catch (error) {
         console.error('Error getting commissions:', error);
         res.status(500).json({ message: 'Error al obtener comisiones' });
+    }
+};
+
+exports.payCommission = async (req, res) => {
+    try {
+        const { recipient, amount, rate, month, year } = req.body;
+        const userId = req.user.id;
+
+        if (!recipient || !amount || !rate) {
+            return res.status(400).json({ message: 'Datos incompletos' });
+        }
+
+        // 1. Find the TRANSFERENCIA method
+        const [methods] = await pool.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE ?', ['%TRANSFERENCIA%']);
+        if (methods.length === 0) {
+            return res.status(400).json({ message: 'No se encontró el método de pago por TRANSFERENCIA' });
+        }
+        const methodId = methods[0].id_metodo_pago;
+
+        // 2. Validation: Check Funds
+        const requiredBs = amount * rate;
+        const check = await balanceUtils.checkSufficientFunds(methodId, requiredBs);
+        if (!check.ok) {
+            return res.status(400).json({ message: check.message });
+        }
+
+        // 3. Record the Payment in the NEW pago_comision table
+        const now = new Date();
+        const pad = (n) => n.toString().padStart(2, '0');
+        const formattedDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+        await pool.query(
+            'INSERT INTO pago_comision (id_usuario, nb_beneficiario, id_metodo_pago, monto_usd, tasa_dia, fecha_pago, mes_referencia, ano_referencia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [userId, recipient.toUpperCase(), methodId, amount, rate, formattedDate, month || (now.getMonth() + 1), year || now.getFullYear()]
+        );
+
+        res.json({ message: `Pago de comisión a ${recipient} registrado exitosamente` });
+    } catch (error) {
+        console.error('Error paying commission:', error);
+        res.status(500).json({ message: 'Error interno al procesar el pago de comisión' });
     }
 };
