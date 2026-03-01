@@ -166,30 +166,35 @@ exports.getDashboardStats = async (req, res) => {
         `);
         const todaySales = parseFloat(todayRows[0].total);
 
-        // 7. Top Products
+        // 7. Top Products (Current Month)
         const topProductsQuery = `
             SELECT 
                 p.nb_producto as name, 
                 COALESCE(c.nb_categoria, 'Sin Categoría') as category,
                 SUM(dv.cantidad) as sold
             FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
             JOIN producto p ON dv.id_producto = p.id_producto
             LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+            AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
             GROUP BY p.id_producto
             ORDER BY sold DESC
             LIMIT 5
         `;
-        const [topProducts] = await pool.query(topProductsQuery);
+        const [topProducts] = await pool.query(topProductsQuery, [currentMonth, currentYear]);
 
-        // 8. Total Products Sold
+        // 8. Total Products Sold (Current Month)
         const [totalSoldRows] = await pool.query(`
             SELECT COALESCE(SUM(dv.cantidad), 0) as total
             FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
             JOIN producto p ON dv.id_producto = p.id_producto
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
-        `);
+            AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+        `, [currentMonth, currentYear]);
         const totalProductsSold = parseInt(totalSoldRows[0].total) || 0;
+
 
         res.json({
             stats: {
