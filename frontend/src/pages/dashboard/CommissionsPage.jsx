@@ -8,8 +8,9 @@ import { useRate } from '../../context/RateContext';
 
 const StatCard = ({ title, bgClass, textClass, icon: Icon, stats, onPay }) => {
     const { rate } = useRate();
-    const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
-    const totalBs = (stats.total * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+    const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+    const cleanTotal = Math.round((stats.total || 0) * 100) / 100;
+    const totalBs = (cleanTotal * cleanRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return (
         <motion.div
@@ -172,8 +173,8 @@ const CommissionsPage = () => {
                 },
                 body: JSON.stringify({
                     recipient: payInfo.recipient.toLowerCase(),
-                    amount: payInfo.amount,
-                    rate: roundedRate,
+                    amount: Math.round(payInfo.amount * 100) / 100,
+                    rate: Math.round((parseFloat(rate) || 0) * 100) / 100,
                     month: selectedMonth,
                     year: selectedYear
                 })
@@ -315,7 +316,7 @@ const CommissionsPage = () => {
                                 <div className="flex justify-between items-center py-4 bg-emerald-50/50 px-4 rounded-xl border border-emerald-100">
                                     <span className="text-emerald-700 font-black uppercase text-sm">Total en Bolívares</span>
                                     <span className="text-2xl font-black text-emerald-600">
-                                        {(payInfo.amount * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs.
+                                        {(Math.round(payInfo.amount * 100) / 100 * (Math.round((parseFloat(rate) || 0) * 100) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
                                     </span>
                                 </div>
                             </div>

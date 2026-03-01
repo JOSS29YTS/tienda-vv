@@ -169,7 +169,7 @@ exports.getProfitLoss = async (req, res) => {
             if (isUsdMethod(p.nb_metodo_pago)) {
                 totalPagosPrestamos += amt;
             } else {
-                totalPagosPrestamos += amt / rate;
+                totalPagosPrestamos += Math.round((amt / rate) * 100) / 100;
             }
         }
 
@@ -238,7 +238,7 @@ exports.getProfitLoss = async (req, res) => {
                           OR mp.nb_metodo_pago LIKE '%DOLAR%' 
                           OR mp.nb_metodo_pago LIKE '%EFECTIVO ($)%' 
                         THEN pp.monto
-                        ELSE (pp.monto / COALESCE(NULLIF(pp.tasa_dia, 0), 1))
+                        ELSE ROUND(pp.monto / COALESCE(NULLIF(pp.tasa_dia, 0), 1), 2)
                     END as total
                 FROM pago_prestamo pp
                 JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago

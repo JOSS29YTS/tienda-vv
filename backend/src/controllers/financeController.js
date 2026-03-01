@@ -1264,21 +1264,26 @@ exports.getCommissions = async (req, res) => {
             paidByRole[r.nb_beneficiario.toUpperCase()] = parseFloat(r.paid);
         });
 
-        const gerenteCommission = (totalSales * 0.01) + 20 - paidByRole.GERENTE;
-        const vendedorCommission = (totalSales * 0.005) + 10 - paidByRole.VENDEDOR;
+        const rawGerenteComision = Math.round((totalSales * 0.01) * 100) / 100;
+        const rawVendedorComision = Math.round((totalSales * 0.005) * 100) / 100;
+        const gerenteBonificacion = 20;
+        const vendedorBonificacion = 10;
+
+        const gerenteRemaining = Math.round((rawGerenteComision + gerenteBonificacion - paidByRole.GERENTE) * 100) / 100;
+        const vendedorRemaining = Math.round((rawVendedorComision + vendedorBonificacion - paidByRole.VENDEDOR) * 100) / 100;
 
         res.json({
             gerente: {
-                comision: Math.max(0, totalSales * 0.01),
-                bonificacion: 20,
-                total: Math.max(0, gerenteCommission)
+                comision: rawGerenteComision,
+                bonificacion: gerenteBonificacion,
+                total: Math.max(0, gerenteRemaining)
             },
             vendedor: {
-                comision: Math.max(0, totalSales * 0.005),
-                bonificacion: 10,
-                total: Math.max(0, vendedorCommission)
+                comision: rawVendedorComision,
+                bonificacion: vendedorBonificacion,
+                total: Math.max(0, vendedorRemaining)
             },
-            totalSales
+            totalSales: Math.round(totalSales * 100) / 100
         });
     } catch (error) {
         console.error('Error getting commissions:', error);

@@ -6,7 +6,7 @@ exports.getHistory = async (req, res) => {
             SELECT 
                 DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
                 metodo,
-                tasa_dia,
+                ROUND(tasa_dia, 2) as tasa_dia,
                 type,
                 SUM(amount) as total
             FROM (
@@ -36,7 +36,7 @@ exports.getHistory = async (req, res) => {
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
                 WHERE tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
             ) AS daily_movements
-            GROUP BY DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, tasa_dia, type
+            GROUP BY DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(tasa_dia, 2), type
             ORDER BY fecha DESC
         `;
 
@@ -45,7 +45,7 @@ exports.getHistory = async (req, res) => {
             SELECT 
                 DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
                 'PENDIENTE POR COBRAR' as metodo,
-                v.tasa_dia,
+                ROUND(v.tasa_dia, 2) as tasa_dia,
                 'DEBT' as type,
                 SUM((dv.cantidad * dv.precio_unitario) - (
                     SELECT COALESCE(SUM(dp.monto), 0)
@@ -58,7 +58,7 @@ exports.getHistory = async (req, res) => {
             FROM deuda d
             JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
             JOIN venta v ON dv.id_venta = v.id_venta
-            GROUP BY DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, tasa_dia, type
+            GROUP BY DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(v.tasa_dia, 2), type
         `;
 
         // Merge debtRows into rows if necessary, or process separately
@@ -86,54 +86,53 @@ exports.getHistory = async (req, res) => {
         rows.forEach(row => {
             if (!row.fecha) return;
             const dateKey = row.fecha;
-            initDay(dateKey, row.tasa_dia);
 
+            // Tasa for the day (rounded to 2)
+            const rate = Math.round((parseFloat(row.tasa_dia) || 1) * 100) / 100;
+            initDay(dateKey, rate);
 
-            // Totals Calculation & Breakdown Aggregation
             const method = row.metodo ? row.metodo.toUpperCase() : 'DESCONOCIDO';
-            // Note: PENDIENTE POR COBRAR is treated as USD in the original logic for classification, 
-            // but might be excluded from totals.
             const isUSD = /DIVISA|ZELLE|BINANCE|PAYPAL|USD|DOLAR|[$]/.test(method);
+            const amountUSD = Math.round((parseFloat(row.total) || 0) * 100) / 100;
 
-            const amountVal = parseFloat(row.total) || 0;
-            const rate = parseFloat(row.tasa_dia) || 1;
-
-            let amountForBreakdown = 0;
-            let currencyForBreakdown = 'BS';
-
+            // Totals Accumulation (Global Day Level)
             if (isUSD) {
-                amountForBreakdown = amountVal;
-                currencyForBreakdown = 'USD';
-            } else {
-                amountForBreakdown = amountVal * rate;
-                currencyForBreakdown = 'BS';
+                historyByDay[dateKey].totalUSD = Math.round((historyByDay[dateKey].totalUSD + amountUSD) * 100) / 100;
             }
 
-            // ONLY Add to Totals if it is a SALE (Income)
-            // We ignore Expenses and Transfers for the "Venta" total to match Dashboard
-            // Add to Totals (NET FLOW)
-            // User requested to match History ($27.11) which was Net Flow.
-            if (isUSD) {
-                // Exclude Pending/Debt from Total Cash/Income USD
-                historyByDay[dateKey].totalUSD += amountVal;
-            } else {
-                const amountInBs = amountVal * rate;
-                historyByDay[dateKey].totalBS += amountInBs;
-            }
-
-            // Aggregate in Breakdown
-            // Find if this method already exists in the breakdown for this day
-            const existingItem = historyByDay[dateKey].breakdown.find(item => item.method === row.metodo);
-
-            if (existingItem) {
-                existingItem.amount += amountForBreakdown;
-            } else {
-                historyByDay[dateKey].breakdown.push({
+            // Breakdown Aggregation
+            let existingItem = historyByDay[dateKey].breakdown.find(item => item.method === row.metodo);
+            if (!existingItem) {
+                existingItem = {
                     method: row.metodo,
-                    amount: amountForBreakdown,
-                    currency: currencyForBreakdown
-                });
+                    totalUSDAmount: 0,
+                    amount: 0,
+                    currency: isUSD ? 'USD' : 'BS'
+                };
+                historyByDay[dateKey].breakdown.push(existingItem);
             }
+
+            // Always sum the USD component
+            existingItem.totalUSDAmount = Math.round((existingItem.totalUSDAmount + amountUSD) * 100) / 100;
+        });
+
+        // SECOND PASS: Finalize calculations to ensure perfect multiplication parity
+        Object.values(historyByDay).forEach(day => {
+            day.totalBS = 0; // Reset to recalculate cleanly
+            day.breakdown.forEach(item => {
+                const dayRate = day.tasa || 1;
+                if (item.currency === 'USD') {
+                    item.amount = item.totalUSDAmount;
+                } else {
+                    // For BS methods, enforce: Amount Bs = Total USD * Day Rate
+                    item.amount = Math.round((item.totalUSDAmount * dayRate) * 100) / 100;
+                    // Add to the day's total BS
+                    day.totalBS = Math.round((day.totalBS + item.amount) * 100) / 100;
+                }
+
+                // Cleanup temporary property
+                delete item.totalUSDAmount;
+            });
         });
 
         const sortedHistory = Object.values(historyByDay).sort((a, b) => new Date(b.date) - new Date(a.date));

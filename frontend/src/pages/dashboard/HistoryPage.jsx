@@ -222,11 +222,11 @@ const HistoryCard = ({ day, formatDate }) => {
                     <div className="space-y-2 col-span-2 md:col-span-1">
                         <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
                             <span className="text-xs text-slate-500 font-bold uppercase">Venta Bs</span>
-                            <span className="text-sm font-bold text-slate-700">{day.totalBS.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                            <span className="text-sm font-bold text-slate-700">{day.totalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
                             <span className="text-xs text-slate-500 font-bold uppercase">Venta $</span>
-                            <span className="text-sm font-bold text-slate-700">$ {day.totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            <span className="text-sm font-bold text-slate-700">$ {day.totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     </div>
 

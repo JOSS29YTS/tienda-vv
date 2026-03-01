@@ -183,7 +183,7 @@ const SalesPage = () => {
                 },
                 body: JSON.stringify({
                     rows: cleanRows,
-                    rate: parseFloat(rate)
+                    rate: Math.round((parseFloat(rate) || 0) * 100) / 100
                 })
             });
         } catch (err) {
@@ -452,7 +452,9 @@ const SalesPage = () => {
             totalUSD += rowTotalUSD;
         });
 
-        totalBS = totalUSD * (parseFloat(rate) || 0);
+        // Force 2 decimal precision on rate and result
+        const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+        totalBS = Math.round((totalUSD * cleanRate) * 100) / 100;
 
         return { totalUSD, totalBS };
     };
@@ -471,7 +473,9 @@ const SalesPage = () => {
             selTotalUSD += rowTotalUSD;
         });
 
-        selTotalBS = selTotalUSD * (parseFloat(rate) || 0);
+        // Force 2 decimal precision on rate and result
+        const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+        selTotalBS = Math.round((selTotalUSD * cleanRate) * 100) / 100;
 
         return { selTotalUSD, selTotalBS };
     };
@@ -528,7 +532,7 @@ const SalesPage = () => {
                 },
                 body: JSON.stringify({
                     rows: processedRows,
-                    rate: parseFloat(rate)
+                    rate: Math.round((parseFloat(rate) || 0) * 100) / 100
                 })
             });
 
@@ -589,7 +593,8 @@ const SalesPage = () => {
                 (products.find(p => p.id_producto == row.productId)?.nombre || 'Producto Desconocido');
 
             const rowTotalUSD = (row.quantity || 0) * (row.unitPrice || 0);
-            const rowTotalBS = rowTotalUSD * parseFloat(rate);
+            const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+            const rowTotalBS = Math.round((rowTotalUSD * cleanRate) * 100) / 100;
 
             return [
                 productName,
@@ -845,9 +850,10 @@ const SalesPage = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {rows.map((row, index) => {
-                                const rowTotalUSD = (row.quantity || 0) * (row.unitPrice || 0);
-                                const unitBS = (row.unitPrice || 0) * (parseFloat(rate) || 0);
-                                const rowTotalBS = rowTotalUSD * (parseFloat(rate) || 0);
+                                const rowTotalUSD = Math.round(((row.quantity || 0) * (row.unitPrice || 0)) * 100) / 100;
+                                const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+                                const unitBS = Math.round(((row.unitPrice || 0) * cleanRate) * 100) / 100;
+                                const rowTotalBS = Math.round((rowTotalUSD * cleanRate) * 100) / 100;
 
                                 const isSelected = selectedRows.includes(row.id);
 
@@ -1096,7 +1102,7 @@ const SalesPage = () => {
                                         $ {mixedModalData.totalToPayUSD.toFixed(2)}
                                     </div>
                                     <div className="font-mono text-sm text-slate-300">
-                                        Bs. {(mixedModalData.totalToPayUSD * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                        Bs. {(mixedModalData.totalToPayUSD * (Math.round((parseFloat(rate) || 0) * 100) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
                             </div>
@@ -1142,15 +1148,17 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
     const [currency, setCurrency] = useState('USD'); // USD or BS
 
     // Calculate totals
+    const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
     const totalPaidUSD = payments.reduce((acc, p) => acc + p.amountInUSD, 0);
-    const remainingUSD = totalUSD - totalPaidUSD;
-    const remainingBS = remainingUSD * rate;
+    const remainingUSD = Math.round((totalUSD - totalPaidUSD) * 100) / 100;
+    const remainingBS = Math.round((remainingUSD * cleanRate) * 100) / 100;
 
     const addPayment = () => {
         if (!currentMethod || !amount || parseFloat(amount) <= 0) return;
 
         const val = parseFloat(amount);
-        const valInUSD = currency === 'BS' ? val / rate : val;
+        const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+        const valInUSD = currency === 'BS' ? Math.round((val / cleanRate) * 100) / 100 : val;
 
         setPayments([...payments, {
             id: Date.now(),
@@ -1212,7 +1220,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         />
                         {currency === 'BS' && amount && !isNaN(parseFloat(amount)) && (
                             <div className="absolute top-full right-0 mt-1 text-xs text-slate-500 font-bold whitespace-nowrap">
-                                $ {(parseFloat(amount) / parseFloat(rate)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                $ {(parseFloat(amount) / (Math.round((parseFloat(rate) || 0) * 100) / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         )}
                     </div>
@@ -1446,8 +1454,9 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
 
     // Derived
     const currentProduct = products.find(p => p.id_producto == selectedProductId);
-    const invoiceTotalUSD = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-    const invoiceTotalBS = invoiceTotalUSD * rate;
+    const invoiceTotalUSD = Math.round(items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) * 100) / 100;
+    const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+    const invoiceTotalBS = Math.round((invoiceTotalUSD * cleanRate) * 100) / 100;
 
     const addItem = () => {
         if (!currentProduct || quantity <= 0) return;
@@ -1480,7 +1489,8 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
     const addMixedPayment = () => {
         if (!mixedMethodInput || !mixedAmountInput || parseFloat(mixedAmountInput) <= 0) return;
         const val = parseFloat(mixedAmountInput);
-        const valInUSD = mixedCurrencyInput === 'BS' ? val / rate : val;
+        const cleanRate = Math.round((parseFloat(rate) || 0) * 100) / 100;
+        const valInUSD = mixedCurrencyInput === 'BS' ? Math.round((val / cleanRate) * 100) / 100 : val;
 
         setMixedPayments([...mixedPayments, {
             id: Date.now(),
@@ -1809,7 +1819,7 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
                                             <div>${remainingUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                             {(Math.abs(remainingUSD) > 0.01) && (
                                                 <div className="text-xs opacity-75 font-mono">
-                                                    Bs. {(remainingUSD * parseFloat(rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    Bs. {(remainingUSD * (Math.round((parseFloat(rate) || 0) * 100) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
                                             )}
                                         </div>

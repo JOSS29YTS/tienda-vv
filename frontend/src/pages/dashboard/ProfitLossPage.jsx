@@ -144,7 +144,7 @@ const ProfitLossPage = () => {
         }
 
         const doc = new jsPDF();
-        const r = parseFloat(rate) || 1;
+        const r = Math.round((parseFloat(rate) || 1) * 100) / 100;
         const slateColor = [15, 23, 42];
         const primaryColor = [249, 115, 22];
         const greenColor = [16, 185, 129];
@@ -197,11 +197,11 @@ const ProfitLossPage = () => {
             startY: 96,
             head: [['Concepto', 'Monto (USD)', 'Monto (Bs)']],
             body: [
-                ['Total Ingresos', `$ ${resumen.totalIngresos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(resumen.totalIngresos * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`],
-                ['  · Compras de Mercancía', `$ ${resumen.desglose.compras.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(resumen.desglose.compras * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`],
-                ['  · Gastos Operativos', `$ ${resumen.desglose.gastosOperativos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(resumen.desglose.gastosOperativos * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`],
-                ['  · Pagos de Préstamos', `$ ${resumen.desglose.pagosPrestamos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(resumen.desglose.pagosPrestamos * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`],
-                ['Total Egresos', `$ ${resumen.totalEgresos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(resumen.totalEgresos * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`],
+                ['Total Ingresos', `$ ${resumen.totalIngresos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(Math.round(resumen.totalIngresos * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                ['  · Compras de Mercancía', `$ ${resumen.desglose.compras.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(Math.round(resumen.desglose.compras * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                ['  · Gastos Operativos', `$ ${resumen.desglose.gastosOperativos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(Math.round(resumen.desglose.gastosOperativos * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                ['  · Pagos de Préstamos', `$ ${resumen.desglose.pagosPrestamos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(Math.round(resumen.desglose.pagosPrestamos * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+                ['Total Egresos', `$ ${resumen.totalEgresos.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `Bs ${(Math.round(resumen.totalEgresos * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
             ],
             theme: 'grid',
             headStyles: { fillColor: slateColor, textColor: 255, fontStyle: 'bold', fontSize: 9 },
@@ -229,7 +229,7 @@ const ProfitLossPage = () => {
                 body: data.ingresosDetalle.map(item => [
                     item.metodo,
                     `$ ${item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-                    `Bs ${(item.total * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+                    `Bs ${(Math.round(item.total * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                     resumen.totalIngresos > 0 ? `${((item.total / resumen.totalIngresos) * 100).toFixed(1)}%` : '0%'
                 ]),
                 theme: 'grid',
@@ -254,7 +254,7 @@ const ProfitLossPage = () => {
                 body: data.gastosOperativosDetalle.map(item => [
                     item.tipo,
                     `$ ${item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-                    `Bs ${(item.total * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+                    `Bs ${(Math.round(item.total * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                 ]),
                 theme: 'grid',
                 headStyles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: 'bold', fontSize: 9 },
@@ -277,7 +277,7 @@ const ProfitLossPage = () => {
         if (startDate && endDate) fetchData();
     };
 
-    const r = parseFloat(rate) || 1;
+    const r = Math.round((parseFloat(rate) || 1) * 100) / 100;
     const resumen = data?.resumen;
     const balance = resumen?.balanceNeto ?? 0;
     const isProfit = balance >= 0;
@@ -479,7 +479,7 @@ const ProfitLossPage = () => {
                                                 />
                                             </div>
                                             <p className="text-xs text-slate-400 text-right mt-0.5 px-1">
-                                                Bs {(item.total * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })} · {pct.toFixed(1)}%
+                                                Bs {(Math.round(item.total * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {pct.toFixed(1)}%
                                             </p>
                                         </div>
                                     );
@@ -588,7 +588,7 @@ const ProfitLossPage = () => {
                                                     ${item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-6 py-3 text-right font-mono text-slate-500 text-sm">
-                                                    Bs {(item.total * r).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                                    Bs {(Math.round(item.total * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                             </tr>
                                         ))}
@@ -646,7 +646,7 @@ const EgresoRow = ({ icon: Icon, label, value, total, rate, color, barColor, del
                 />
             </div>
             <p className="text-xs text-slate-400 text-right mt-0.5 px-1">
-                Bs {(value * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 })} · {pct.toFixed(1)}%
+                Bs {(Math.round(value * rate * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {pct.toFixed(1)}%
             </p>
         </div>
     );

@@ -108,8 +108,8 @@ exports.closeSales = async (req, res) => {
             throw new Error(`Usuario con ID ${userId} no encontrado en la base de datos.`);
         }
 
-        // Parse rate safely
-        const safeRate = parseFloat(String(rate).replace(',', '.'));
+        // Parse rate safely and enforce 2 decimals
+        const safeRate = Math.round((parseFloat(String(rate).replace(',', '.')) || 0) * 100) / 100;
         if (isNaN(safeRate)) throw new Error('Tasa de cambio inválida.');
 
         // Validate Role
