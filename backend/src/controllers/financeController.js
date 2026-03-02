@@ -392,7 +392,7 @@ exports.getFinanceSummary = async (req, res) => {
 
         res.json({
             stats: {
-                income: parseFloat(currentPeriodIncomeUSD.toFixed(2)),
+                income: parseFloat((currentPeriodIncomeUSD + totalInitialBalanceUSD).toFixed(2)),
                 expenses: parseFloat(totalExpenses.toFixed(2)),
                 balance: parseFloat(netBalance.toFixed(2)),
                 incomeBs: parseFloat((totalEfectivoBs + totalPuntoBs + totalPagoMovilBs + totalBiopagoBs + totalTransferenciaBs).toFixed(2)),
