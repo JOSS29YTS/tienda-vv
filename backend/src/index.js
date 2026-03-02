@@ -8,6 +8,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 const allowedOrigins = [
     'https://bodega-app-v2.netlify.app',
+    'https://ropa-mania-v1.netlify.app',
     'http://localhost:5173',
     'http://localhost:3000'
 ];
