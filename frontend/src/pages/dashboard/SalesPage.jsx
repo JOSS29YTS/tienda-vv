@@ -738,7 +738,7 @@ const SalesPage = () => {
                             Generar Reporte
                         </motion.button>
                     )}
-                    {user && user.rol === 'Administrador' && (
+                    {user && (user.rol === 'Administrador' || user.rol === 'Gerente') && (
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
