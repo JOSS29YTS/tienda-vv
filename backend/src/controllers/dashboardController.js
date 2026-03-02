@@ -150,8 +150,42 @@ exports.getDashboardStats = async (req, res) => {
             GROUP BY YEAR(v.fecha_venta), MONTH(v.fecha_venta)
             ORDER BY YEAR(v.fecha_venta), MONTH(v.fecha_venta)
         `;
-        const [chartData] = await pool.query(chartQuery);
-        // Fill missing months? Maybe later. For now send what we have.
+        const [chartDataResults] = await pool.query(chartQuery);
+
+        // Ensure starting balance shows up in Feb 2026 chart even without sales
+        const [initMethods] = await pool.query('SELECT nb_metodo_pago, saldo_inicial FROM metodo_pago');
+        const [initRateConfig] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_dolar']);
+        const initRate = Math.round((parseFloat(initRateConfig[0]?.valor) || 1) * 100) / 100;
+
+        let initialUSD = 0;
+        for (const m of initMethods) {
+            const val = parseFloat(m.saldo_inicial) || 0;
+            if (val <= 0) continue;
+            const name = m.nb_metodo_pago.toUpperCase();
+            if (name.includes('ZELLE') || name.includes('USD') || name.includes('DIVISA') || name.includes('DOLAR')) {
+                initialUSD += val;
+            } else {
+                initialUSD += (val / initRate);
+            }
+        }
+
+        let chartData = chartDataResults.map(row => {
+            if (row.year_num === 2026 && row.month_num === 2) {
+                return { ...row, total: parseFloat(row.total) + initialUSD };
+            }
+            return row;
+        });
+
+        // Add Feb row if missing
+        if (!chartData.some(d => d.year_num === 2026 && d.month_num === 2)) {
+            chartData.push({
+                month_name: 'Feb',
+                month_num: 2,
+                year_num: 2026,
+                total: initialUSD
+            });
+            chartData.sort((a, b) => (a.year_num - b.year_num) || (a.month_num - b.month_num));
+        }
 
         // 6. Ventas de Hoy (excluyendo PENDIENTE POR COBRAR)
         const [todayRows] = await pool.query(`

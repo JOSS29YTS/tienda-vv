@@ -54,7 +54,39 @@ exports.getProfitLoss = async (req, res) => {
             WHERE ${applyFilter('v.fecha_venta')}
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
         `, dateParams);
-        const totalIngresos = parseFloat(salesRows[0].total);
+        // Initial Balance calculation (Capitalization)
+        const [config] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_dolar']);
+        const rawRate = parseFloat(config[0]?.valor) || 1;
+        const currentRate = Math.round(rawRate * 100) / 100;
+
+        const [methods] = await pool.query('SELECT nb_metodo_pago, saldo_inicial FROM metodo_pago');
+        let initialBalanceUSD = 0;
+        let initialBreakdown = [];
+
+        for (const m of methods) {
+            const val = parseFloat(m.saldo_inicial) || 0;
+            if (val === 0) continue;
+
+            let valUSD = val;
+            if (!isUsdMethod(m.nb_metodo_pago)) {
+                valUSD = val / currentRate;
+            }
+            initialBalanceUSD += valUSD;
+            initialBreakdown.push({
+                metodo: m.nb_metodo_pago,
+                total: parseFloat(valUSD.toFixed(10)),
+                montoOriginalBs: !isUsdMethod(m.nb_metodo_pago) ? val : null
+            });
+        }
+
+        // Partitioning: Only include initial capital in previous month (Feb) or year total
+        // This ensures March starts at 0 for "Este Mes"
+        let showInitialInThisReport = false;
+        if (period === 'prev_month') showInitialInThisReport = true;
+        if (period === 'year') showInitialInThisReport = true;
+        if (period === 'custom') showInitialInThisReport = false; // Usually for specific date range
+
+        const totalIngresos = parseFloat(salesRows[0].total) + (showInitialInThisReport ? initialBalanceUSD : 0);
 
         // Desglose de ingresos por método de pago
         const [salesBreakdown] = await pool.query(`
@@ -180,8 +212,8 @@ exports.getProfitLoss = async (req, res) => {
         const balanceNeto = totalIngresos - totalEgresos;
 
         // ─────────────────────────────────────────────
-        // 7. Resumen mensual para gráfico (Año Actual)
-        // ─────────────────────────────────────────────
+        // 7. Resumen mensual para gráfico (Año 2026)
+        // Add initial balance to February's income for the chart
         const [monthlyIncome] = await pool.query(`
             SELECT 
                 DATE_FORMAT(v.fecha_venta, '%Y-%m') as mes,
@@ -192,11 +224,30 @@ exports.getProfitLoss = async (req, res) => {
             JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
             JOIN detalle_pago dp ON p.id_pago = dp.id_pago
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE YEAR(v.fecha_venta) = YEAR(NOW())
+            WHERE YEAR(v.fecha_venta) = 2026
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m')
             ORDER BY mes ASC
         `);
+
+        // Ensure February shows the initial balance in the chart even if no sales exist
+        let foundFeb = false;
+        let chartIncomeData = monthlyIncome.map(row => {
+            if (row.mes === '2026-02') {
+                foundFeb = true;
+                return { ...row, ingresos: parseFloat(row.ingresos) + initialBalanceUSD };
+            }
+            return row;
+        });
+
+        if (!foundFeb) {
+            chartIncomeData.push({
+                mes: '2026-02',
+                mes_label: 'Feb 2026',
+                ingresos: initialBalanceUSD
+            });
+            chartIncomeData.sort((a, b) => a.mes.localeCompare(b.mes));
+        }
         const [monthlyExpenses] = await pool.query(`
             SELECT mes, SUM(total) as compras
             FROM (
@@ -204,7 +255,7 @@ exports.getProfitLoss = async (req, res) => {
                     DATE_FORMAT(fecha_compra, '%Y-%m') as mes,
                     total_compra as total
                 FROM compra
-                WHERE YEAR(fecha_compra) = YEAR(NOW())
+                WHERE YEAR(fecha_compra) = 2026
 
                 UNION ALL
 
@@ -213,7 +264,7 @@ exports.getProfitLoss = async (req, res) => {
                     monto as total
                 FROM pago_fijo pf
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-                WHERE YEAR(fecha_pago_fijo) = YEAR(NOW())
+                WHERE YEAR(fecha_pago_fijo) = 2026
                 AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
 
                 UNION ALL
@@ -222,7 +273,7 @@ exports.getProfitLoss = async (req, res) => {
                     DATE_FORMAT(fecha_gasto_variable, '%Y-%m') as mes,
                     monto_usd as total
                 FROM gasto_variable
-                WHERE YEAR(fecha_gasto_variable) = YEAR(NOW())
+                WHERE YEAR(fecha_gasto_variable) = 2026
 
                 UNION ALL
 
@@ -241,21 +292,21 @@ exports.getProfitLoss = async (req, res) => {
                     END as total
                 FROM pago_prestamo pp
                 JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
-                WHERE YEAR(pp.fecha_pago) = YEAR(NOW())
+                WHERE YEAR(pp.fecha_pago) = 2026
                 UNION ALL
 
                 SELECT 
                     DATE_FORMAT(fecha_pago, '%Y-%m') as mes,
                     monto_usd as total
                 FROM pago_comision
-                WHERE YEAR(fecha_pago) = YEAR(NOW())
+                WHERE YEAR(fecha_pago) = 2026
             ) as all_expenses
             GROUP BY mes
         `);
 
         // Merge monthly data
         const monthlyMap = {};
-        for (const row of monthlyIncome) {
+        for (const row of chartIncomeData) {
             monthlyMap[row.mes] = { mes: row.mes_label, ingresos: parseFloat(row.ingresos), egresos: 0 };
         }
         for (const row of monthlyExpenses) {
@@ -286,10 +337,14 @@ exports.getProfitLoss = async (req, res) => {
                     pagosFacturas: parseFloat(totalPagosFacturas.toFixed(2)),
                 }
             },
-            ingresosDetalle: salesBreakdown.map(r => ({
-                metodo: r.metodo,
-                total: parseFloat(parseFloat(r.total).toFixed(2))
-            })),
+            ingresosDetalle: [
+                ...(showInitialInThisReport ? initialBreakdown : []),
+                ...salesBreakdown.map(r => ({
+                    metodo: r.metodo,
+                    total: parseFloat(parseFloat(r.total).toFixed(2)),
+                    montoOriginalBs: null
+                }))
+            ],
             gastosOperativosDetalle: fixedRows.map(r => ({
                 tipo: r.tipo,
                 total: parseFloat(parseFloat(r.total_usd).toFixed(2))

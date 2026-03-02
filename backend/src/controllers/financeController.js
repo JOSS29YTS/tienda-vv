@@ -8,6 +8,10 @@ exports.getFinanceSummary = async (req, res) => {
         const usdKeywords = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
 
         // 0. Initial Balances
+        const [config] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_dolar']);
+        const rawRate = parseFloat(config[0]?.valor) || 1;
+        const currentRate = Math.round(rawRate * 100) / 100;
+
         const [methods] = await pool.query('SELECT nb_metodo_pago, saldo_inicial FROM metodo_pago');
         let totalInitialBalanceUSD = 0;
         let initEfectivoBs = 0;
@@ -30,6 +34,9 @@ exports.getFinanceSummary = async (req, res) => {
                 initOtherUSD += val;
                 totalInitialBalanceUSD += val;
             } else {
+                // Convert Bs starting balance to USD and add to totalInitialBalanceUSD
+                totalInitialBalanceUSD += (val / currentRate);
+
                 if (name.includes('EFECTIVO')) initEfectivoBs += val;
                 else if (name.includes('PUNTO')) initPuntoBs += val;
                 else if (name.includes('MOVIL') || name.includes('MÓVIL')) initPagoMovilBs += val;
@@ -355,12 +362,9 @@ exports.getFinanceSummary = async (req, res) => {
         // For netBalance including Initial, we need totalInitialBalanceUSD.
         // But some initials are in Bs. Let's assume a generic rate or just focus on the method totals.
 
-        const netIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD;
-        // Balance = (Starting + Earned) - Spent
-        // We add totalInitialBalanceUSD here. If some were in Bs, they are in the initBs vars which were NOT in totalInitialBalanceUSD yet.
-        // Actually, let's keep netBalance as Period performance for now, or add total.
-
-        const netBalance = (netIncomeUSD + totalInitialBalanceUSD) - totalExpensesForBalance;
+        const currentPeriodIncomeUSD = (collectedIncomeUSD - totalAvance) + totalLoansUSD;
+        // Total capital includes what we started with
+        const netBalance = (currentPeriodIncomeUSD + totalInitialBalanceUSD) - totalExpensesForBalance;
 
         // Liabilities (Invoices & Pending Loans)
         const [pendingInvoices] = await pool.query(`
@@ -388,7 +392,7 @@ exports.getFinanceSummary = async (req, res) => {
 
         res.json({
             stats: {
-                income: parseFloat(netIncomeUSD.toFixed(2)),
+                income: parseFloat(currentPeriodIncomeUSD.toFixed(2)),
                 expenses: parseFloat(totalExpenses.toFixed(2)),
                 balance: parseFloat(netBalance.toFixed(2)),
                 incomeBs: parseFloat((totalEfectivoBs + totalPuntoBs + totalPagoMovilBs + totalBiopagoBs + totalTransferenciaBs).toFixed(2)),

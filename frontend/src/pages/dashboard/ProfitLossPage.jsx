@@ -479,7 +479,7 @@ const ProfitLossPage = () => {
                                                 />
                                             </div>
                                             <p className="text-xs text-slate-400 text-right mt-0.5 px-1">
-                                                Bs {(Math.round(item.total * r * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {pct.toFixed(1)}%
+                                                Bs {(item.montoOriginalBs ?? (Math.round(item.total * r * 100) / 100)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · {pct.toFixed(1)}%
                                             </p>
                                         </div>
                                     );
