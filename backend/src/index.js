@@ -75,6 +75,15 @@ app.listen(PORT, async () => {
         // Migration: Ensure Commissions table and columns exist
         await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
         try { await pool.query('ALTER TABLE pago_comision ADD COLUMN nb_beneficiario VARCHAR(100) AFTER id_usuario'); } catch (e) { }
+
+        // Migration: Add 'activo' column to usuario if it doesn't exist
+        // This column is required by authMiddleware: WHERE u.activo = 1
+        try {
+            await pool.query('ALTER TABLE usuario ADD COLUMN activo TINYINT(1) DEFAULT 1');
+            console.log('[MIGRATION] Columna activo agregada a tabla usuario.');
+            await pool.query('UPDATE usuario SET activo = 1 WHERE activo IS NULL');
+        } catch (e) { /* Column already exists */ }
+
     } catch (error) {
         console.error('Error al conectar a la base de datos:', error.message);
     }
