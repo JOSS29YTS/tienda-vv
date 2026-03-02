@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
     'https://bodega-app-v2.netlify.app',
     'https://ropa-mania-v1.netlify.app',
+    'https://tienda-ropa-mania-production.up.railway.app',
     'http://localhost:5173',
     'http://localhost:3000'
 ];
