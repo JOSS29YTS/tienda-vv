@@ -4,6 +4,18 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 
+// ============================================================
+// 🛑 PROTECCIÓN DE PRODUCCIÓN
+// Este script BORRARÁ y RECREARÁ la base de datos.
+// NUNCA debe ejecutarse en el entorno de Railway (producción).
+// ============================================================
+if (process.env.NODE_ENV === 'production') {
+    console.error('❌ ERROR CRÍTICO: init_db.js NO puede ejecutarse en producción.');
+    console.error('   Este script destruiría todos los datos de la base de datos.');
+    console.error('   Si necesitas inicializar la DB, hazlo en un entorno local primero.');
+    process.exit(1);
+}
+
 async function initDB() {
     try {
         const connection = await mysql.createConnection({

@@ -1,8 +1,10 @@
 -- ==========================================================
 -- 1. CREACIÓN DE LA BASE DE DATOS
 -- ==========================================================
-DROP DATABASE IF EXISTS tienda_db;
-CREATE DATABASE tienda_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- ⚠️ SEGURIDAD: NO uses DROP DATABASE en producción.
+-- Este script solo debe ejecutarse UNA VEZ para inicializar la DB.
+-- En producción (Railway), ejecutar init-db BORRARÁ TODOS LOS DATOS.
+CREATE DATABASE IF NOT EXISTS tienda_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE tienda_db;
 
 -- ==========================================================
