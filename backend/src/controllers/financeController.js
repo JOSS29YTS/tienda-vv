@@ -121,44 +121,33 @@ exports.getFinanceSummary = async (req, res) => {
         const finalBalance = finalIncome - finalExpenses - totalAvance;
 
         // --- CUMULATIVE METHOD BALANCES (For the bottom cards) ---
-        const [allSales] = await pool.query(`
-            SELECT mp.nb_metodo_pago, dp.monto as amount_usd, p.tasa_dia
-            FROM detalle_pago dp
-            JOIN pago p ON dp.id_pago = p.id_pago
-            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
-            JOIN venta v ON dv.id_venta = v.id_venta
-            WHERE mp.nb_metodo_pago != 'PENDIENTE POR COBRAR' ${tiendaFilterV}
-        `);
+        // Use balanceUtils which correctly accounts for ALL movements:
+        // sales, purchases (pago_compra), fixed/variable expenses, commissions, loans, transfers
+        const balanceUtils = require('../utils/balanceUtils');
+        const methodBalances = await balanceUtils.getMethodBalances();
 
-        // Initialize with 0 if it's not Tienda 1 or Global
-        const useInit = (!tiendaId || tiendaId === 1);
-        let totalEfectivoBs = useInit ? initEfectivoBs : 0;
-        let totalPuntoBs = useInit ? initPuntoBs : 0;
-        let totalPagoMovilBs = useInit ? initPagoMovilBs : 0;
-        let totalBiopagoBs = useInit ? initBiopagoBs : 0;
-        let totalTransferenciaBs = useInit ? initTransferenciaBs : 0;
-        let totalZelleUSD = useInit ? initZelleUSD : 0;
-        let incomeUSD_Only = useInit ? initOtherUSD : 0;
+        // Map to named totals for the response
+        let totalEfectivoBs = 0;
+        let totalPuntoBs = 0;
+        let totalPagoMovilBs = 0;
+        let totalBiopagoBs = 0;
+        let totalTransferenciaBs = 0;
+        let totalZelleUSD = 0;
+        let incomeUSD_Only = 0;
 
-        for (const pay of allSales) {
-            const method = (pay.nb_metodo_pago || '').toUpperCase();
-            const amount = parseFloat(pay.amount_usd);
-            const rate = parseFloat(pay.tasa_dia) || currentRate;
-            if (method.includes('ZELLE')) totalZelleUSD += amount;
-            else if (usdKeywords.some(k => method.includes(k))) incomeUSD_Only += amount;
+        for (const [, m] of Object.entries(methodBalances)) {
+            const name = (m.name || '').toUpperCase();
+            const bal = m.balance;
+            if (name.includes('ZELLE')) totalZelleUSD += bal;
+            else if (usdKeywords.some(k => name.includes(k))) incomeUSD_Only += bal;
             else {
-                const amountInBs = amount * rate;
-                if (method.includes('EFECTIVO')) totalEfectivoBs += amountInBs;
-                else if (method.includes('PUNTO')) totalPuntoBs += amountInBs;
-                else if (method.includes('MOVIL') || method.includes('MÓVIL')) totalPagoMovilBs += amountInBs;
-                else if (method.includes('BIOPAGO')) totalBiopagoBs += amountInBs;
-                else if (method.includes('TRANSFERENCIA')) totalTransferenciaBs += amountInBs;
+                if (name.includes('EFECTIVO')) totalEfectivoBs += bal;
+                else if (name.includes('PUNTO')) totalPuntoBs += bal;
+                else if (name.includes('MOVIL') || name.includes('MÓVIL')) totalPagoMovilBs += bal;
+                else if (name.includes('BIOPAGO')) totalBiopagoBs += bal;
+                else if (name.includes('TRANSFERENCIA')) totalTransferenciaBs += bal;
             }
         }
-
-        // Subtract all individual account movements (Simplified to match the netBalance total)
-        // [In a production app, we would subtract each expense from its specific account]
 
         res.json({
             stats: {
