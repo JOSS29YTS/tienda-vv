@@ -244,10 +244,11 @@ const SalesPage = () => {
                     // TRUST server state:
                     finalMerged = [...serverResults];
 
-                    // But still keep truly NEW un-synced local rows 
-                    // (those that have a product but never made it to the server)
-                    const myNewLocalRows = prevRows.filter(r => !r._userId && r.productId && r.quantity > 0);
-                    myNewLocalRows.forEach(localRow => {
+                    // Keep my local rows that haven't synced yet:
+                    // - Rows with a product not yet on server
+                    // - Empty placeholder rows (no productId) that I added intentionally
+                    const myLocalRows = prevRows.filter(r => !r._userId || String(r._userId) === String(user.id));
+                    myLocalRows.forEach(localRow => {
                         if (!finalMerged.some(sr => sr.id === localRow.id)) {
                             finalMerged.push({ ...localRow, _isReadOnly: false });
                         }
