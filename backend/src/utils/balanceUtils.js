@@ -3,83 +3,80 @@ const pool = require('../database/db');
 // Sync keywords with financeController.js
 const usdKeywords = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
 
-exports.getMethodBalances = async () => {
+exports.getMethodBalances = async (connection, tiendaId = null) => {
+    const db = connection || pool;
     try {
         const balances = {}; // { [methodId]: { name: '', balance: 0, type: 'BS'/'USD' } }
 
         // Get Methods and initialize balances
-        const [methods] = await pool.query('SELECT * FROM metodo_pago');
+        const [methods] = await db.query('SELECT * FROM metodo_pago');
+        // saldo_inicial only applies to Global or Tienda 1 (main store)
+        const applyInitial = !tiendaId || tiendaId === 1;
         methods.forEach(m => {
             const name = m.nb_metodo_pago.toUpperCase();
             const type = usdKeywords.some(k => name.includes(k)) ? 'USD' : 'BS';
             balances[m.id_metodo_pago] = {
                 id: m.id_metodo_pago,
                 name: m.nb_metodo_pago,
-                balance: parseFloat(m.saldo_inicial) || 0,
+                balance: applyInitial ? (parseFloat(m.saldo_inicial) || 0) : 0,
                 type
             };
         });
 
+        // Build tienda filter for each query
+        const tiendaV = tiendaId ? `AND v.id_tienda = ${tiendaId}` : '';
+        const tiendaPF = tiendaId ? `AND pf.id_tienda = ${tiendaId}` : '';
+        const tiendaGV = tiendaId ? `AND gv.id_tienda = ${tiendaId}` : '';
+        const tiendaC = tiendaId ? `AND c.id_tienda = ${tiendaId}` : '';
+        const tiendaL = tiendaId ? `AND p.id_tienda = ${tiendaId}` : '';
+        const tiendaPC = tiendaId ? `AND pc.id_tienda = ${tiendaId}` : '';
+        const tiendaTR = tiendaId ? `AND tr.id_tienda = ${tiendaId}` : '';
 
-        // 1. Sales Income (Payments)
-        const [sales] = await pool.query(`
+        // 1. Sales Income
+        const [sales] = await db.query(`
             SELECT dp.id_metodo_pago, dp.monto as amount_usd, p.tasa_dia
             FROM detalle_pago dp
             JOIN pago p ON dp.id_pago = p.id_pago
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
+            JOIN venta v ON dv.id_venta = v.id_venta
+            WHERE mp.nb_metodo_pago != 'PENDIENTE POR COBRAR' ${tiendaV}
         `);
         sales.forEach(s => {
             const acc = balances[s.id_metodo_pago];
             if (!acc) return;
             const amount = parseFloat(s.amount_usd);
             const rate = parseFloat(s.tasa_dia) || 1;
-
-            if (acc.type === 'BS') {
-                acc.balance += (amount * rate);
-            } else {
-                acc.balance += amount;
-            }
+            if (acc.type === 'BS') acc.balance += (amount * rate);
+            else acc.balance += amount;
         });
 
-        // 2. Transfers (Traspasos)
-        // In the UI, monto is in BS for BS accounts, or BS equivalent for conversions.
-        // Logic should match financeController exactly.
-        const [transfers] = await pool.query('SELECT * FROM traspaso');
+        // 2. Transfers (Traspasos) - filter by tienda if column exists
+        const [transfers] = await db.query(`SELECT * FROM traspaso ${tiendaId ? `WHERE id_tienda = ${tiendaId}` : ''}`);
         transfers.forEach(t => {
-            const amount = parseFloat(t.monto); // This is BS amount from UI logic "Monto (Bs)"
+            const amount = parseFloat(t.monto);
             const rate = parseFloat(t.tasa_dia) || 1;
             const origin = balances[t.id_metodo_origen];
             const dest = balances[t.id_metodo_destino];
-
             if (origin && dest) {
                 if (origin.type === 'USD' && dest.type === 'USD') {
-                    // USD -> USD (amount in DB for transfers is usually BS, but for USD it might be normalized?)
-                    // Actually, financeController.js assumes amount is USD if both are USD? 
-                    // Let's check: updateUsdMethod(origin, -amount);
-                    // If UI says "Monto (Bs)", we should convert if it's USD.
-                    // BUT FinancesPage.jsx says "Monto (Bs)" for ALL transfers.
-                    // So we treat 'amount' as BS and divide by rate for USD accounts.
                     origin.balance -= (amount / rate);
                     dest.balance += (amount / rate);
                 } else if (origin.type === 'USD' && dest.type === 'BS') {
-                    // USD -> Bs (Selling)
                     origin.balance -= (amount / rate);
                     dest.balance += amount;
                 } else if (origin.type === 'BS' && dest.type === 'USD') {
-                    // Bs -> USD (Buying)
                     origin.balance -= amount;
                     dest.balance += (amount / rate);
                 } else {
-                    // Bs -> Bs
                     origin.balance -= amount;
                     dest.balance += amount;
                 }
             }
         });
 
-        // 3. Fixed and Variable Payments (Gastos)
-        const [fixed] = await pool.query('SELECT id_metodo_pago, monto as amount_usd, tasa_dia FROM pago_fijo');
+        // 3. Fixed Payments
+        const [fixed] = await db.query(`SELECT id_metodo_pago, monto as amount_usd, tasa_dia FROM pago_fijo WHERE 1=1 ${tiendaPF}`);
         fixed.forEach(p => {
             const acc = balances[p.id_metodo_pago];
             if (!acc) return;
@@ -89,7 +86,8 @@ exports.getMethodBalances = async () => {
             else acc.balance -= amount;
         });
 
-        const [variable] = await pool.query('SELECT id_metodo_pago, monto_usd, tasa_dia FROM gasto_variable');
+        // 4. Variable Expenses
+        const [variable] = await db.query(`SELECT id_metodo_pago, monto_usd, tasa_dia FROM gasto_variable WHERE 1=1 ${tiendaGV}`);
         variable.forEach(p => {
             const acc = balances[p.id_metodo_pago];
             if (!acc) return;
@@ -99,8 +97,14 @@ exports.getMethodBalances = async () => {
             else acc.balance -= amount;
         });
 
-        // 4. Supplier Invoice Payments
-        const [supplierPayments] = await pool.query('SELECT id_metodo_pago, monto as amount_usd, tasa_dia FROM pago_factura_proveedor');
+        // 5. Supplier Invoice Payments — filter via compra.id_tienda
+        const [supplierPayments] = await db.query(`
+            SELECT pfp.id_metodo_pago, pfp.monto as amount_usd, pfp.tasa_dia
+            FROM pago_factura_proveedor pfp
+            JOIN factura_proveedor fp ON pfp.id_factura_proveedor = fp.id_factura_proveedor
+            JOIN compra c ON fp.id_compra = c.id_compra
+            WHERE 1=1 ${tiendaC}
+        `);
         supplierPayments.forEach(p => {
             const acc = balances[p.id_metodo_pago];
             if (!acc) return;
@@ -110,8 +114,13 @@ exports.getMethodBalances = async () => {
             else acc.balance -= amount;
         });
 
-        // 5. Immediate Purchases
-        const [immediate] = await pool.query('SELECT id_metodo_pago, monto as amount_usd, tasa_dia FROM pago_compra');
+        // 6. Immediate Purchases — filter via compra.id_tienda
+        const [immediate] = await db.query(`
+            SELECT pc.id_metodo_pago, pc.monto as amount_usd, pc.tasa_dia
+            FROM pago_compra pc
+            JOIN compra c ON pc.id_compra = c.id_compra
+            WHERE 1=1 ${tiendaC}
+        `);
         immediate.forEach(p => {
             const acc = balances[p.id_metodo_pago];
             if (!acc) return;
@@ -121,30 +130,24 @@ exports.getMethodBalances = async () => {
             else acc.balance -= amount;
         });
 
-        // 6. Loans (Préstamos) - Income
-        const [loanIncomes] = await pool.query('SELECT id_metodo_pago, monto_prestamo, tasa_dia FROM prestamo');
+        // 7. Loans (Préstamos) - Income
+        const [loanIncomes] = await db.query(`SELECT id_metodo_pago, monto_prestamo, tasa_dia FROM prestamo WHERE 1=1 ${tiendaL}`);
         loanIncomes.forEach(l => {
             const acc = balances[l.id_metodo_pago];
             if (!acc) return;
-            const amount = parseFloat(l.monto_prestamo);
-            // In financeController, loan amount is added directly to Bs or USD accounts
-            acc.balance += amount;
+            acc.balance += parseFloat(l.monto_prestamo);
         });
 
-        // 7. Loan Repayments (Pago de Préstamos) - Expense
-        const [loanRepayments] = await pool.query('SELECT id_metodo_pago, monto, tasa_dia FROM pago_prestamo');
+        // 8. Loan Repayments - Expense
+        const [loanRepayments] = await db.query(`SELECT id_metodo_pago, monto, tasa_dia FROM pago_prestamo`);
         loanRepayments.forEach(p => {
             const acc = balances[p.id_metodo_pago];
             if (!acc) return;
-            const amount = parseFloat(p.monto);
-            // In financeController, loan payment amount is also direct
-            acc.balance -= amount;
+            acc.balance -= parseFloat(p.monto);
         });
 
-        // 8. Commission Payments (Pago de Comisiones) - NEW
-        await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
-        try { await pool.query('ALTER TABLE pago_comision ADD COLUMN nb_beneficiario VARCHAR(100) AFTER id_usuario'); } catch (e) { }
-        const [commissionPayments] = await pool.query('SELECT id_metodo_pago, monto_usd, tasa_dia FROM pago_comision');
+        // 9. Commission Payments
+        const [commissionPayments] = await db.query(`SELECT id_metodo_pago, monto_usd, tasa_dia FROM pago_comision WHERE 1=1 ${tiendaPC}`);
         commissionPayments.forEach(p => {
             const acc = balances[p.id_metodo_pago];
             if (!acc) return;

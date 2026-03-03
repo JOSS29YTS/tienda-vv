@@ -124,7 +124,7 @@ exports.getFinanceSummary = async (req, res) => {
         // Use balanceUtils which correctly accounts for ALL movements:
         // sales, purchases (pago_compra), fixed/variable expenses, commissions, loans, transfers
         const balanceUtils = require('../utils/balanceUtils');
-        const methodBalances = await balanceUtils.getMethodBalances();
+        const methodBalances = await balanceUtils.getMethodBalances(null, tiendaId);
 
         // Map to named totals for the response
         let totalEfectivoBs = 0;
