@@ -186,7 +186,8 @@ const SalesPage = () => {
                 },
                 body: JSON.stringify({
                     rows: cleanRows,
-                    rate: Math.round((parseFloat(rate) || 0) * 100) / 100
+                    rate: Math.round((parseFloat(rate) || 0) * 100) / 100,
+                    id_tienda: effectiveTiendaId || null
                 })
             });
         } catch (err) {

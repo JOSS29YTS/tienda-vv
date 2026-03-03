@@ -13,18 +13,21 @@ exports.getPaymentMethods = async (req, res) => {
 // Save draft sales (work in progress)
 exports.saveDraftSales = async (req, res) => {
     try {
-        const { rows, rate } = req.body;
+        const { rows, rate, id_tienda } = req.body;
         const userId = req.user.id;
-        // Delete existing draft for this user
+        // id_tienda: puede venir del body (frontend la incluye) o del usuario logueado
+        const tiendaId = id_tienda || req.user.id_tienda || null;
+
+        // Delete existing draft for this user AND this store
         await pool.query(
-            'DELETE FROM venta_borrador WHERE id_usuario = ?',
-            [userId]
+            'DELETE FROM venta_borrador WHERE id_usuario = ? AND (id_tienda = ? OR (id_tienda IS NULL AND ? IS NULL))',
+            [userId, tiendaId, tiendaId]
         );
 
-        // Insert new draft
+        // Insert new draft with store association
         await pool.query(
-            'INSERT INTO venta_borrador (id_usuario, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, NOW(), ?, ?)',
-            [userId, JSON.stringify(rows), rate]
+            'INSERT INTO venta_borrador (id_usuario, id_tienda, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, ?, NOW(), ?, ?)',
+            [userId, tiendaId, JSON.stringify(rows), rate]
         );
 
         res.json({ message: 'Borrador guardado exitosamente' });
@@ -34,31 +37,64 @@ exports.saveDraftSales = async (req, res) => {
     }
 };
 
-// Get all draft sales for today (from all users)
+// Get draft sales filtered by store
 exports.getDraftSales = async (req, res) => {
     try {
-        const [drafts] = await pool.query(`
-            SELECT 
-                vb.id_venta_borrador,
-                vb.id_usuario,
-                vb.datos_venta,
-                vb.tasa_dia,
-                vb.fecha_actualizacion,
-                u.nombre,
-                u.apellido,
-                r.nb_rol as rol
-            FROM venta_borrador vb
-            JOIN usuario u ON vb.id_usuario = u.id_usuario
-            LEFT JOIN rol r ON u.id_rol = r.id_rol
-            ORDER BY vb.fecha_actualizacion DESC
-            LIMIT 100
-        `);
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global'
+            ? parseInt(req.query.tienda)
+            : null;
 
-        // Parse JSON data
+        let query;
+        let params;
+
+        if (tiendaId) {
+            // Filter strictly by this store
+            query = `
+                SELECT 
+                    vb.id_venta_borrador,
+                    vb.id_usuario,
+                    vb.id_tienda,
+                    vb.datos_venta,
+                    vb.tasa_dia,
+                    vb.fecha_actualizacion,
+                    u.nombre,
+                    u.apellido,
+                    r.nb_rol as rol
+                FROM venta_borrador vb
+                JOIN usuario u ON vb.id_usuario = u.id_usuario
+                LEFT JOIN rol r ON u.id_rol = r.id_rol
+                WHERE vb.id_tienda = ?
+                ORDER BY vb.fecha_actualizacion DESC
+                LIMIT 100
+            `;
+            params = [tiendaId];
+        } else {
+            // Global: return all
+            query = `
+                SELECT 
+                    vb.id_venta_borrador,
+                    vb.id_usuario,
+                    vb.id_tienda,
+                    vb.datos_venta,
+                    vb.tasa_dia,
+                    vb.fecha_actualizacion,
+                    u.nombre,
+                    u.apellido,
+                    r.nb_rol as rol
+                FROM venta_borrador vb
+                JOIN usuario u ON vb.id_usuario = u.id_usuario
+                LEFT JOIN rol r ON u.id_rol = r.id_rol
+                ORDER BY vb.fecha_actualizacion DESC
+                LIMIT 100
+            `;
+            params = [];
+        }
+
+        const [drafts] = await pool.query(query, params);
+
         // Parse JSON data robustly
         const parsedDrafts = drafts.map(draft => {
             let datosFinales;
-            // Catch both string and object cases
             if (typeof draft.datos_venta === 'string') {
                 try {
                     datosFinales = JSON.parse(draft.datos_venta);

@@ -94,8 +94,8 @@ app.listen(PORT, async () => {
             { q: "CREATE TABLE IF NOT EXISTS gasto_variable (id_gasto_variable INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tipo_gasto_variable INT, id_metodo_pago INT NULL, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_gasto_variable DATETIME, id_tienda INT NULL, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_tipo_gasto_variable) REFERENCES tipo_gasto_variable(id_tipo_gasto_variable))" },
             { q: "CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, id_tienda INT NULL, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario))" },
             // venta_borrador para drafts
-            { q: "CREATE TABLE IF NOT EXISTS venta_borrador (id_venta_borrador INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT NOT NULL, datos_venta JSON, tasa_dia DECIMAL(14,4), fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario))" },
-            { q: "ALTER TABLE venta_borrador ADD COLUMN id_tienda INT NULL" },
+            { q: "CREATE TABLE IF NOT EXISTS venta_borrador (id_venta_borrador INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT NOT NULL, id_tienda INT NULL, datos_venta JSON, tasa_dia DECIMAL(14,4), fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario))" },
+            { q: "ALTER TABLE venta_borrador ADD COLUMN id_tienda INT NULL", post: "DELETE FROM venta_borrador WHERE id_tienda IS NULL" },
         ];
 
         for (const m of migrations) {
