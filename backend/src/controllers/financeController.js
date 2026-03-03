@@ -335,9 +335,17 @@ exports.createTraspaso = async (req, res) => {
 
 exports.createLoan = async (req, res) => {
     try {
-        const { id_metodo_pago, monto_prestamo, tasa_dia, fecha_prestamo } = req.body;
+        // Accept both FE naming conventions: methodId/amount/rate/date  OR  id_metodo_pago/monto_prestamo/tasa_dia/fecha_prestamo
+        const id_metodo_pago = req.body.id_metodo_pago || req.body.methodId;
+        const monto_prestamo = req.body.monto_prestamo || req.body.amount;
+        const tasa_dia = req.body.tasa_dia || req.body.rate;
+        const fecha_prestamo = req.body.fecha_prestamo || req.body.date;
         const userId = req.user.id;
         const tiendaId = req.body.id_tienda || req.user.id_tienda || 1;
+
+        if (!id_metodo_pago || !monto_prestamo) {
+            return res.status(400).json({ message: 'Debe seleccionar una cuenta y un monto.' });
+        }
         let dateObj = new Date();
         dateObj.setHours(dateObj.getHours() - 4);
         if (fecha_prestamo) {
