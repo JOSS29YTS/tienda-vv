@@ -10,6 +10,9 @@ exports.createPurchase = async (req, res) => {
         const userId = req.user.id; // From authMiddleware
         const tiendaId = req.user.id_tienda || req.body.id_tienda || 1;
 
+        // DEBUG: log everything received
+        console.log('[Purchase] body:', JSON.stringify({ date, rate, rows, payments, invoiceData, tiendaId }, null, 2));
+
         // Calculate Total Purchase Cost first for validation
         let totalPurchaseCost = 0;
         for (const row of rows) {
@@ -116,15 +119,22 @@ exports.createPurchase = async (req, res) => {
 
         // 2a. Record Payments (pago_compra) if immediate
         if (!invoiceData && payments) {
+            console.log('[Purchase] payments received:', JSON.stringify(payments));
             for (const p of payments) {
-                if (!p.methodId) {
+                const methodId = parseInt(p.methodId);
+                const amount = parseFloat(p.amount);
+                if (!p.methodId || isNaN(methodId) || methodId <= 0) {
                     await connection.rollback();
-                    return res.status(400).json({ message: 'Debe seleccionar un método de pago válido para cada pago.' });
+                    return res.status(400).json({ message: `Método de pago inválido (recibido: ${p.methodId}). Seleccione un método válido.` });
+                }
+                if (isNaN(amount) || amount <= 0) {
+                    await connection.rollback();
+                    return res.status(400).json({ message: `Monto de pago inválido (recibido: ${p.amount}). Ingrese un monto válido.` });
                 }
                 await connection.query(
                     `INSERT INTO pago_compra (id_compra, id_metodo_pago, monto, tasa_dia)
                       VALUES (?, ?, ?, ?)`,
-                    [compraId, p.methodId, parseFloat(p.amount), rate]
+                    [compraId, methodId, amount, rate]
                 );
             }
         }
