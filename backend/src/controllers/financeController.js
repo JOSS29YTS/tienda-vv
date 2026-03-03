@@ -369,12 +369,17 @@ exports.getPendingLoans = async (req, res) => {
         const tiendaFilter = tiendaId ? ` WHERE p.id_tienda = ${tiendaId}` : '';
 
         const [loans] = await pool.query(`SELECT p.*, mp.nb_metodo_pago, u.nombre as nb_usuario FROM prestamo p JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago JOIN usuario u ON p.id_usuario = u.id_usuario ${tiendaFilter} ORDER BY p.fecha_prestamo DESC`);
+        const usdKeywordsLocal = ['DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL', 'USD', 'DOLAR', 'EFECTIVO ($)'];
         for (let l of loans) {
             const [payments] = await pool.query('SELECT monto FROM pago_prestamo WHERE id_prestamo = ?', [l.id_prestamo]);
             l.total_pagado = payments.reduce((sum, p) => sum + parseFloat(p.monto), 0);
-            l.pendiente = l.monto_prestamo - l.total_pagado;
+            l.monto_pendiente = parseFloat(l.monto_prestamo) - l.total_pagado;
+            l.pendiente = l.monto_pendiente; // backward compat
+            l.tasa_prestamo = parseFloat(l.tasa_dia) || 1; // alias expected by FE
+            const methodName = (l.nb_metodo_pago || '').toUpperCase();
+            l.is_usd = usdKeywordsLocal.some(k => methodName.includes(k));
         }
-        res.json(loans.filter(l => l.pendiente > 0.05));
+        res.json(loans.filter(l => l.monto_pendiente > 0.05));
     } catch (error) {
         console.error('Error getting pending loans:', error);
         res.status(500).json({ message: 'Error al obtener préstamos pendientes' });
