@@ -102,7 +102,8 @@ exports.createPurchase = async (req, res) => {
         }
 
         // 1. Determine Purchase Status
-        const purchaseStatus = invoiceData ? 'PENDIENTE' : 'PAGADA';
+        // DB values: 'Pendiente', 'Completada', 'Cancelada', 'PAGADA'
+        const purchaseStatus = invoiceData ? 'Pendiente' : 'PAGADA';
 
         // 1. Create Purchase Header (with Status, without single method)
         // Note: id_metodo_pago removed or set NULL
@@ -153,6 +154,20 @@ exports.createPurchase = async (req, res) => {
             // Calculate Unit Cost (Costo Unitario)
             // stored 'costo' column in detalle_compra is Unit Cost
             const unitCost = quantity > 0 ? finalCostBultoUsd / quantity : 0;
+
+            // Validate row fields before DB insert
+            if (!productId || productId === '') {
+                await connection.rollback();
+                return res.status(400).json({ message: `Fila ${rows.indexOf(row) + 1}: debe seleccionar un producto.` });
+            }
+            if (!quantity || parseInt(quantity) <= 0) {
+                await connection.rollback();
+                return res.status(400).json({ message: `Fila ${rows.indexOf(row) + 1}: la cantidad debe ser mayor a 0.` });
+            }
+            if (!pvp || parseFloat(pvp) <= 0) {
+                await connection.rollback();
+                return res.status(400).json({ message: `Fila ${rows.indexOf(row) + 1}: el Precio de Venta (PVP) no puede estar vacío.` });
+            }
 
             // Insert Detail
             await connection.query(
