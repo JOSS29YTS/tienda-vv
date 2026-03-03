@@ -3,7 +3,6 @@ const pool = require('../database/db');
 exports.getHistory = async (req, res) => {
     try {
         const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
-        const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
         const tiendaFilterPF = tiendaId ? ` AND pf.id_tienda = ${tiendaId}` : '';
         const tiendaFilterV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
 
@@ -25,7 +24,10 @@ exports.getHistory = async (req, res) => {
                 FROM pago p
                 JOIN detalle_pago dp ON p.id_pago = dp.id_pago
                 JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                WHERE UPPER(mp.nb_metodo_pago) != 'PENDIENTE POR COBRAR' ${tiendaFilterP}
+                JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
+                JOIN venta v ON dv.id_venta = v.id_venta
+                WHERE UPPER(mp.nb_metodo_pago) != 'PENDIENTE POR COBRAR'
+                ${tiendaId ? ` AND v.id_tienda = ${tiendaId}` : ''}
 
                 UNION ALL
 
@@ -43,6 +45,7 @@ exports.getHistory = async (req, res) => {
             ) AS daily_movements
             GROUP BY DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(tasa_dia, 2), type
             ORDER BY fecha DESC
+            LIMIT 100
         `;
 
         // NEW: Fetch Pending Debts separately (since we don't store them in detalle_pago anymore)

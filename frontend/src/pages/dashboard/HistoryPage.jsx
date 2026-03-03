@@ -8,9 +8,14 @@ import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 
 const HistoryPage = () => {
-    const { effectiveTiendaId } = useStore();
+    const { effectiveTiendaId, selectedTienda, tiendas } = useStore();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Obtener nombre de la tienda para el reporte
+    const currentStoreName = selectedTienda
+        ? selectedTienda.nb_tienda.toUpperCase()
+        : (tiendas.find(t => t.id_tienda === effectiveTiendaId)?.nb_tienda?.toUpperCase() || 'GLOBAL');
 
     useEffect(() => {
         fetchHistory();
@@ -58,7 +63,7 @@ const HistoryPage = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
-        doc.text('ROPA MANIA — HISTORIAL DE VENTAS', 15, 18);
+        doc.text(`${currentStoreName} — HISTORIAL DE VENTAS`, 15, 18);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(`Generado: ${date} ${time}`, 15, 30);
@@ -149,12 +154,12 @@ const HistoryPage = () => {
             doc.setFontSize(7);
             doc.setTextColor(150);
             doc.text(
-                `Reporte generado automáticamente por Ropa Mania System — Pág. ${i} de ${pageCount}`,
+                `Reporte generado automáticamente por ${currentStoreName} System — Pág. ${i} de ${pageCount}`,
                 105, doc.internal.pageSize.height - 6, { align: 'center' }
             );
         }
 
-        doc.save(`Historial_RopaMania_${date.replace(/\//g, '-')}.pdf`);
+        doc.save(`Historial_${currentStoreName.replace(/\s+/g, '_')}_${date.replace(/\//g, '-')}.pdf`);
         toast.success('Historial exportado exitosamente');
     };
 
