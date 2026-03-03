@@ -55,6 +55,18 @@ const DashboardLayout = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Auto-seleccionar primera tienda al entrar a Ventas o Compras desde Global
+    React.useEffect(() => {
+        const isOperationalRoute = location.pathname.includes('/sales') || location.pathname.includes('/purchases');
+        const isInGlobal = !selectedTienda;
+        const hasTiendas = tiendas.length > 0;
+
+        if (isOperationalRoute && isInGlobal && hasTiendas && canSwitchStore) {
+            // Seleccionar la primera tienda automáticamente (ej: Ropa Mania)
+            setSelectedTienda(tiendas[0]);
+        }
+    }, [location.pathname, tiendas]);
+
     let navItems = [
         { to: "/dashboard", icon: FaHome, label: "Inicio" }
     ];
