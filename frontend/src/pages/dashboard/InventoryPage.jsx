@@ -5,6 +5,7 @@ import API_URL from '../../config/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
+import { useStore } from '../../context/StoreContext';
 
 const InventoryPage = () => {
     const [products, setProducts] = useState([]);
@@ -16,14 +17,17 @@ const InventoryPage = () => {
     const [reportYear, setReportYear] = useState(new Date().getFullYear());
     const [generatingReport, setGeneratingReport] = useState(false);
 
+    const { effectiveTiendaId, tiendas } = useStore();
+
     useEffect(() => {
         fetchInventory();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const fetchInventory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/inventory`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/inventory${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -42,7 +46,8 @@ const InventoryPage = () => {
         setGeneratingReport(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/inventory/report?month=${reportMonth}&year=${reportYear}`, {
+            const tiendaParam = effectiveTiendaId ? `&tienda=${effectiveTiendaId}` : '&tienda=global';
+            const response = await fetch(`${API_URL}/api/inventory/report?month=${reportMonth}&year=${reportYear}${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -61,7 +66,10 @@ const InventoryPage = () => {
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(22);
             doc.setFont('helvetica', 'bold');
-            doc.text("ROPA MANIA", 105, 15, { align: 'center' });
+            const currentStore = tiendas.find(t => t.id_tienda == effectiveTiendaId);
+            const storeTitle = currentStore ? currentStore.nb_tienda.toUpperCase() : "TODAS LAS TIENDAS";
+
+            doc.text(storeTitle, 105, 15, { align: 'center' });
 
             doc.setFontSize(14);
             doc.setFont('helvetica', 'normal');

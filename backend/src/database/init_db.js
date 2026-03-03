@@ -1,76 +1,29 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
-const bcrypt = require('bcrypt');
-require('dotenv').config();
-
-// ============================================================
-// 🛑 PROTECCIÓN DE PRODUCCIÓN
-// Este script BORRARÁ y RECREARÁ la base de datos.
-// NUNCA debe ejecutarse en el entorno de Railway (producción).
-// ============================================================
-if (process.env.NODE_ENV === 'production') {
-    console.error('❌ ERROR CRÍTICO: init_db.js NO puede ejecutarse en producción.');
-    console.error('   Este script destruiría todos los datos de la base de datos.');
-    console.error('   Si necesitas inicializar la DB, hazlo en un entorno local primero.');
-    process.exit(1);
-}
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 async function initDB() {
-    try {
-        const connection = await mysql.createConnection({
-            host: process.env.DB_HOST || 'localhost',
-            user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || '',
-            multipleStatements: true
-        });
+    // Connect WITHOUT specifying DB to allow CREATE DATABASE
+    const conn = await mysql.createConnection({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        multipleStatements: true
+    });
 
-        console.log('Conectado a MySQL...');
+    console.log('✅ Conectado a MySQL');
 
-        // Read schema
-        const schemaPath = path.join(__dirname, 'schema.sql');
-        const schema = fs.readFileSync(schemaPath, 'utf8');
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    const schema = fs.readFileSync(schemaPath, 'utf8');
 
-        // Execute schema
-        console.log('Ejecutando esquema de base de datos...');
-        await connection.query(schema);
-        console.log('Base de datos y tablas creadas exitosamente.');
+    await conn.query(schema);
+    console.log('✅ Base de datos toda_las_tiendas_db inicializada correctamente');
 
-        // Insert initial user
-        console.log('Insertando usuario inicial...');
-        const passwordHash = await bcrypt.hash('React29d$', 10);
-        const user = {
-            nombre: 'ALEJANDRO',
-            apellido: 'VILLA',
-            email: 'alejandrovilla2912@gmail.com',
-            password: passwordHash,
-            rol: 'contador'
-        };
-
-        // We need to ensure we are using the correct DB for the check
-        await connection.query(`USE ${process.env.DB_NAME}`);
-
-        // Get 'Administrador' Role ID
-        const [rolRows] = await connection.query("SELECT id_rol FROM rol WHERE nb_rol = 'Administrador'");
-        const idAdmin = rolRows.length > 0 ? rolRows[0].id_rol : 1; // Default to 1 if not found (should be there from schema)
-
-        const [rows] = await connection.query('SELECT * FROM usuario WHERE email = ?', [user.email]);
-
-        if (rows.length === 0) {
-            await connection.query(
-                `INSERT INTO usuario (nombre, apellido, email, password, id_rol) VALUES (?, ?, ?, ?, ?)`,
-                [user.nombre, user.apellido, user.email, user.password, idAdmin]
-            );
-            console.log('Usuario inicial (Administrador) creado exitosamente.');
-        } else {
-            console.log('El usuario inicial ya existe.');
-        }
-
-        await connection.end();
-
-    } catch (error) {
-        console.error('Error inicializando la base de datos:', error);
-    }
+    await conn.end();
 }
 
-initDB();
+initDB().catch(err => {
+    console.error('❌ Error al inicializar la base de datos:', err.message);
+    process.exit(1);
+});

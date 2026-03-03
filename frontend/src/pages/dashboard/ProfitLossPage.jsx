@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useAuth } from '../../context/AuthContext';
+import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -104,6 +105,7 @@ const periodLabel = (period, startDate, endDate) => {
 const ProfitLossPage = () => {
     const { rate } = useRate();
     const { user } = useAuth();
+    const { effectiveTiendaId, selectedTienda } = useStore();
     const [period, setPeriod] = useState('month');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -116,7 +118,8 @@ const ProfitLossPage = () => {
         setError('');
         try {
             const token = localStorage.getItem('token');
-            let url = `${API_URL}/api/profit-loss?period=${period}`;
+            const tiendaParam = effectiveTiendaId ? `&tienda=${effectiveTiendaId}` : '&tienda=global';
+            let url = `${API_URL}/api/profit-loss?period=${period}${tiendaParam}`;
             if (period === 'custom' && startDate && endDate) {
                 url += `&startDate=${startDate}&endDate=${endDate}`;
             }
@@ -135,7 +138,7 @@ const ProfitLossPage = () => {
 
     useEffect(() => {
         if (period !== 'custom') fetchData();
-    }, [period]);
+    }, [period, effectiveTiendaId]);
 
     const handleGenerateReport = () => {
         if (!data || !resumen) {
@@ -159,7 +162,8 @@ const ProfitLossPage = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
-        doc.text('ROPA MANIA — BALANCE FINANCIERO', 15, 18);
+        const tiendaName = selectedTienda ? selectedTienda.nb_tienda.toUpperCase() : 'ROPA MANIA';
+        doc.text(`${tiendaName} — BALANCE FINANCIERO`, 15, 18);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(`Período: ${label}`, 15, 28);

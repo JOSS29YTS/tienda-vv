@@ -2,22 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCalendarAlt, FaMoneyBillWave, FaExchangeAlt, FaChevronDown, FaChevronUp, FaFilePdf } from 'react-icons/fa';
 import API_URL from '../../config/api';
+import { useStore } from '../../context/StoreContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 
 const HistoryPage = () => {
+    const { effectiveTiendaId } = useStore();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchHistory();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const fetchHistory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/history`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/history${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();

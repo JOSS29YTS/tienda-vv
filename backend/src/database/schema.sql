@@ -1,14 +1,11 @@
 -- ==========================================================
 -- 1. CREACIÓN DE LA BASE DE DATOS
 -- ==========================================================
--- ⚠️ SEGURIDAD: NO uses DROP DATABASE en producción.
--- Este script solo debe ejecutarse UNA VEZ para inicializar la DB.
--- En producción (Railway), ejecutar init-db BORRARÁ TODOS LOS DATOS.
-CREATE DATABASE IF NOT EXISTS tienda_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE tienda_db;
+CREATE DATABASE IF NOT EXISTS toda_las_tiendas_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE toda_las_tiendas_db;
 
 -- ==========================================================
--- 2. TABLAS CATÁLOGO
+-- 2. TABLAS CATÁLOGO BASE
 -- ==========================================================
 
 CREATE TABLE estado (
@@ -18,7 +15,8 @@ CREATE TABLE estado (
 
 CREATE TABLE metodo_pago (
     id_metodo_pago INT AUTO_INCREMENT PRIMARY KEY,
-    nb_metodo_pago VARCHAR(50) NOT NULL
+    nb_metodo_pago VARCHAR(50) NOT NULL,
+    saldo_inicial DECIMAL(14,4) DEFAULT 0
 );
 
 CREATE TABLE categoria (
@@ -32,39 +30,61 @@ CREATE TABLE rol (
 );
 
 -- ==========================================================
--- 3. TABLAS DE PERSONAS
+-- 3. TABLA DE TIENDAS (NUEVA - MULTI-TIENDA)
 -- ==========================================================
+-- Cada tienda tiene su nombre, correo de contacto y color visual
+CREATE TABLE tienda (
+    id_tienda INT AUTO_INCREMENT PRIMARY KEY,
+    nb_tienda VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(255) NULL,
+    color VARCHAR(20) DEFAULT '#6366f1',
+    activa TINYINT(1) DEFAULT 1,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
--- Tabla de Empleados (Con Roles y Aprobación)
+-- Insertar las 3 tiendas del dueño
+INSERT INTO tienda (nb_tienda, descripcion, color) VALUES
+('Tienda A', 'Primera sucursal', '#6366f1'),
+('Tienda B', 'Segunda sucursal', '#10b981'),
+('Tienda C', 'Tercera sucursal', '#f59e0b');
+
+-- ==========================================================
+-- 4. TABLAS DE PERSONAS
+-- ==========================================================
+-- id_tienda NULL = Administrador/Dueño con acceso global
 CREATE TABLE usuario (
     id_usuario INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     apellido VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL, 
+    password VARCHAR(255) NOT NULL,
     id_rol INT NOT NULL,
+    id_tienda INT NULL,  -- NULL = acceso global (dueño/admin), valor = pertenece a esa tienda
     activo TINYINT(1) DEFAULT 1,
     fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
+    FOREIGN KEY (id_rol) REFERENCES rol(id_rol),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda)
 );
 
 -- ==========================================================
--- 4. TABLAS DE INVENTARIO
+-- 5. TABLAS DE INVENTARIO
 -- ==========================================================
-
+-- Los productos pueden pertenecer a una tienda específica o ser globales
 CREATE TABLE producto (
     id_producto INT AUTO_INCREMENT PRIMARY KEY,
     nb_producto VARCHAR(150) NOT NULL,
-    codigo_de_barra VARCHAR(100) NULL UNIQUE, -- Added Barcode
+    codigo_de_barra VARCHAR(100) NULL UNIQUE,
     precio DECIMAL(14, 4) NOT NULL,
     id_categoria INT,
     id_estado INT NOT NULL,
+    id_tienda INT NULL,  -- NULL = producto global / compartido
     FOREIGN KEY (id_categoria) REFERENCES categoria(id_categoria),
-    FOREIGN KEY (id_estado) REFERENCES estado(id_estado)
+    FOREIGN KEY (id_estado) REFERENCES estado(id_estado),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda)
 );
 
 -- ==========================================================
--- 5. MÓDULO DE COMPRAS
+-- 6. MÓDULO DE COMPRAS
 -- ==========================================================
 CREATE TABLE estado_compra (
     id_estado_compra INT AUTO_INCREMENT PRIMARY KEY,
@@ -74,14 +94,14 @@ CREATE TABLE estado_compra (
 CREATE TABLE compra (
     id_compra INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
+    id_tienda INT NULL,  -- Tienda que realizó la compra
     tasa_dia DECIMAL(14, 4) NOT NULL,
     total_compra DECIMAL(14, 4) NOT NULL,
     id_estado_compra INT NOT NULL,
-    id_metodo_pago INT NOT NULL,
     fecha_compra DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
-    FOREIGN KEY (id_estado_compra) REFERENCES estado_compra(id_estado_compra),
-    FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda),
+    FOREIGN KEY (id_estado_compra) REFERENCES estado_compra(id_estado_compra)
 );
 
 CREATE TABLE detalle_compra (
@@ -97,15 +117,16 @@ CREATE TABLE detalle_compra (
 );
 
 -- ==========================================================
--- 6. MÓDULO DE VENTAS
+-- 7. MÓDULO DE VENTAS
 -- ==========================================================
-
 CREATE TABLE venta (
     id_venta INT AUTO_INCREMENT PRIMARY KEY,
-    id_usuario INT NOT NULL,  -- ¿Quién hizo la venta?
+    id_usuario INT NOT NULL,
+    id_tienda INT NOT NULL,  -- Tienda donde se realizó la venta
     fecha_venta DATETIME DEFAULT CURRENT_TIMESTAMP,
     tasa_dia DECIMAL(14, 4) NOT NULL,
-    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda)
 );
 
 CREATE TABLE detalle_venta (
@@ -119,15 +140,11 @@ CREATE TABLE detalle_venta (
 );
 
 -- ==========================================================
--- 7. MÓDULO DE PAGOS
+-- 8. MÓDULO DE PAGOS
 -- ==========================================================
-
 CREATE TABLE pago (
     id_pago INT AUTO_INCREMENT PRIMARY KEY,
-    id_detalle_venta INT NULL, -- Enlazado a detalle de venta ahora? O venta? 
-    -- EL CODIGO ACTUAL USA id_detalle_venta en PAGO?
-    -- Checked controller: 'INSERT INTO pago (id_detalle_venta, ...)' 
-    -- YES. The controller links payment to Detail.
+    id_detalle_venta INT NULL,
     tasa_dia DECIMAL(14, 4) NOT NULL,
     fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_detalle_venta) REFERENCES detalle_venta(id_detalle_venta)
@@ -142,38 +159,27 @@ CREATE TABLE detalle_pago (
     FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
 );
 
-
 -- ==========================================================
--- 8. MÓDULO DE CONFIGURACIÓN
+-- 9. MÓDULO DE CONFIGURACIÓN
 -- ==========================================================
-
 CREATE TABLE configuracion (
     id_configuracion INT AUTO_INCREMENT PRIMARY KEY,
     clave VARCHAR(50) UNIQUE NOT NULL,
-    valor VARCHAR(255) NOT NULL, -- Ej: '40.50'
+    valor VARCHAR(255) NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '0.00');
 
-INSERT INTO categoria (nb_categoria) VALUES 
-('Camisa'), 
-('Pantalón'), 
-('Ropa interior'), 
-('Mono'), 
-('Short'), 
-('Pijama'), 
-('Sweater');
-
-
 -- ==========================================================
--- 9. TABLAS FINANCIERAS Y PROVEEDORES
+-- 10. TABLAS FINANCIERAS Y PROVEEDORES
 -- ==========================================================
-
 CREATE TABLE proveedor (
     id_proveedor INT AUTO_INCREMENT PRIMARY KEY,
     nb_proveedor VARCHAR(100) NOT NULL,
-    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+    id_tienda INT NULL,  -- NULL = proveedor global / compartido
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda)
 );
 
 CREATE TABLE factura_proveedor (
@@ -220,12 +226,14 @@ CREATE TABLE tipo_pago_fijo (
 CREATE TABLE pago_fijo (
     id_pago_fijo INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
+    id_tienda INT NOT NULL,  -- Tienda que realizó el pago fijo
     id_tipo_pago_fijo INT NOT NULL,
     id_metodo_pago INT NOT NULL,
     monto DECIMAL(14, 4) NOT NULL,
     tasa_dia DECIMAL(14, 4) NOT NULL,
     fecha_pago_fijo DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda),
     FOREIGN KEY (id_tipo_pago_fijo) REFERENCES tipo_pago_fijo(id_tipo_pago_fijo),
     FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
 );
@@ -233,11 +241,13 @@ CREATE TABLE pago_fijo (
 CREATE TABLE prestamo (
     id_prestamo INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
+    id_tienda INT NOT NULL,
     id_metodo_pago INT NOT NULL,
     monto_prestamo DECIMAL(14, 4) NOT NULL,
     tasa_dia DECIMAL(14, 4) NOT NULL,
     fecha_prestamo DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda),
     FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
 );
 
@@ -255,14 +265,30 @@ CREATE TABLE pago_prestamo (
 CREATE TABLE traspaso (
     id_traspaso INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
+    id_tienda INT NOT NULL,
     id_metodo_origen INT NOT NULL,
     id_metodo_destino INT NOT NULL,
     monto DECIMAL(14, 4) NOT NULL,
     tasa_dia DECIMAL(14, 4) NOT NULL,
     fecha_traspaso DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda),
     FOREIGN KEY (id_metodo_origen) REFERENCES metodo_pago(id_metodo_pago),
     FOREIGN KEY (id_metodo_destino) REFERENCES metodo_pago(id_metodo_pago)
+);
+
+CREATE TABLE pago_comision (
+    id_pago_comision INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_tienda INT NOT NULL,
+    nb_beneficiario VARCHAR(100),
+    id_metodo_pago INT NOT NULL,
+    monto_usd DECIMAL(10,2),
+    tasa_dia DECIMAL(10,2),
+    fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda),
+    FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago)
 );
 
 CREATE TABLE venta_borrador (
@@ -274,12 +300,39 @@ CREATE TABLE venta_borrador (
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
 );
 
-INSERT INTO rol (nb_rol) VALUES 
-('Administrador'), 
-('Gerente'), 
+-- ==========================================================
+-- 11. DATOS INICIALES
+-- ==========================================================
+INSERT INTO rol (nb_rol) VALUES
+('Administrador'),
+('Gerente'),
 ('Vendedor');
 
-INSERT INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES 
+INSERT INTO estado (nb_estado) VALUES
+('Activo'),
+('Inactivo');
+
+INSERT INTO metodo_pago (nb_metodo_pago) VALUES
+('Efectivo'),
+('Punto'),
+('Pago Móvil'),
+('Zelle');
+
+INSERT INTO categoria (nb_categoria) VALUES
+('Camisa'),
+('Pantalón'),
+('Ropa interior'),
+('Mono'),
+('Short'),
+('Pijama'),
+('Sweater');
+
+INSERT INTO estado_compra (nb_estado_compra) VALUES
+('PENDIENTE'),
+('PAGADA'),
+('CANCELADA');
+
+INSERT INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES
 ('ALQUILER'),
 ('ASEO'),
 ('LUZ'),

@@ -1,0 +1,7 @@
+compra: YES
+venta: YES
+pago_fijo: YES
+gasto_variable: YES
+pago_comision: YES
+pago_factura_proveedor: NO
+prestamo: YES

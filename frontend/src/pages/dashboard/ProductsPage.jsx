@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash, FaBarcode, FaHistory, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import { useAuth } from '../../context/AuthContext';
+import { useStore } from '../../context/StoreContext';
+import toast, { Toaster } from 'react-hot-toast';
 import API_URL from '../../config/api';
 
 const ProductsPage = () => {
+    const { user } = useAuth();
+    const { effectiveTiendaId } = useStore();
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -168,7 +173,7 @@ const ProductsPage = () => {
     useEffect(() => {
         fetchProducts();
         fetchCategories();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const fetchCategories = async () => {
         try {
@@ -187,7 +192,11 @@ const ProductsPage = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/products`);
+            const token = localStorage.getItem('token');
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/products${tiendaParam}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (!response.ok) throw new Error('Error al cargar productos');
             const data = await response.json();
             setProducts(data);

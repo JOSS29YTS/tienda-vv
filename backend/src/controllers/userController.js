@@ -2,10 +2,16 @@ const pool = require('../database/db');
 
 exports.getAllUsers = async (req, res) => {
     try {
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        const tiendaFilter = tiendaId ? ` WHERE u.id_tienda = ${tiendaId}` : '';
+
         const [users] = await pool.query(`
-            SELECT u.id_usuario, u.nombre, u.apellido, u.email, r.nb_rol as rol, u.activo 
+            SELECT u.id_usuario, u.nombre, u.apellido, u.email, r.nb_rol as rol, 
+                   u.activo, u.id_tienda, t.nb_tienda
             FROM usuario u 
             LEFT JOIN rol r ON u.id_rol = r.id_rol
+            LEFT JOIN tienda t ON u.id_tienda = t.id_tienda
+            ${tiendaFilter}
         `);
         res.json(users);
     } catch (error) {
@@ -40,11 +46,32 @@ exports.updateUserRole = async (req, res) => {
     }
 };
 
+exports.updateUserStore = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { id_tienda } = req.body; // null = acceso global
+
+        const [result] = await pool.query(
+            'UPDATE usuario SET id_tienda = ? WHERE id_usuario = ?',
+            [id_tienda || null, id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        res.json({ message: 'Tienda asignada exitosamente' });
+    } catch (error) {
+        console.error('Error updating user store:', error);
+        res.status(500).json({ message: 'Error al asignar tienda' });
+    }
+};
+
 exports.deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Usamos Soft Delete para evitar errores de restricción de llave foránea if the user has sales/history
+        // Soft Delete para preservar historial
         const [result] = await pool.query('UPDATE usuario SET activo = 0 WHERE id_usuario = ?', [id]);
 
         if (result.affectedRows === 0) {

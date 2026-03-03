@@ -36,6 +36,7 @@ const PlaceholderComponent = ({ title }) => (
 
 import { AuthProvider } from './context/AuthContext';
 import { RateProvider } from './context/RateContext';
+import { StoreProvider } from './context/StoreContext';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
@@ -43,58 +44,60 @@ function App() {
   return (
     <AuthProvider>
       <RateProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <StoreProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-            {/* Protected Dashboard Routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<DashboardHome />} />
-              <Route path="products" element={<ProductsPage />} />
-              <Route path="inventory" element={
-                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
-                  <InventoryPage />
+              {/* Protected Dashboard Routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <DashboardLayout />
                 </ProtectedRoute>
-              } />
-              <Route path="sales" element={<SalesPage />} />
-              <Route path="purchases" element={<PurchasesPage />} />
-              <Route path="clients" element={<ClientsPage />} />
-              <Route path="invoices" element={
-                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
-                  <InvoicesPage />
-                </ProtectedRoute>
-              } />
-              <Route path="commissions" element={
-                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
-                  <CommissionsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="finances" element={
-                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
-                  <FinancesPage />
-                </ProtectedRoute>
-              } />
-              <Route path="profit-loss" element={
-                <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
-                  <ProfitLossPage />
-                </ProtectedRoute>
-              } />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="history" element={<HistoryPage />} />
-            </Route>
+              }>
+                <Route index element={<DashboardHome />} />
+                <Route path="products" element={<ProductsPage />} />
+                <Route path="inventory" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <InventoryPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="sales" element={<SalesPage />} />
+                <Route path="purchases" element={<PurchasesPage />} />
+                <Route path="clients" element={<ClientsPage />} />
+                <Route path="invoices" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <InvoicesPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="commissions" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <CommissionsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="finances" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <FinancesPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="profit-loss" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <ProfitLossPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="history" element={<HistoryPage />} />
+              </Route>
 
 
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes >
-        </BrowserRouter >
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes >
+          </BrowserRouter >
+        </StoreProvider>
       </RateProvider>
     </AuthProvider >
   );

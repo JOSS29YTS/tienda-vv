@@ -13,16 +13,19 @@ exports.verifyToken = async (req, res, next) => {
         const secret = process.env.JWT_SECRET || 'secreto_super_seguro';
         const decoded = jwt.verify(token, secret);
 
-        // Verify that the user still exists in the database and get role name
+        // Verify that the user still exists in the database and get role name + tienda
         const [users] = await pool.query(`
             SELECT 
                 u.id_usuario, 
                 u.nombre, 
                 u.apellido, 
                 u.email, 
-                r.nb_rol as rol
+                r.nb_rol as rol,
+                u.id_tienda,
+                t.nb_tienda
             FROM usuario u
             LEFT JOIN rol r ON u.id_rol = r.id_rol
+            LEFT JOIN tienda t ON u.id_tienda = t.id_tienda
             WHERE u.id_usuario = ? AND u.activo = 1
         `, [decoded.id]);
 
@@ -36,7 +39,9 @@ exports.verifyToken = async (req, res, next) => {
             nombre: users[0].nombre,
             apellido: users[0].apellido,
             email: users[0].email,
-            rol: users[0].rol
+            rol: users[0].rol,
+            id_tienda: users[0].id_tienda,   // NULL = acceso global (admin/dueño)
+            nb_tienda: users[0].nb_tienda     // Nombre de la tienda o null
         };
 
         next();
@@ -45,6 +50,9 @@ exports.verifyToken = async (req, res, next) => {
         return res.status(403).json({ message: 'Token inválido o expirado.' });
     }
 };
+
+// Alias para compatibilidad con nuevas rutas
+exports.authMiddleware = exports.verifyToken;
 
 exports.isAdmin = (req, res, next) => {
     if (req.user && req.user.rol === 'Administrador') {

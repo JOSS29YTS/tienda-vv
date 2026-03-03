@@ -4,6 +4,7 @@ const userController = require('../controllers/userController');
 
 router.get('/', userController.getAllUsers);
 router.put('/:id/role', userController.updateUserRole);
+router.put('/:id/store', userController.updateUserStore);
 router.patch('/:id/activate', userController.activateUser);
 router.delete('/:id', userController.deleteUser);
 

@@ -2,6 +2,11 @@ const pool = require('../database/db');
 
 exports.getHistory = async (req, res) => {
     try {
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterPF = tiendaId ? ` AND pf.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+
         const query = `
             SELECT 
                 DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
@@ -20,7 +25,7 @@ exports.getHistory = async (req, res) => {
                 FROM pago p
                 JOIN detalle_pago dp ON p.id_pago = dp.id_pago
                 JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-                WHERE UPPER(mp.nb_metodo_pago) != 'PENDIENTE POR COBRAR'
+                WHERE UPPER(mp.nb_metodo_pago) != 'PENDIENTE POR COBRAR' ${tiendaFilterP}
 
                 UNION ALL
 
@@ -34,7 +39,7 @@ exports.getHistory = async (req, res) => {
                 FROM pago_fijo pf
                 JOIN metodo_pago mp ON pf.id_metodo_pago = mp.id_metodo_pago
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-                WHERE tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
+                WHERE tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO' ${tiendaFilterPF}
             ) AS daily_movements
             GROUP BY DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(tasa_dia, 2), type
             ORDER BY fecha DESC
@@ -58,6 +63,7 @@ exports.getHistory = async (req, res) => {
             FROM deuda d
             JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
             JOIN venta v ON dv.id_venta = v.id_venta
+            WHERE 1=1 ${tiendaFilterV}
             GROUP BY DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(v.tasa_dia, 2), type
         `;
 

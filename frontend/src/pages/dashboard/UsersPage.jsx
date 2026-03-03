@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaUserCog, FaSearch, FaCheckCircle, FaExclamationCircle, FaTrash } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
+import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
 
 const UsersPage = () => {
@@ -9,6 +10,7 @@ const UsersPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const { user: currentUser } = useAuth();
+    const { effectiveTiendaId, tiendas } = useStore();
 
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -25,11 +27,15 @@ const UsersPage = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/users`);
+            const token = localStorage.getItem('token');
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/users${tiendaParam}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (!response.ok) throw new Error('Error al cargar usuarios');
             const data = await response.json();
             setUsers(data);
@@ -58,6 +64,33 @@ const UsersPage = () => {
             // Revert on error
             setUsers(originalUsers);
             showNotification('Error al actualizar el rol: ' + err.message, 'error');
+        }
+    };
+    const handleStoreChange = async (userId, newStoreId) => {
+        // Optimistic update
+        const originalUsers = [...users];
+        const storeId = newStoreId === 'null' ? null : parseInt(newStoreId);
+        const storeName = storeId ? tiendas.find(t => t.id_tienda === storeId)?.nb_tienda : 'Global';
+
+        setUsers(users.map(u => u.id_usuario === userId ? { ...u, id_tienda: storeId, nb_tienda: storeName } : u));
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/api/users/${userId}/store`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ id_tienda: storeId })
+            });
+
+            if (!response.ok) throw new Error('Error al asignar tienda');
+            showNotification('Tienda asignada exitosamente');
+
+        } catch (err) {
+            setUsers(originalUsers);
+            showNotification('Error: ' + err.message, 'error');
         }
     };
 
@@ -159,7 +192,8 @@ const UsersPage = () => {
                             <tr className="bg-slate-50/80 border-b border-slate-100">
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Usuario</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Email</th>
-                                <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider">Rol Actual</th>
+                                <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider text-center">Rol</th>
+                                <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider text-center">Tienda Asignada</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider text-center">Estado</th>
                                 <th className="p-4 font-bold text-slate-700 text-sm uppercase tracking-wider text-center">Acciones</th>
                             </tr>
@@ -174,7 +208,9 @@ const UsersPage = () => {
                                             </div>
                                             <div>
                                                 <div className="font-bold text-slate-800">{user.nombre} {user.apellido}</div>
-                                                <div className="text-xs text-slate-400 font-medium">ID: {user.id_usuario}</div>
+                                                <div className="text-xs text-slate-400 font-medium">
+                                                    ID: {user.id_usuario} {user.nb_tienda ? `| Tienda: ${user.nb_tienda}` : '| Global'}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -198,6 +234,28 @@ const UsersPage = () => {
                                                 <option value="Gerente">Gerente</option>
                                             </select>
                                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <div className="relative inline-block">
+                                            <select
+                                                value={user.id_tienda || 'null'}
+                                                onChange={(e) => handleStoreChange(user.id_usuario, e.target.value)}
+                                                disabled={currentUser && user.id_usuario === currentUser.id_usuario}
+                                                className={`
+                                                    appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-xs font-bold shadow-sm outline-none transition-all cursor-pointer bg-white
+                                                    ${user.id_tienda ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 focus:ring-slate-200'}
+                                                    disabled:opacity-50 disabled:cursor-not-allowed
+                                                `}
+                                            >
+                                                <option value="null">🌐 Acceso Global</option>
+                                                {tiendas.map(t => (
+                                                    <option key={t.id_tienda} value={t.id_tienda}>🏪 {t.nb_tienda}</option>
+                                                ))}
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500 font-bold">
                                                 <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                                             </div>
                                         </div>

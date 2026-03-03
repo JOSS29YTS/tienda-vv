@@ -8,6 +8,7 @@ exports.createPurchase = async (req, res) => {
 
         const { date, rate, rows, payments, invoiceData } = req.body;
         const userId = req.user.id; // From authMiddleware
+        const tiendaId = req.user.id_tienda || req.body.id_tienda || 1;
 
         // Calculate Total Purchase Cost first for validation
         let totalPurchaseCost = 0;
@@ -106,9 +107,9 @@ exports.createPurchase = async (req, res) => {
         // 1. Create Purchase Header (with Status, without single method)
         // Note: id_metodo_pago removed or set NULL
         const [compraResult] = await connection.query(
-            `INSERT INTO compra (id_usuario, tasa_dia, fecha_compra, id_estado_compra, total_compra) 
-             VALUES (?, ?, ?, (SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = ? LIMIT 1), ?)`,
-            [userId, rate, finalDate, purchaseStatus, totalPurchaseCost]
+            `INSERT INTO compra (id_usuario, id_tienda, tasa_dia, fecha_compra, id_estado_compra, total_compra) 
+             VALUES (?, ?, ?, ?, (SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = ? LIMIT 1), ?)`,
+            [userId, tiendaId, rate, finalDate, purchaseStatus, totalPurchaseCost]
         );
         const compraId = compraResult.insertId;
 
@@ -182,8 +183,8 @@ exports.createPurchase = async (req, res) => {
 
             if (isNew && providerName) {
                 const [provResult] = await connection.query(
-                    'INSERT INTO proveedor (nb_proveedor) VALUES (?)',
-                    [providerName]
+                    'INSERT INTO proveedor (nb_proveedor, id_tienda) VALUES (?, ?)',
+                    [providerName, tiendaId]
                 );
                 finalProviderId = provResult.insertId;
             }

@@ -9,6 +9,12 @@ exports.getDashboardStats = async (req, res) => {
         const prevMonth = prevMonthDate.getMonth() + 1;
         const prevMonthYear = prevMonthDate.getFullYear();
 
+        // Filtro de tienda
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        const tiendaFilter = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterGeneric = tiendaId ? ` AND id_tienda = ${tiendaId}` : '';
+
         // 1. Total Sales (Current Month vs Prev Month)
         // Helper to get total sales for a specific month/year
         // MODIFIED: Sum actual payments excluding "PENDIENTE POR COBRAR"
@@ -23,6 +29,7 @@ exports.getDashboardStats = async (req, res) => {
                 WHERE MONTH(v.fecha_venta) = ? 
                 AND YEAR(v.fecha_venta) = ?
                 AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                ${tiendaFilter}
             `;
             const [rows] = await pool.query(query, [month, year]);
             return parseFloat(rows[0].total);
@@ -40,6 +47,7 @@ exports.getDashboardStats = async (req, res) => {
                 WHERE MONTH(pf.fecha_pago_fijo) = ? 
                 AND YEAR(pf.fecha_pago_fijo) = ?
                 AND tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
+                ${tiendaFilterGeneric.replace('id_tienda', 'pf.id_tienda')}
             `;
             const [rows] = await pool.query(query, [month, year]);
             return parseFloat(rows[0].total);
@@ -66,6 +74,7 @@ exports.getDashboardStats = async (req, res) => {
                 JOIN compra c ON fp.id_compra = c.id_compra
                 JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
                 WHERE ec.nb_estado_compra = 'PENDIENTE'
+                ${tiendaFilterGeneric.replace('id_tienda', 'c.id_tienda')}
             `;
             const [rows] = await pool.query(query);
             return rows[0].count;
@@ -81,6 +90,7 @@ exports.getDashboardStats = async (req, res) => {
                 mp.nb_metodo_pago
             FROM prestamo p
             JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE 1=1 ${tiendaFilterP}
         `);
 
         for (const loan of loans) {
@@ -122,13 +132,13 @@ exports.getDashboardStats = async (req, res) => {
 
         // 3. Total Products (Assuming all products are "active" for now or check status if exists)
         // 3. Total Products (Active Only & Exclude Avance)
-        const [prodRows] = await pool.query("SELECT COUNT(*) as count FROM producto WHERE nb_producto != 'AVANCE DE EFECTIVO' AND id_estado = 1");
+        const [prodRows] = await pool.query(`SELECT COUNT(*) as count FROM producto p WHERE nb_producto != 'AVANCE DE EFECTIVO' AND id_estado = 1 ${tiendaFilterP}`);
         const totalProducts = prodRows[0].count;
 
         // 4. Clients (Total count) — safe fallback if table doesn't exist
         let totalClients = 0;
         try {
-            const [clientRows] = await pool.query('SELECT COUNT(*) as count FROM cliente');
+            const [clientRows] = await pool.query(`SELECT COUNT(*) as count FROM cliente WHERE 1=1 ${tiendaFilterGeneric}`);
             totalClients = clientRows[0].count;
         } catch (_) { totalClients = 0; }
 
@@ -147,6 +157,7 @@ exports.getDashboardStats = async (req, res) => {
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
             WHERE v.fecha_venta >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            ${tiendaFilter}
             GROUP BY YEAR(v.fecha_venta), MONTH(v.fecha_venta)
             ORDER BY YEAR(v.fecha_venta), MONTH(v.fecha_venta)
         `;
@@ -158,14 +169,17 @@ exports.getDashboardStats = async (req, res) => {
         const initRate = Math.round((parseFloat(initRateConfig[0]?.valor) || 1) * 100) / 100;
 
         let initialUSD = 0;
-        for (const m of initMethods) {
-            const val = parseFloat(m.saldo_inicial) || 0;
-            if (val <= 0) continue;
-            const name = m.nb_metodo_pago.toUpperCase();
-            if (name.includes('ZELLE') || name.includes('USD') || name.includes('DIVISA') || name.includes('DOLAR')) {
-                initialUSD += val;
-            } else {
-                initialUSD += (val / initRate);
+        // Solo mostrar saldo inicial si estamos en Global o en la tienda principal (id_tienda = 1)
+        if (!tiendaId || tiendaId === 1) {
+            for (const m of initMethods) {
+                const val = parseFloat(m.saldo_inicial) || 0;
+                if (val <= 0) continue;
+                const name = m.nb_metodo_pago.toUpperCase();
+                if (name.includes('ZELLE') || name.includes('USD') || name.includes('DIVISA') || name.includes('DOLAR')) {
+                    initialUSD += val;
+                } else {
+                    initialUSD += (val / initRate);
+                }
             }
         }
 
@@ -197,6 +211,7 @@ exports.getDashboardStats = async (req, res) => {
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
             WHERE DATE(v.fecha_venta) = CURDATE()
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            ${tiendaFilter}
         `);
         const todaySales = parseFloat(todayRows[0].total);
 
@@ -212,6 +227,7 @@ exports.getDashboardStats = async (req, res) => {
             LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+            ${tiendaFilter}
             GROUP BY p.id_producto
             ORDER BY sold DESC
             LIMIT 5
@@ -226,6 +242,7 @@ exports.getDashboardStats = async (req, res) => {
             JOIN producto p ON dv.id_producto = p.id_producto
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
+            ${tiendaFilter}
         `, [currentMonth, currentYear]);
         const totalProductsSold = parseInt(totalSoldRows[0].total) || 0;
 

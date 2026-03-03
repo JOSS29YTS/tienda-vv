@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FaMoneyBillWave, FaUserTie, FaUserTag } from 'react-icons/fa';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
+import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
 import { useRate } from '../../context/RateContext';
 
@@ -75,6 +76,7 @@ const StatCard = ({ title, bgClass, textClass, icon: Icon, stats, onPay }) => {
 const CommissionsPage = () => {
     const { rate } = useRate();
     const { logout } = useAuth();
+    const { effectiveTiendaId } = useStore();
     const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -114,7 +116,7 @@ const CommissionsPage = () => {
     useEffect(() => {
         fetchCommissions();
         fetchMethods();
-    }, [selectedMonth, selectedYear]);
+    }, [selectedMonth, selectedYear, effectiveTiendaId]);
 
     const fetchMethods = async () => {
         try {
@@ -137,7 +139,8 @@ const CommissionsPage = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/commissions?month=${selectedMonth}&year=${selectedYear}`, {
+            const tiendaParam = effectiveTiendaId ? `&tienda=${effectiveTiendaId}` : '&tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/commissions?month=${selectedMonth}&year=${selectedYear}${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -204,6 +207,7 @@ const CommissionsPage = () => {
                     id_metodo_pago: selectedMethod,
                     monto_usd: Math.round(payInfo.amount * 100) / 100,
                     tasa_dia: Math.round((parseFloat(rate) || 0) * 100) / 100,
+                    id_tienda: effectiveTiendaId || 1,
                     month: selectedMonth,
                     year: selectedYear
                 })

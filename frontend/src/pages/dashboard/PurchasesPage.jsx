@@ -5,6 +5,7 @@ import Tesseract from 'tesseract.js';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext';
+import { useStore } from '../../context/StoreContext';
 
 import { useRate } from '../../context/RateContext';
 import API_URL from '../../config/api';
@@ -14,6 +15,7 @@ const PurchasesPage = () => {
     const { rate, setRate } = useRate();
     const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const { user } = useAuth();
+    const { effectiveTiendaId } = useStore();
     const [date, setDate] = useState(() => {
         const d = new Date();
         const yyyy = d.getFullYear();
@@ -157,7 +159,7 @@ const PurchasesPage = () => {
     useEffect(() => {
         fetchProducts();
         fetchPaymentMethods();
-    }, []);
+    }, [effectiveTiendaId]);
 
     // Auto-select first payment method when methods load and there are empty rows
     // (removed - handled directly in handleFinalizeClick)
@@ -200,7 +202,8 @@ const PurchasesPage = () => {
     const fetchProviders = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/suppliers`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/suppliers${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -215,7 +218,8 @@ const PurchasesPage = () => {
     const fetchProducts = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/products`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/products${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -345,6 +349,7 @@ const PurchasesPage = () => {
             const dataToSave = {
                 date,
                 rate: roundedRate,
+                id_tienda: effectiveTiendaId, // Agregado contexto de venta
                 rows: rows.filter(r => r.productId && r.quantity && r.pvp).map(r => ({
                     productId: r.productId,
                     profitPercent: r.profitPercent,

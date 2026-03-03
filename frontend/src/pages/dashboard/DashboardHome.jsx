@@ -37,6 +37,7 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, gradient, foote
 };
 
 import { useAuth } from '../../context/AuthContext';
+import { useStore } from '../../context/StoreContext';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -46,6 +47,7 @@ import API_URL from '../../config/api';
 
 const DashboardHome = () => {
     const { user, logout } = useAuth();
+    const { effectiveTiendaId, selectedTienda, isGlobal } = useStore();
     const navigate = useNavigate();
     const [stats, setStats] = useState(null);
     const [chartData, setChartData] = useState([]);
@@ -56,7 +58,8 @@ const DashboardHome = () => {
         const fetchDashboardData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/api/dashboard/stats`, {
+                const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+                const response = await fetch(`${API_URL}/api/dashboard/stats${tiendaParam}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -79,8 +82,9 @@ const DashboardHome = () => {
             }
         };
 
+        setLoading(true);
         fetchDashboardData();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const handleGenerateReport = () => {
         if (!stats) return;
@@ -189,6 +193,18 @@ const DashboardHome = () => {
                         Hola, <span className="text-orange-600">{user ? user.nombre : 'Usuario'}</span>
                     </h1>
                     <p className="text-slate-500 mt-2 text-lg">Aquí tienes el resumen de tu tienda hoy.</p>
+                    {/* Badge de tienda activa */}
+                    <div className="mt-2">
+                        {isGlobal ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1 rounded-full border border-slate-200">
+                                🌍 Vista Global — Todas las tiendas
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-orange-50 text-orange-600 px-3 py-1 rounded-full border border-orange-200">
+                                🏪 {selectedTienda?.nb_tienda || user?.nb_tienda || 'Mi Tienda'}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <button
                     onClick={handleGenerateReport}

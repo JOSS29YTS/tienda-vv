@@ -1,8 +1,11 @@
 const pool = require('../database/db');
-const balanceUtils = require('../utils/balanceUtils'); // Import Balance Utils
+const balanceUtils = require('../utils/balanceUtils');
 
 exports.getPendingInvoices = async (req, res) => {
     try {
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        const tiendaFilter = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
+
         const [invoices] = await pool.query(`
             SELECT 
                 fp.*, 
@@ -12,7 +15,7 @@ exports.getPendingInvoices = async (req, res) => {
             JOIN proveedor p ON fp.id_proveedor = p.id_proveedor
             JOIN compra c ON fp.id_compra = c.id_compra
             JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
-            WHERE ec.nb_estado_compra = 'PENDIENTE'
+            WHERE ec.nb_estado_compra = 'PENDIENTE' ${tiendaFilter}
             ORDER BY fp.fecha_finalizacion ASC
         `);
 
@@ -36,6 +39,8 @@ exports.payInvoice = async (req, res) => {
 
         const { id_factura_proveedor, id_metodo_pago, monto, tasa_dia, fecha_pago } = req.body;
         const userId = req.user.id;
+        const tiendaId = req.body.id_tienda || req.user.id_tienda || 1;
+        const rate = parseFloat(tasa_dia);
 
         // 1. Fetch Invoice Info & Current Payments (Locking the row)
         const [invoice] = await connection.query(
@@ -60,25 +65,21 @@ exports.payInvoice = async (req, res) => {
         // VALIDACIÓN DUAL (Facturas son USD, pero se valida el excedente en Bs)
         const finalPaymentUsd = Math.round(paymentAmount * 10000) / 10000;
         const finalRemainingUsd = Math.round(remainingDebt * 10000) / 10000;
-        const toleranceInUsd = 0.05 / roundedRate;
+        const toleranceInUsd = 0.05 / rate;
 
         if (finalPaymentUsd > (finalRemainingUsd + toleranceInUsd)) {
             await connection.rollback();
-            const paidBs = (paymentAmount * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
-            const remainBs = (remainingDebt * roundedRate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+            const paidBs = (paymentAmount * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
+            const remainBs = (remainingDebt * rate).toLocaleString('es-VE', { minimumFractionDigits: 2 });
             return res.status(400).json({
                 message: `El monto a pagar exceden los bolívares restantes. Deuda: Bs ${remainBs} / Pago: Bs ${paidBs}`
             });
         }
 
         // VALIDATION: Check Sufficient Funds
-        const rate = parseFloat(tasa_dia);
         const methodId = parseInt(id_metodo_pago);
 
-        const balances = await balanceUtils.getMethodBalances(connection); // Pass connection if supported, but utils might not use it yet. 
-        // Note: checking existing balanceUtils, it doesn't take connection. It reads committed data.
-        // This is acceptable for "Suficiente Dinero" check.
-
+        const balances = await balanceUtils.getMethodBalances(connection);
         const method = balances[methodId];
         let requiredAmount = paymentAmount;
         if (method && method.type === 'BS') {
@@ -94,11 +95,6 @@ exports.payInvoice = async (req, res) => {
         // Fix Date Time
         let dateObj = new Date();
         if (fecha_pago) {
-            const datePart = fecha_pago.includes('T') ? fecha_pago.split('T')[0] : fecha_pago.split(' ');
-            if (Array.isArray(datePart)) { // Handle potential split issue
-                // ... handled below
-            }
-            // Simple parsing
             const d = new Date(fecha_pago);
             if (!isNaN(d.getTime())) {
                 dateObj = d;
@@ -115,9 +111,9 @@ exports.payInvoice = async (req, res) => {
         // Insert Payment
         await connection.query(`
             INSERT INTO pago_factura_proveedor 
-            (id_factura_proveedor, id_usuario, id_metodo_pago, monto, tasa_dia, fecha_pago)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `, [id_factura_proveedor, userId, methodId, paymentAmount, rate, formattedDate]);
+            (id_factura_proveedor, id_usuario, id_tienda, id_metodo_pago, monto, tasa_dia, fecha_pago)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [id_factura_proveedor, userId, tiendaId, methodId, paymentAmount, rate, formattedDate]);
 
         // Check if fully paid (Using the values we already calculated + new payment)
         const newTotalPaid = alreadyPaid + paymentAmount;

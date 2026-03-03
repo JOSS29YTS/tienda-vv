@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaMoneyBillWave, FaSearch, FaTimes, FaPlus, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
+import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
 
 const InvoicesPage = () => {
     const { rate } = useRate();
+    const { effectiveTiendaId } = useStore();
     const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const [invoices, setInvoices] = useState([]);
     const [pendingLoans, setPendingLoans] = useState([]); // New state
@@ -28,12 +30,13 @@ const InvoicesPage = () => {
         fetchInvoices();
         fetchPendingLoans(); // Fetch loans
         fetchPaymentMethods();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const fetchInvoices = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/invoices/pending`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/invoices/pending${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -48,7 +51,8 @@ const InvoicesPage = () => {
     const fetchPendingLoans = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/loans/pending`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/loans/pending${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -183,6 +187,7 @@ const InvoicesPage = () => {
                 // LOAN PAYMENT LOGIC (Native Amounts, Bulk)
                 const payload = {
                     loanId: selectedItem.id_prestamo,
+                    id_tienda: effectiveTiendaId || 1,
                     payments: payments.filter(p => p.methodId && p.amount).map(p => ({
                         methodId: p.methodId,
                         amount: parseFloat(p.amount) // Native amount
@@ -250,6 +255,7 @@ const InvoicesPage = () => {
 
                     const payload = {
                         id_factura_proveedor: selectedItem.id_factura_proveedor,
+                        id_tienda: effectiveTiendaId || 1,
                         id_metodo_pago: p.methodId,
                         monto: finalAmount, // All stored payments normalized to USD for debt checking
                         tasa_dia: roundedRate,

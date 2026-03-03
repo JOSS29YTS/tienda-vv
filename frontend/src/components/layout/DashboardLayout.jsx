@@ -1,8 +1,10 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale, FaPercentage } from 'react-icons/fa';
+import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale, FaPercentage, FaStore, FaGlobe, FaChevronDown } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { useRate } from '../../context/RateContext';
+import { useStore } from '../../context/StoreContext';
 
 const SidebarItem = ({ to, icon: Icon, label, active }) => {
     return (
@@ -13,14 +15,23 @@ const SidebarItem = ({ to, icon: Icon, label, active }) => {
     );
 };
 
-import { useRate } from '../../context/RateContext';
+// Colores predefinidos por tienda
+const TIENDA_COLORS = {
+    1: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+    2: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    3: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500' },
+};
+const GLOBAL_COLORS = { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', dot: 'bg-slate-400' };
 
 const DashboardLayout = () => {
     const { user, logout } = useAuth();
     const { rate, setRate } = useRate();
+    const { tiendas, selectedTienda, setSelectedTienda, canSwitchStore } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+    const [showStoreDropdown, setShowStoreDropdown] = React.useState(false);
+    const dropdownRef = React.useRef(null);
 
     // Responsive Sidebar
     React.useEffect(() => {
@@ -33,6 +44,17 @@ const DashboardLayout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Cerrar dropdown al hacer clic fuera
+    React.useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setShowStoreDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     let navItems = [
         { to: "/dashboard", icon: FaHome, label: "Inicio" }
     ];
@@ -43,7 +65,6 @@ const DashboardLayout = () => {
         if (role === 'vendedor') {
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
         } else if (role === 'gerente') {
-            // Gerente sees everything EXCEPT History and Users
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
@@ -54,7 +75,6 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
         } else if (role === 'administrador') {
-            // Admin sees EVERYTHING
             navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
@@ -64,7 +84,7 @@ const DashboardLayout = () => {
             navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
-            navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuario" });
+            navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuarios" });
         }
     }
 
@@ -79,6 +99,11 @@ const DashboardLayout = () => {
         navigate('/');
     };
 
+    // Calcular colores actuales del selector de tienda
+    const currentColors = selectedTienda
+        ? (TIENDA_COLORS[selectedTienda.id_tienda] || TIENDA_COLORS[1])
+        : GLOBAL_COLORS;
+
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden font-primary">
             {/* Sidebar */}
@@ -90,14 +115,23 @@ const DashboardLayout = () => {
                 style={{ position: window.innerWidth < 1024 ? 'fixed' : 'relative' }}
             >
                 <Link to="/" className="p-6 flex items-center gap-4 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
-                    {/* Logo - Ropa Mania Style */}
                     <div className="relative px-3 py-2 bg-slate-950 ring-1 ring-white/10 rounded-lg leading-none flex items-center gap-2 w-full justify-center">
-                        <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">RM</div>
+                        <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">TT</div>
                         <span className="text-xl font-bold font-heading tracking-wide text-white">
-                            Ropa <span className="text-orange-500">Mania</span>
+                            Todas las <span className="text-orange-500">Tiendas</span>
                         </span>
                     </div>
                 </Link>
+
+                {/* Tienda activa en sidebar */}
+                {user?.id_tienda && (
+                    <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                        <div className="flex items-center gap-2">
+                            <FaStore className="text-orange-400 text-xs" />
+                            <span className="text-xs text-orange-300 font-semibold">{user.nb_tienda || 'Mi Tienda'}</span>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
                     {navItems.map((item) => (
@@ -106,7 +140,6 @@ const DashboardLayout = () => {
                 </div>
 
                 <div className="p-4 border-t border-slate-800/50 space-y-2">
-
                     <button
                         onClick={handleLogout}
                         className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all font-medium group"
@@ -115,8 +148,8 @@ const DashboardLayout = () => {
                         <span>Cerrar Sesión</span>
                     </button>
                     <div className="px-4 py-3 mt-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 font-medium">Ropa Mania System</div>
-                        <div className="text-[10px] text-slate-600">v2.0.0 Business Edition</div>
+                        <div className="text-xs text-slate-400 font-medium">Todas las Tiendas v1.0</div>
+                        <div className="text-[10px] text-slate-600">Multi-Store Business System</div>
                     </div>
                 </div>
             </motion.aside>
@@ -142,7 +175,79 @@ const DashboardLayout = () => {
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
+                        {/* Selector de Tienda - Solo visible para admin/dueño */}
+                        {canSwitchStore && tiendas.length > 0 && (
+                            <div className="relative" ref={dropdownRef}>
+                                <button
+                                    onClick={() => setShowStoreDropdown(!showStoreDropdown)}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${currentColors.bg} ${currentColors.border} ${currentColors.text} hover:shadow-sm`}
+                                >
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${currentColors.dot}`}></span>
+                                    <span className="text-xs font-bold uppercase tracking-wide">
+                                        {selectedTienda ? selectedTienda.nb_tienda : 'Global'}
+                                    </span>
+                                    <FaChevronDown className={`text-xs transition-transform ${showStoreDropdown ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {/* Dropdown */}
+                                <AnimatePresence>
+                                    {showStoreDropdown && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                                            transition={{ duration: 0.15 }}
+                                            className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50"
+                                        >
+                                            {/* Opción Global */}
+                                            <button
+                                                onClick={() => { setSelectedTienda(null); setShowStoreDropdown(false); }}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left ${!selectedTienda ? 'bg-slate-50 font-bold' : ''}`}
+                                            >
+                                                <FaGlobe className="text-slate-400 text-sm" />
+                                                <div>
+                                                    <div className="text-sm font-semibold text-slate-700">Global</div>
+                                                    <div className="text-xs text-slate-400">Todas las tiendas</div>
+                                                </div>
+                                                {!selectedTienda && <div className="ml-auto w-2 h-2 bg-slate-400 rounded-full"></div>}
+                                            </button>
+
+                                            <div className="border-t border-slate-100"></div>
+
+                                            {/* Opciones por Tienda */}
+                                            {tiendas.map((tienda) => {
+                                                const colors = TIENDA_COLORS[tienda.id_tienda] || TIENDA_COLORS[1];
+                                                const isSelected = selectedTienda?.id_tienda === tienda.id_tienda;
+                                                return (
+                                                    <button
+                                                        key={tienda.id_tienda}
+                                                        onClick={() => { setSelectedTienda(tienda); setShowStoreDropdown(false); }}
+                                                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left ${isSelected ? 'bg-slate-50 font-bold' : ''}`}
+                                                    >
+                                                        <span className={`w-3 h-3 rounded-full flex-shrink-0 ${colors.dot}`}></span>
+                                                        <div>
+                                                            <div className={`text-sm font-semibold ${colors.text}`}>{tienda.nb_tienda}</div>
+                                                            {tienda.descripcion && <div className="text-xs text-slate-400">{tienda.descripcion}</div>}
+                                                        </div>
+                                                        {isSelected && <div className={`ml-auto w-2 h-2 rounded-full ${colors.dot}`}></div>}
+                                                    </button>
+                                                );
+                                            })}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
+
+                        {/* Usuario de tienda específica: badge de su tienda */}
+                        {!canSwitchStore && user?.nb_tienda && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-200">
+                                <FaStore className="text-orange-500 text-xs" />
+                                <span className="text-xs font-bold text-orange-700 uppercase">{user.nb_tienda}</span>
+                            </div>
+                        )}
+
                         {/* Global Rate Input */}
                         <div className="flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100">
                             <span className="text-xs font-bold text-orange-600 uppercase">Tasa: BS</span>

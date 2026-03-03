@@ -6,7 +6,15 @@ const isUsdMethod = (name) => USD_KEYWORDS.some(k => name.toUpperCase().includes
 exports.getProfitLoss = async (req, res) => {
     try {
         const { period = 'month' } = req.query; // 'month', 'prev_month', 'year', 'custom'
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, tienda } = req.query;
+        const tiendaId = tienda && tienda !== 'global' ? parseInt(tienda) : null;
+        const tiendaFilter = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterC = tiendaId ? ` AND id_tienda = ${tiendaId}` : '';
+        const tiendaFilterPF = tiendaId ? ` AND pf.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterGV = tiendaId ? ` AND gv.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterPC = tiendaId ? ` AND id_tienda = ${tiendaId}` : '';
+        const tiendaFilterPFP = tiendaId ? ` AND pfp.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterPP = tiendaId ? ` AND pr.id_tienda = ${tiendaId}` : '';
 
         // Build date filter
         let dateFilter = '';
@@ -51,7 +59,7 @@ exports.getProfitLoss = async (req, res) => {
             JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
             JOIN detalle_pago dp ON p.id_pago = dp.id_pago
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE ${applyFilter('v.fecha_venta')}
+            WHERE ${applyFilter('v.fecha_venta')}${tiendaFilter}
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
         `, dateParams);
         // Initial Balance calculation (Capitalization)
@@ -86,7 +94,7 @@ exports.getProfitLoss = async (req, res) => {
         if (period === 'year') showInitialInThisReport = true;
         if (period === 'custom') showInitialInThisReport = false; // Usually for specific date range
 
-        const totalIngresos = parseFloat(salesRows[0].total) + (showInitialInThisReport ? initialBalanceUSD : 0);
+        const totalIngresos = parseFloat(salesRows[0].total) + (showInitialInThisReport && (!tiendaId || tiendaId === 1) ? initialBalanceUSD : 0);
 
         // Desglose de ingresos por método de pago
         const [salesBreakdown] = await pool.query(`
@@ -98,7 +106,7 @@ exports.getProfitLoss = async (req, res) => {
             JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
             JOIN detalle_pago dp ON p.id_pago = dp.id_pago
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE ${applyFilter('v.fecha_venta')}
+            WHERE ${applyFilter('v.fecha_venta')}${tiendaFilter}
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             GROUP BY mp.id_metodo_pago, mp.nb_metodo_pago
             ORDER BY total DESC
@@ -110,7 +118,7 @@ exports.getProfitLoss = async (req, res) => {
         const [purchaseRows] = await pool.query(`
             SELECT COALESCE(SUM(total_compra), 0) as total
             FROM compra
-            WHERE ${applyFilter('fecha_compra')}
+            WHERE ${applyFilter('fecha_compra')}${tiendaFilterC}
         `, dateParams);
         const totalCompras = parseFloat(purchaseRows[0].total);
 
@@ -125,7 +133,7 @@ exports.getProfitLoss = async (req, res) => {
                     pf.monto as total_usd
                 FROM pago_fijo pf
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-                WHERE ${applyFilter('pf.fecha_pago_fijo')}
+                WHERE ${applyFilter('pf.fecha_pago_fijo')}${tiendaFilterPF}
                 AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
 
                 UNION ALL
@@ -135,7 +143,7 @@ exports.getProfitLoss = async (req, res) => {
                     gv.monto_usd as total_usd
                 FROM gasto_variable gv
                 JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable
-                WHERE ${applyFilter('gv.fecha_gasto_variable')}
+                WHERE ${applyFilter('gv.fecha_gasto_variable')}${tiendaFilterGV}
 
                 UNION ALL
 
@@ -143,7 +151,7 @@ exports.getProfitLoss = async (req, res) => {
                     'PAGO COMISION' as tipo,
                     monto_usd as total_usd
                 FROM pago_comision
-                WHERE ${applyFilter('fecha_pago')}
+                WHERE ${applyFilter('fecha_pago')}${tiendaFilterPC}
             ) as combined_expenses
             GROUP BY tipo
             ORDER BY total_usd DESC
@@ -155,20 +163,20 @@ exports.getProfitLoss = async (req, res) => {
                 SELECT pf.monto as total
                 FROM pago_fijo pf
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-                WHERE ${applyFilter('pf.fecha_pago_fijo')}
+                WHERE ${applyFilter('pf.fecha_pago_fijo')}${tiendaFilterPF}
                 AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
 
                 UNION ALL
 
                 SELECT gv.monto_usd as total
                 FROM gasto_variable gv
-                WHERE ${applyFilter('gv.fecha_gasto_variable')}
+                WHERE ${applyFilter('gv.fecha_gasto_variable')}${tiendaFilterGV}
 
                 UNION ALL
 
                 SELECT monto_usd as total
                 FROM pago_comision
-                WHERE ${applyFilter('fecha_pago')}
+                WHERE ${applyFilter('fecha_pago')}${tiendaFilterPC}
             ) as combined_totals
         `, [...dateParams, ...dateParams, ...dateParams]);
         const totalGastosOperativos = parseFloat(fixedTotalRows[0].total);
@@ -179,7 +187,7 @@ exports.getProfitLoss = async (req, res) => {
         const [invoicePayRows] = await pool.query(`
             SELECT COALESCE(SUM(pfp.monto), 0) as total
             FROM pago_factura_proveedor pfp
-            WHERE ${applyFilter('pfp.fecha_pago')}
+            WHERE ${applyFilter('pfp.fecha_pago')}${tiendaFilterPFP}
         `, dateParams);
         const totalPagosFacturas = parseFloat(invoicePayRows[0].total);
 
@@ -191,7 +199,7 @@ exports.getProfitLoss = async (req, res) => {
             FROM pago_prestamo pp
             JOIN prestamo pr ON pp.id_prestamo = pr.id_prestamo
             JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
-            WHERE ${applyFilter('pp.fecha_pago')}
+            WHERE ${applyFilter('pp.fecha_pago')}${tiendaFilterPP}
         `, dateParams);
 
         let totalPagosPrestamos = 0;
@@ -224,7 +232,7 @@ exports.getProfitLoss = async (req, res) => {
             JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
             JOIN detalle_pago dp ON p.id_pago = dp.id_pago
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE YEAR(v.fecha_venta) = 2026
+            WHERE YEAR(v.fecha_venta) = 2026 ${tiendaFilter}
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m')
             ORDER BY mes ASC
@@ -235,7 +243,7 @@ exports.getProfitLoss = async (req, res) => {
         let chartIncomeData = monthlyIncome.map(row => {
             if (row.mes === '2026-02') {
                 foundFeb = true;
-                return { ...row, ingresos: parseFloat(row.ingresos) + initialBalanceUSD };
+                return { ...row, ingresos: parseFloat(row.ingresos) + (tiendaId === 1 || !tiendaId ? initialBalanceUSD : 0) };
             }
             return row;
         });
@@ -244,10 +252,11 @@ exports.getProfitLoss = async (req, res) => {
             chartIncomeData.push({
                 mes: '2026-02',
                 mes_label: 'Feb 2026',
-                ingresos: initialBalanceUSD
+                ingresos: (tiendaId === 1 || !tiendaId ? initialBalanceUSD : 0)
             });
             chartIncomeData.sort((a, b) => a.mes.localeCompare(b.mes));
         }
+
         const [monthlyExpenses] = await pool.query(`
             SELECT mes, SUM(total) as compras
             FROM (
@@ -255,7 +264,7 @@ exports.getProfitLoss = async (req, res) => {
                     DATE_FORMAT(fecha_compra, '%Y-%m') as mes,
                     total_compra as total
                 FROM compra
-                WHERE YEAR(fecha_compra) = 2026
+                WHERE YEAR(fecha_compra) = 2026 ${tiendaFilterC}
 
                 UNION ALL
 
@@ -264,7 +273,7 @@ exports.getProfitLoss = async (req, res) => {
                     monto as total
                 FROM pago_fijo pf
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
-                WHERE YEAR(fecha_pago_fijo) = 2026
+                WHERE YEAR(fecha_pago_fijo) = 2026 ${tiendaFilterPF}
                 AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
 
                 UNION ALL
@@ -272,8 +281,8 @@ exports.getProfitLoss = async (req, res) => {
                 SELECT 
                     DATE_FORMAT(fecha_gasto_variable, '%Y-%m') as mes,
                     monto_usd as total
-                FROM gasto_variable
-                WHERE YEAR(fecha_gasto_variable) = 2026
+                FROM gasto_variable gv
+                WHERE YEAR(fecha_gasto_variable) = 2026 ${tiendaFilterGV}
 
                 UNION ALL
 
@@ -291,15 +300,17 @@ exports.getProfitLoss = async (req, res) => {
                         ELSE ROUND(pp.monto / COALESCE(NULLIF(pp.tasa_dia, 0), 1), 2)
                     END as total
                 FROM pago_prestamo pp
+                JOIN prestamo pr ON pp.id_prestamo = pr.id_prestamo
                 JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
-                WHERE YEAR(pp.fecha_pago) = 2026
+                WHERE YEAR(pp.fecha_pago) = 2026 ${tiendaFilterPP}
+
                 UNION ALL
 
                 SELECT 
                     DATE_FORMAT(fecha_pago, '%Y-%m') as mes,
                     monto_usd as total
-                FROM pago_comision
-                WHERE YEAR(fecha_pago) = 2026
+                FROM pago_comision pc
+                WHERE YEAR(fecha_pago) = 2026 ${tiendaFilterPC.replace('id_tienda', 'pc.id_tienda')}
             ) as all_expenses
             GROUP BY mes
         `);

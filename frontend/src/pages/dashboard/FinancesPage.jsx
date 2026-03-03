@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaChartLine, FaMoneyBillWave, FaArrowUp, FaArrowDown, FaFileInvoiceDollar, FaWallet, FaReceipt, FaShoppingCart, FaPlus, FaTimes, FaDollarSign, FaMobileAlt, FaCreditCard, FaFingerprint, FaExchangeAlt, FaMoneyBill, FaHandHoldingUsd } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
+import { useStore } from '../../context/StoreContext';
 import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,6 +13,7 @@ const FinancesPage = () => {
     const { rate } = useRate();
     const roundedRate = parseFloat(parseFloat(rate || 0).toFixed(2));
     const { user, logout } = useAuth();
+    const { effectiveTiendaId, selectedTienda, isGlobal } = useStore();
     const [stats, setStats] = useState({
         income: 0,
         expenses: 0,
@@ -97,7 +99,8 @@ const FinancesPage = () => {
         setLoadingAllTransactions(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/transactions?limit=1000`, {
+            const tiendaParam = effectiveTiendaId ? `&tienda=${effectiveTiendaId}` : '';
+            const res = await fetch(`${API_URL}/api/finances/transactions?limit=1000${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -145,7 +148,8 @@ const FinancesPage = () => {
                 body: JSON.stringify({
                     ...loanForm,
                     rate: roundedRate,
-                    date: loanForm.date
+                    date: loanForm.date,
+                    id_tienda: effectiveTiendaId || 1
                 })
             });
 
@@ -196,7 +200,7 @@ const FinancesPage = () => {
         fetchFixedPaymentTypes();
         fetchVariableExpenseTypes();
         fetchPaymentMethods();
-    }, []);
+    }, [effectiveTiendaId]);
 
     const fetchVariableExpenseTypes = async () => {
         try {
@@ -223,10 +227,11 @@ const FinancesPage = () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { 'Authorization': `Bearer ${token}` };
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
 
             const [summaryRes, transactionsRes] = await Promise.all([
-                fetch(`${API_URL}/api/finances/summary`, { headers }),
-                fetch(`${API_URL}/api/finances/transactions`, { headers })
+                fetch(`${API_URL}/api/finances/summary${tiendaParam}`, { headers }),
+                fetch(`${API_URL}/api/finances/transactions${tiendaParam}`, { headers })
             ]);
 
             if (summaryRes.status === 401 || summaryRes.status === 403 || transactionsRes.status === 401 || transactionsRes.status === 403) {
@@ -267,7 +272,8 @@ const FinancesPage = () => {
     const fetchFixedPaymentTypes = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/fixed-payment-types`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/fixed-payment-types${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -351,7 +357,8 @@ const FinancesPage = () => {
                 ...variableExpenseForm,
                 id_tipo_gasto_variable: finalTipoId,
                 monto: finalAmount,
-                fecha: localDateString
+                fecha: localDateString,
+                id_tienda: effectiveTiendaId || 1
             };
             delete payload.moneda; // Keep clean
 
@@ -436,7 +443,8 @@ const FinancesPage = () => {
             const payload = {
                 ...formData,
                 monto: finalAmount, // Send calculated USD amount
-                fecha: localDateString
+                fecha: localDateString,
+                id_tienda: effectiveTiendaId || 1
             };
             // Remove moneda from payload to avoid backend confusion (although backend ignores it, it's cleaner)
             delete payload.moneda;
@@ -530,7 +538,8 @@ const FinancesPage = () => {
 
             const payload = {
                 ...transferFormData,
-                fecha_traspaso: localDateString
+                fecha_traspaso: localDateString,
+                id_tienda: effectiveTiendaId || 1
             };
 
             const res = await fetch(`${API_URL}/api/finances/transfers`, {

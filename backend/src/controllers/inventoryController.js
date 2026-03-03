@@ -2,6 +2,12 @@ const pool = require('../database/db');
 
 exports.getInventory = async (req, res) => {
     try {
+        const { tienda } = req.query;
+        const tiendaId = tienda && tienda !== 'global' ? parseInt(tienda) : null;
+        const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterSub = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterSubV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+
         const query = `
             SELECT 
                 p.id_producto, 
@@ -15,16 +21,20 @@ exports.getInventory = async (req, res) => {
             FROM producto p
             LEFT JOIN estado e ON p.id_estado = e.id_estado
             LEFT JOIN (
-                SELECT id_producto, SUM(cantidad) as total_bought
-                FROM detalle_compra
-                GROUP BY id_producto
+                SELECT dc.id_producto, SUM(dc.cantidad) as total_bought
+                FROM detalle_compra dc
+                JOIN compra c ON dc.id_compra = c.id_compra
+                WHERE 1=1 ${tiendaFilterSub}
+                GROUP BY dc.id_producto
             ) purchased ON p.id_producto = purchased.id_producto
             LEFT JOIN (
-                SELECT id_producto, SUM(cantidad) as total_sold
-                FROM detalle_venta
-                GROUP BY id_producto
+                SELECT dv.id_producto, SUM(dv.cantidad) as total_sold
+                FROM detalle_venta dv
+                JOIN venta v ON dv.id_venta = v.id_venta
+                WHERE 1=1 ${tiendaFilterSubV}
+                GROUP BY dv.id_producto
             ) sold ON p.id_producto = sold.id_producto
-            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO' ${tiendaFilterP}
             ORDER BY p.nb_producto ASC
         `;
 
@@ -47,9 +57,13 @@ exports.getInventory = async (req, res) => {
 };
 
 exports.getInventoryReport = async (req, res) => {
-    let { month, year } = req.query;
+    let { month, year, tienda } = req.query;
     month = parseInt(month);
     year = parseInt(year);
+    const tiendaId = tienda && tienda !== 'global' ? parseInt(tienda) : null;
+    const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
+    const tiendaFilterSub = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
+    const tiendaFilterSubV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
 
     try {
         // First day of current report month
@@ -80,7 +94,7 @@ exports.getInventoryReport = async (req, res) => {
                 SELECT dc.id_producto, SUM(dc.cantidad) as total
                 FROM detalle_compra dc
                 JOIN compra c ON dc.id_compra = c.id_compra
-                WHERE c.fecha_compra < ?
+                WHERE c.fecha_compra < ? ${tiendaFilterSub}
                 GROUP BY dc.id_producto
             ) purchased_before ON p.id_producto = purchased_before.id_producto
             -- Sub-query for total sold BEFORE period
@@ -88,7 +102,7 @@ exports.getInventoryReport = async (req, res) => {
                 SELECT dv.id_producto, SUM(dv.cantidad) as total
                 FROM detalle_venta dv
                 JOIN venta v ON dv.id_venta = v.id_venta
-                WHERE v.fecha_venta < ?
+                WHERE v.fecha_venta < ? ${tiendaFilterSubV}
                 GROUP BY dv.id_producto
             ) sold_before ON p.id_producto = sold_before.id_producto
             -- Sub-query for total bought DURING period
@@ -96,7 +110,7 @@ exports.getInventoryReport = async (req, res) => {
                 SELECT dc.id_producto, SUM(dc.cantidad) as total
                 FROM detalle_compra dc
                 JOIN compra c ON dc.id_compra = c.id_compra
-                WHERE c.fecha_compra >= ? AND c.fecha_compra < ?
+                WHERE c.fecha_compra >= ? AND c.fecha_compra < ? ${tiendaFilterSub}
                 GROUP BY dc.id_producto
             ) purchased_period ON p.id_producto = purchased_period.id_producto
             -- Sub-query for total sold DURING period
@@ -104,10 +118,10 @@ exports.getInventoryReport = async (req, res) => {
                 SELECT dv.id_producto, SUM(dv.cantidad) as total
                 FROM detalle_venta dv
                 JOIN venta v ON dv.id_venta = v.id_venta
-                WHERE v.fecha_venta >= ? AND v.fecha_venta < ?
+                WHERE v.fecha_venta >= ? AND v.fecha_venta < ? ${tiendaFilterSubV}
                 GROUP BY dv.id_producto
             ) sold_period ON p.id_producto = sold_period.id_producto
-            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO' ${tiendaFilterP}
             ORDER BY p.nb_producto ASC
         `;
 

@@ -96,6 +96,7 @@ exports.closeSales = async (req, res) => {
         }
 
         const userId = req.user.id;
+        const tiendaId = req.user.id_tienda || req.body.id_tienda || 1; // Tienda del usuario o la que envíe el frontend
 
         // Validate User exists
         const [userCheck] = await connection.query('SELECT id_usuario FROM usuario WHERE id_usuario = ?', [userId]);
@@ -180,8 +181,8 @@ exports.closeSales = async (req, res) => {
         for (const [clientName, clientRows] of Object.entries(rowsByClient)) {
             // Create ONE Venta per Client Group
             const [ventaResult] = await connection.query(
-                'INSERT INTO venta (id_usuario, fecha_venta, tasa_dia) VALUES (?, NOW(), ?)',
-                [userId, safeRate]
+                'INSERT INTO venta (id_usuario, id_tienda, fecha_venta, tasa_dia) VALUES (?, ?, NOW(), ?)',
+                [userId, tiendaId, safeRate]
             );
             const ventaId = ventaResult.insertId;
 
@@ -245,8 +246,8 @@ exports.closeSales = async (req, res) => {
                         const expenseAmountUSD = row.advanceAmountBs / safeRate;
 
                         await connection.query(
-                            'INSERT INTO pago_fijo (id_usuario, id_tipo_pago_fijo, id_metodo_pago, monto, tasa_dia, fecha_pago_fijo) VALUES (?, ?, ?, ?, ?, NOW())',
-                            [userId, typeId, efectivoId, expenseAmountUSD, safeRate]
+                            'INSERT INTO pago_fijo (id_usuario, id_tienda, id_tipo_pago_fijo, id_metodo_pago, monto, tasa_dia, fecha_pago_fijo) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+                            [userId, tiendaId, typeId, efectivoId, expenseAmountUSD, safeRate]
                         );
                     }
                 }

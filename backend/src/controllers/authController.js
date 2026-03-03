@@ -11,11 +11,12 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Por favor ingrese email y contraseña' });
         }
 
-        // Buscar usuario por email con su rol
+        // Buscar usuario por email con su rol y tienda
         const [users] = await pool.query(`
-            SELECT u.*, r.nb_rol as rol 
+            SELECT u.*, r.nb_rol as rol, t.nb_tienda
             FROM usuario u 
-            LEFT JOIN rol r ON u.id_rol = r.id_rol 
+            LEFT JOIN rol r ON u.id_rol = r.id_rol
+            LEFT JOIN tienda t ON u.id_tienda = t.id_tienda
             WHERE u.email = ? AND u.activo = 1
         `, [email]);
 
@@ -40,9 +41,10 @@ exports.login = async (req, res) => {
                 id: user.id_usuario,
                 rol: user.rol,
                 nombre: user.nombre,
-                apellido: user.apellido
+                apellido: user.apellido,
+                id_tienda: user.id_tienda
             },
-            process.env.JWT_SECRET || 'secreto_super_seguro', // Deberíamos poner esto en .env
+            process.env.JWT_SECRET || 'secreto_super_seguro',
             { expiresIn: '8h' }
         );
 
@@ -54,7 +56,9 @@ exports.login = async (req, res) => {
                 nombre: user.nombre,
                 apellido: user.apellido,
                 email: user.email,
-                rol: user.rol
+                rol: user.rol,
+                id_tienda: user.id_tienda,
+                nb_tienda: user.nb_tienda
             }
         });
 

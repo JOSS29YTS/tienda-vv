@@ -8,10 +8,12 @@ import autoTable from 'jspdf-autotable';
 
 import { useRate } from '../../context/RateContext';
 import API_URL from '../../config/api';
+import { useStore } from '../../context/StoreContext';
 
 const SalesPage = () => {
     const { user } = useAuth();
     const { rate, setRate } = useRate();
+    const { effectiveTiendaId } = useStore();
     // Current Date
     const today = new Date().toLocaleDateString('es-VE');
 
@@ -146,7 +148,7 @@ const SalesPage = () => {
         }, 15000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [effectiveTiendaId]);
 
     // Save rows to server AND localStorage whenever they change (with debounce)
     useEffect(() => {
@@ -195,7 +197,8 @@ const SalesPage = () => {
     const fetchDraftSales = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/api/sales/draft`, {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/sales/draft${tiendaParam}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const drafts = await response.json();
@@ -277,7 +280,8 @@ const SalesPage = () => {
 
     const fetchProducts = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/products`);
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/products${tiendaParam}`);
             const data = await response.json();
             // Filter only active products
             const activeProducts = data.filter(p => p.estado === 'activo');
@@ -1203,7 +1207,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         >
                             <option value="">Seleccionar...</option>
                             {paymentMethods
-                                .filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'PENDIENTE POR COBRAR')
+                                .filter(m => m.nb_metodo_pago !== 'MIXTO')
                                 .map(m => (
                                     <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
                                 ))}
@@ -1750,7 +1754,7 @@ const NewInvoiceModal = ({ products, paymentMethods, rate, onClose, onConfirm })
                                                 className="flex-1 text-xs border rounded p-1"
                                             >
                                                 <option value="">Método...</option>
-                                                {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'PENDIENTE POR COBRAR').map(m => (
+                                                {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO').map(m => (
                                                     <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
                                                 ))}
                                             </select>

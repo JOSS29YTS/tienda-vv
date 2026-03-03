@@ -20,6 +20,8 @@ const ensureEstadosExist = async () => {
 exports.getAllProducts = async (req, res) => {
     try {
         await ensureEstadosExist(); // Ensure connection and states
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        const tiendaFilter = tiendaId ? ` AND (p.id_tienda = ${tiendaId} OR p.id_tienda IS NULL)` : '';
 
         const query = `
             SELECT 
@@ -34,7 +36,7 @@ exports.getAllProducts = async (req, res) => {
             FROM producto p
             JOIN estado e ON p.id_estado = e.id_estado
             LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
-            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO' ${tiendaFilter}
             ORDER BY p.nb_producto ASC
         `;
 
@@ -66,7 +68,8 @@ exports.getCategories = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
     try {
-        const { nombre, precio, estado, id_categoria, codigo_de_barra } = req.body;
+        const { nombre, precio, estado, id_categoria, codigo_de_barra, id_tienda } = req.body;
+        const targetTienda = req.user.id_tienda || id_tienda || null;
 
         if (!nombre || !precio || !id_categoria) {
             return res.status(400).json({ message: 'Nombre, precio y categoría son requeridos' });
@@ -90,8 +93,8 @@ exports.createProduct = async (req, res) => {
         const id_estado = statusRows[0].id_estado;
 
         const [result] = await pool.query(
-            'INSERT INTO producto (nb_producto, precio, id_estado, id_categoria, codigo_de_barra) VALUES (?, ?, ?, ?, ?)',
-            [nombreUpperCase, precio, id_estado, id_categoria, codigo_de_barra || null]
+            'INSERT INTO producto (nb_producto, precio, id_estado, id_categoria, codigo_de_barra, id_tienda) VALUES (?, ?, ?, ?, ?, ?)',
+            [nombreUpperCase, precio, id_estado, id_categoria, codigo_de_barra || null, targetTienda]
         );
 
         res.status(201).json({
@@ -102,7 +105,8 @@ exports.createProduct = async (req, res) => {
                 precio,
                 estado: estado || 'activo',
                 id_categoria,
-                codigo_de_barra: codigo_de_barra || null
+                codigo_de_barra: codigo_de_barra || null,
+                id_tienda: targetTienda
             }
         });
 
