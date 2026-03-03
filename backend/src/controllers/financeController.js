@@ -149,6 +149,25 @@ exports.getFinanceSummary = async (req, res) => {
             }
         }
 
+        // --- PENDING INVOICES ---
+        const tiendaFilterFP = tiendaId ? `AND c.id_tienda = ${tiendaId}` : '';
+        const [pendingInvoices] = await pool.query(`
+            SELECT 
+                COUNT(*) as count,
+                COALESCE(SUM(fp.monto_deuda - COALESCE(paid.total_paid, 0)), 0) as total
+            FROM factura_proveedor fp
+            JOIN compra c ON fp.id_compra = c.id_compra
+            LEFT JOIN (
+                SELECT id_factura_proveedor, SUM(monto) as total_paid
+                FROM pago_factura_proveedor
+                GROUP BY id_factura_proveedor
+            ) paid ON fp.id_factura_proveedor = paid.id_factura_proveedor
+            WHERE (fp.monto_deuda - COALESCE(paid.total_paid, 0)) > 0.01
+            ${tiendaFilterFP}
+        `);
+        const pendingCount = parseInt(pendingInvoices[0]?.count || 0);
+        const pendingTotal = parseFloat(pendingInvoices[0]?.total || 0);
+
         res.json({
             stats: {
                 income: parseFloat(finalIncome.toFixed(2)),
@@ -162,8 +181,8 @@ exports.getFinanceSummary = async (req, res) => {
                 totalPagoMovil: parseFloat(totalPagoMovilBs.toFixed(2)),
                 totalBiopago: parseFloat(totalBiopagoBs.toFixed(2)),
                 totalTransferencia: parseFloat(totalTransferenciaBs.toFixed(2)),
-                pendingInvoiceCount: 0,
-                pendingInvoiceTotal: 0
+                pendingInvoiceCount: pendingCount,
+                pendingInvoiceTotal: parseFloat(pendingTotal.toFixed(2))
             }
         });
 
