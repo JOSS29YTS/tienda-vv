@@ -800,8 +800,21 @@ const FinancesPage = () => {
                         Reporte
                     </button>
                     <button
-                        onClick={handleLoanClick}
-                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-amber-500 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/30 whitespace-nowrap"
+                        onClick={() => {
+                            if (isGlobal) {
+                                toast.error('Seleccione una tienda específica antes de registrar un préstamo.', {
+                                    icon: '🏪',
+                                    style: { background: '#F59E0B', color: '#fff' }
+                                });
+                                return;
+                            }
+                            handleLoanClick();
+                        }}
+                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-xl font-bold transition-colors shadow-lg whitespace-nowrap ${isGlobal
+                                ? 'bg-amber-300 text-amber-700 cursor-not-allowed'
+                                : 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/30'
+                            }`}
+                        title={isGlobal ? 'Seleccione una tienda para registrar un préstamo' : 'Registrar préstamo'}
                     >
                         <FaHandHoldingUsd />
                         Préstamo
