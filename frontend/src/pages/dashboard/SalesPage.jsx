@@ -28,13 +28,13 @@ const SalesPage = () => {
 
 
     // Rows State (The Sheet)
-    const [rows, setRows] = useState(() => {
-        const savedRows = localStorage.getItem('bodega_sales_rows');
-        if (savedRows) {
-            return JSON.parse(savedRows);
-        }
+    const getInitialRows = () => {
+        const savedRows = localStorage.getItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`);
+        if (savedRows) return JSON.parse(savedRows);
         return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }];
-    });
+    };
+
+    const [rows, setRows] = useState(getInitialRows());
     const [selectedRows, setSelectedRows] = useState([]);
 
     // Mixed Payment Modal State
@@ -137,6 +137,7 @@ const SalesPage = () => {
     }, [isNewInvoiceModalOpen, showConfirmationModal, products]);
 
     useEffect(() => {
+        setRows(getInitialRows()); // Instantly switch local state
         fetchProducts();
         fetchPaymentMethods();
 
@@ -152,7 +153,7 @@ const SalesPage = () => {
 
     // Save rows to server AND localStorage whenever they change (with debounce)
     useEffect(() => {
-        localStorage.setItem('bodega_sales_rows', JSON.stringify(rows));
+        localStorage.setItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`, JSON.stringify(rows));
 
         // Debounce server save to avoid too many requests
         const timeoutId = setTimeout(() => {
@@ -550,7 +551,7 @@ const SalesPage = () => {
             setSuccessMessage('¡Venta cerrada exitosamente! Se han guardado los registros.');
             setRows([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
             setSelectedRows([]);
-            localStorage.removeItem('bodega_sales_rows');
+            localStorage.removeItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`);
             setShowConfirmationModal(false);
 
         } catch (err) {
@@ -575,7 +576,7 @@ const SalesPage = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text('ROPA MANIA SYSTEM', 20, 20);
+        doc.text(user?.nb_tienda ? `${user.nb_tienda.toUpperCase()} SYSTEM` : 'TODAS LAS TIENDAS SYSTEM', 20, 20);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text('REPORTE DE VENTAS (HOJA DE CÁLCULO)', 20, 30);

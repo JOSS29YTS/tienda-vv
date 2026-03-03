@@ -24,12 +24,14 @@ const PurchasesPage = () => {
         return `${yyyy}-${mm}-${dd}`;
     });
 
-    const [rows, setRows] = useState(() => {
-        const savedRows = localStorage.getItem('purchaseRows');
+    const getInitialRows = () => {
+        const savedRows = localStorage.getItem(`purchaseRows_${effectiveTiendaId || 'global'}`);
         return savedRows ? JSON.parse(savedRows) : [
             { id: 1, productId: '', profitPercent: 30, quantity: 1, currency: 'USD', costBultoBs: '', costBultoUsd: '', pvp: '' }
         ];
-    });
+    };
+
+    const [rows, setRows] = useState(getInitialRows());
     const [paymentMethods, setPaymentMethods] = useState([]);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [payments, setPayments] = useState([{ methodId: '', amount: '' }]);
@@ -157,6 +159,7 @@ const PurchasesPage = () => {
     };
 
     useEffect(() => {
+        setRows(getInitialRows());
         fetchProducts();
         fetchPaymentMethods();
     }, [effectiveTiendaId]);
@@ -166,8 +169,8 @@ const PurchasesPage = () => {
 
     // Save state to localStorage
     useEffect(() => {
-        localStorage.setItem('purchaseRows', JSON.stringify(rows));
-    }, [rows]);
+        localStorage.setItem(`purchaseRows_${effectiveTiendaId || 'global'}`, JSON.stringify(rows));
+    }, [rows, effectiveTiendaId]);
 
     useEffect(() => {
         localStorage.setItem('purchaseDate', date);

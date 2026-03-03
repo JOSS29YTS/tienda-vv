@@ -200,20 +200,23 @@ const DashboardLayout = () => {
                                             transition={{ duration: 0.15 }}
                                             className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50"
                                         >
-                                            {/* Opción Global */}
-                                            <button
-                                                onClick={() => { setSelectedTienda(null); setShowStoreDropdown(false); }}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left ${!selectedTienda ? 'bg-slate-50 font-bold' : ''}`}
-                                            >
-                                                <FaGlobe className="text-slate-400 text-sm" />
-                                                <div>
-                                                    <div className="text-sm font-semibold text-slate-700">Global</div>
-                                                    <div className="text-xs text-slate-400">Todas las tiendas</div>
-                                                </div>
-                                                {!selectedTienda && <div className="ml-auto w-2 h-2 bg-slate-400 rounded-full"></div>}
-                                            </button>
-
-                                            <div className="border-t border-slate-100"></div>
+                                            {/* Opción Global - Solo mostrar si no estamos en compra/venta donde se requiere tienda específica */}
+                                            {(!location.pathname.includes('/sales') && !location.pathname.includes('/purchases')) && (
+                                                <>
+                                                    <button
+                                                        onClick={() => { setSelectedTienda(null); setShowStoreDropdown(false); }}
+                                                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left ${!selectedTienda ? 'bg-slate-50 font-bold' : ''}`}
+                                                    >
+                                                        <FaGlobe className="text-slate-400 text-sm" />
+                                                        <div>
+                                                            <div className="text-sm font-semibold text-slate-700">Global</div>
+                                                            <div className="text-xs text-slate-400">Todas las tiendas</div>
+                                                        </div>
+                                                        {!selectedTienda && <div className="ml-auto w-2 h-2 bg-slate-400 rounded-full"></div>}
+                                                    </button>
+                                                    <div className="border-t border-slate-100"></div>
+                                                </>
+                                            )}
 
                                             {/* Opciones por Tienda */}
                                             {tiendas.map((tienda) => {
