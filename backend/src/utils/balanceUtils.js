@@ -23,14 +23,14 @@ exports.getMethodBalances = async (connection, tiendaId = null) => {
             };
         });
 
-        // Build tienda filter for each query
+        // Build tienda filter for each query (use table name, not alias)
         const tiendaV = tiendaId ? `AND v.id_tienda = ${tiendaId}` : '';
-        const tiendaPF = tiendaId ? `AND pf.id_tienda = ${tiendaId}` : '';
-        const tiendaGV = tiendaId ? `AND gv.id_tienda = ${tiendaId}` : '';
+        const tiendaPF = tiendaId ? `AND pago_fijo.id_tienda = ${tiendaId}` : '';
+        const tiendaGV = tiendaId ? `AND gasto_variable.id_tienda = ${tiendaId}` : '';
         const tiendaC = tiendaId ? `AND c.id_tienda = ${tiendaId}` : '';
-        const tiendaL = tiendaId ? `AND p.id_tienda = ${tiendaId}` : '';
-        const tiendaPC = tiendaId ? `AND pc.id_tienda = ${tiendaId}` : '';
-        const tiendaTR = tiendaId ? `AND tr.id_tienda = ${tiendaId}` : '';
+        const tiendaL = tiendaId ? `AND prestamo.id_tienda = ${tiendaId}` : '';
+        const tiendaPC = tiendaId ? `AND pago_comision.id_tienda = ${tiendaId}` : '';
+        const tiendaTR = tiendaId ? `AND traspaso.id_tienda = ${tiendaId}` : '';
 
         // 1. Sales Income
         const [sales] = await db.query(`
