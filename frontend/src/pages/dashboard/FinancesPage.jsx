@@ -973,12 +973,12 @@ const FinancesPage = () => {
                                         </td>
                                         <td className="p-4 font-mono text-slate-600 text-xs">#{tx.id}</td>
                                         <td className="p-4 text-slate-700 font-medium text-xs break-words max-w-[200px]">
-                                            {tx.type === 'Compra' && (tx.payment_method === 'PAGADA' || tx.payment_method === 'PENDIENTE') ? (
-                                                <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold tracking-wider ${tx.payment_method === 'PAGADA'
+                                            {tx.type === 'Compra' && (tx.payment_method?.toUpperCase() === 'PAGADA' || tx.payment_method?.toUpperCase() === 'PENDIENTE') ? (
+                                                <span className={`px-2 py-0.5 rounded border text-[10px] uppercase font-bold tracking-wider ${tx.payment_method?.toUpperCase() === 'PAGADA'
                                                     ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                    : 'bg-orange-50 text-orange-600 border-orange-100'
+                                                    : 'bg-orange-100 text-orange-600 border-orange-200'
                                                     }`}>
-                                                    {tx.payment_method}
+                                                    {tx.payment_method?.toUpperCase()}
                                                 </span>
                                             ) : (
                                                 tx.payment_method || '-'
