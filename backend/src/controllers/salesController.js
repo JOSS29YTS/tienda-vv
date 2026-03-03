@@ -15,12 +15,10 @@ exports.saveDraftSales = async (req, res) => {
     try {
         const { rows, rate } = req.body;
         const userId = req.user.id;
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-        // Delete existing draft for this user today
+        // Delete existing draft for this user
         await pool.query(
-            'DELETE FROM venta_borrador WHERE id_usuario = ? AND DATE(fecha_actualizacion) = ?',
-            [userId, today]
+            'DELETE FROM venta_borrador WHERE id_usuario = ?',
+            [userId]
         );
 
         // Insert new draft
@@ -39,8 +37,6 @@ exports.saveDraftSales = async (req, res) => {
 // Get all draft sales for today (from all users)
 exports.getDraftSales = async (req, res) => {
     try {
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
         const [drafts] = await pool.query(`
             SELECT 
                 vb.id_venta_borrador,
@@ -54,10 +50,9 @@ exports.getDraftSales = async (req, res) => {
             FROM venta_borrador vb
             JOIN usuario u ON vb.id_usuario = u.id_usuario
             LEFT JOIN rol r ON u.id_rol = r.id_rol
-            WHERE DATE(vb.fecha_actualizacion) = ?
             ORDER BY vb.fecha_actualizacion DESC
             LIMIT 100
-        `, [today]);
+        `);
 
         // Parse JSON data
         // Parse JSON data robustly
@@ -315,11 +310,8 @@ exports.closeSales = async (req, res) => {
 
         await connection.commit();
 
-        const today = new Date().toISOString().split('T')[0];
-        await pool.query(
-            'DELETE FROM venta_borrador WHERE DATE(fecha_actualizacion) = ?',
-            [today]
-        );
+        // Clear all drafts upon closing the day's sales
+        await pool.query('DELETE FROM venta_borrador');
 
         res.json({ message: 'Ventas cerradas exitosamente' });
 
