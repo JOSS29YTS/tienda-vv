@@ -91,7 +91,10 @@ const BankPage = () => {
             });
             const data = await res.json();
             if (res.ok) {
-                toast.success(data.message || 'Traspaso registrado');
+                toast.success(data.message || 'Traspaso registrado', {
+                    style: { background: '#10B981', color: '#fff' },
+                    iconTheme: { primary: '#fff', secondary: '#10B981' }
+                });
                 setIsTransferOpen(false);
                 fetchData();
             } else {
