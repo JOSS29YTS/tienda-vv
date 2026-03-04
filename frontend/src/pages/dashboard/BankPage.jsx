@@ -21,7 +21,6 @@ const BankPage = () => {
 
     const [stores, setStores] = useState([]);
     const [posMethodId, setPosMethodId] = useState(3);
-    const [paymentMethods, setPaymentMethods] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Traspaso modal
@@ -40,26 +39,12 @@ const BankPage = () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-
-            const [summaryRes, methodsRes] = await Promise.all([
-                fetch(`${API_URL}/api/finances/bank/pos-summary`, { headers }),
-                fetch(`${API_URL}/api/finances/payment-methods`, { headers }),
-            ]);
-
+            const summaryRes = await fetch(`${API_URL}/api/finances/bank/pos-summary`, { headers });
             if (summaryRes.status === 401) { logout(); return; }
-
             if (summaryRes.ok) {
                 const data = await summaryRes.json();
                 setStores(data.stores || []);
                 setPosMethodId(data.posMethodId || 3);
-            }
-            if (methodsRes.ok) {
-                const methods = await methodsRes.json();
-                // Exclude MIXTO and the POS method itself as destination
-                setPaymentMethods(methods.filter(m =>
-                    !m.nb_metodo_pago.toUpperCase().includes('MIXTO') &&
-                    !m.nb_metodo_pago.toUpperCase().includes('PUNTO')
-                ));
             }
         } catch (err) {
             console.error(err);
@@ -79,15 +64,15 @@ const BankPage = () => {
     // ── Open traspaso modal ────────────────────────────────────────────────────
     const openTransfer = (store) => {
         setSelectedStore(store);
-        setTransferForm({ id_metodo_destino: '', monto: store.neto_bs > 0 ? store.neto_bs.toFixed(2) : '', tasa_dia: parseFloat(rate).toFixed(2) });
+        setTransferForm({ monto: store.neto_bs > 0 ? store.neto_bs.toFixed(2) : '', tasa_dia: parseFloat(rate).toFixed(2) });
         setIsTransferOpen(true);
     };
 
     // ── Submit traspaso ────────────────────────────────────────────────────────
     const handleTransferSubmit = async (e) => {
         e.preventDefault();
-        if (!transferForm.id_metodo_destino || !transferForm.monto) {
-            toast.error('Completa todos los campos');
+        if (!transferForm.monto) {
+            toast.error('Ingresa el monto a traspasar');
             return;
         }
         setSubmitting(true);
@@ -97,8 +82,8 @@ const BankPage = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
-                    id_metodo_origen: posMethodId,
-                    id_metodo_destino: parseInt(transferForm.id_metodo_destino),
+                    id_metodo_origen: posMethodId,       // PUNTO DE VENTA (tagged to this tienda)
+                    id_metodo_destino: posMethodId,       // → PUNTO DE VENTA in Finanzas (global)
                     monto: parseFloat(transferForm.monto),
                     tasa_dia: parseFloat(transferForm.tasa_dia),
                     id_tienda: selectedStore.id_tienda,
@@ -219,8 +204,8 @@ const BankPage = () => {
                                         onClick={() => openTransfer(store)}
                                         disabled={store.neto_bs <= 0}
                                         className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${store.neto_bs > 0
-                                                ? `bg-gradient-to-r ${style.gradient} text-white shadow-md hover:shadow-lg hover:-translate-y-0.5`
-                                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                            ? `bg-gradient-to-r ${style.gradient} text-white shadow-md hover:shadow-lg hover:-translate-y-0.5`
+                                            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                             }`}
                                     >
                                         <FaExchangeAlt /> Traspasar a Cuenta
@@ -253,22 +238,15 @@ const BankPage = () => {
                                 </div>
                             </div>
 
-                            {/* Destination */}
+                            {/* Destination — fixed: PUNTO DE VENTA */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                                     Cuenta Destino
                                 </label>
-                                <select
-                                    value={transferForm.id_metodo_destino}
-                                    onChange={e => setTransferForm(prev => ({ ...prev, id_metodo_destino: e.target.value }))}
-                                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                                    required
-                                >
-                                    <option value="">Seleccionar cuenta...</option>
-                                    {paymentMethods.map(m => (
-                                        <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nb_metodo_pago}</option>
-                                    ))}
-                                </select>
+                                <div className="w-full border border-blue-200 bg-blue-50 rounded-xl px-4 py-3 text-sm font-bold text-blue-700 flex items-center gap-2">
+                                    <FaCreditCard className="text-blue-500" />
+                                    PUNTO DE VENTA
+                                </div>
                             </div>
 
                             {/* Amount */}
