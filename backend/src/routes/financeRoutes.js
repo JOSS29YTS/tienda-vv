@@ -12,6 +12,7 @@ router.get('/fixed-payment-types', verifyToken, isAdminOrManager, financeControl
 router.get('/payment-methods', verifyToken, isAdminOrManager, financeController.getPaymentMethods);
 router.post('/fixed-payments', verifyToken, isAdminOrManager, financeController.createFixedPayment);
 router.post('/transfers', verifyToken, isAdminOrManager, financeController.createTraspaso);
+router.get('/bank/pos-summary', verifyToken, isAdminOrManager, financeController.getBankPosSummary);
 
 // Gasos Variables
 router.get('/variable-expense-types', verifyToken, isAdminOrManager, financeController.getVariableExpenseTypes);

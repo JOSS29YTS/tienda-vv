@@ -819,13 +819,7 @@ const FinancesPage = () => {
                         <FaHandHoldingUsd />
                         Préstamo
                     </button>
-                    <button
-                        onClick={handleTransferClick}
-                        className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 whitespace-nowrap"
-                    >
-                        <FaExchangeAlt />
-                        Traspaso
-                    </button>
+
                     <button
                         onClick={() => {
                             if (isGlobal) {
@@ -846,8 +840,8 @@ const FinancesPage = () => {
                             setIsModalOpen(true);
                         }}
                         className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-xl font-bold transition-colors shadow-lg whitespace-nowrap ${isGlobal
-                                ? 'bg-emerald-200 text-emerald-700 cursor-not-allowed'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/30'
+                            ? 'bg-emerald-200 text-emerald-700 cursor-not-allowed'
+                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/30'
                             }`}
                         title={isGlobal ? 'Seleccione una tienda para registrar un gasto fijo' : 'Registrar gasto fijo'}
                     >
@@ -875,8 +869,8 @@ const FinancesPage = () => {
                             setIsVariableExpenseModalOpen(true);
                         }}
                         className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-xl font-bold transition-colors shadow-lg whitespace-nowrap ${isGlobal
-                                ? 'bg-blue-200 text-blue-700 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/30'
+                            ? 'bg-blue-200 text-blue-700 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/30'
                             }`}
                         title={isGlobal ? 'Seleccione una tienda para registrar un gasto variable' : 'Registrar gasto variable'}
                     >

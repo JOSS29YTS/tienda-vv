@@ -538,4 +538,56 @@ exports.payCommission = async (req, res) => {
         res.status(500).json({ message: 'Error al pagar comisión' });
     }
 };
+// ─── BANK PAGE: POS INCOME PER STORE ──────────────────────────────────────────
+exports.getBankPosSummary = async (req, res) => {
+    try {
+        // Get id of PUNTO DE VENTA method
+        const [[posMethod]] = await pool.query(
+            `SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE '%PUNTO%' LIMIT 1`
+        );
+        const posId = posMethod ? posMethod.id_metodo_pago : 3;
 
+        // POS income per tienda (from sales payments)
+        const [posIncome] = await pool.query(`
+            SELECT
+                t.id_tienda,
+                t.nb_tienda,
+                COALESCE(SUM(dp.monto), 0) AS total_pos_bs
+            FROM tienda t
+            LEFT JOIN venta v ON v.id_tienda = t.id_tienda
+            LEFT JOIN detalle_venta dv ON dv.id_venta = v.id_venta
+            LEFT JOIN pago p ON p.id_detalle_venta = dv.id_detalle_venta
+            LEFT JOIN detalle_pago dp ON dp.id_pago = p.id_pago AND dp.id_metodo_pago = ?
+            GROUP BY t.id_tienda, t.nb_tienda
+            ORDER BY t.id_tienda
+        `, [posId]);
+
+        // POS transfers OUT per tienda (traspasos where origin = POS, grouped by tienda)
+        const [posTransfers] = await pool.query(`
+            SELECT
+                id_tienda,
+                COALESCE(SUM(monto), 0) AS total_traspasado_bs
+            FROM traspaso
+            WHERE id_metodo_origen = ?
+            GROUP BY id_tienda
+        `, [posId]);
+
+        // Merge into one response
+        const transferMap = {};
+        for (const t of posTransfers) transferMap[t.id_tienda] = parseFloat(t.total_traspasado_bs);
+
+        const result = posIncome.map(row => ({
+            id_tienda: row.id_tienda,
+            nb_tienda: row.nb_tienda,
+            total_pos_bs: parseFloat(row.total_pos_bs),
+            total_traspasado_bs: transferMap[row.id_tienda] || 0,
+            neto_bs: parseFloat(row.total_pos_bs) - (transferMap[row.id_tienda] || 0)
+        }));
+
+        res.json({ posMethodId: posId, stores: result });
+
+    } catch (error) {
+        console.error('Error getting bank POS summary:', error);
+        res.status(500).json({ message: 'Error al obtener resumen bancario' });
+    }
+};
