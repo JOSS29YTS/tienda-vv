@@ -98,6 +98,8 @@ app.listen(PORT, async () => {
             { q: "ALTER TABLE venta_borrador ADD COLUMN id_tienda INT NULL", post: "DELETE FROM venta_borrador WHERE id_tienda IS NULL" },
             // compra.id_metodo_pago es legado: el nuevo diseño usa pago_compra (pagos múltiples)
             { q: "ALTER TABLE compra MODIFY COLUMN id_metodo_pago INT NULL" },
+            // BANCO (POS): método virtual origen para traspasos desde Banco -> Punto de Venta
+            { q: "INSERT IGNORE INTO metodo_pago (nb_metodo_pago, saldo_inicial) VALUES ('BANCO (POS)', 0)" },
         ];
 
         for (const m of migrations) {

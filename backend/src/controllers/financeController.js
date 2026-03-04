@@ -541,11 +541,17 @@ exports.payCommission = async (req, res) => {
 // ─── BANK PAGE: POS INCOME PER STORE ──────────────────────────────────────────
 exports.getBankPosSummary = async (req, res) => {
     try {
-        // Get id of PUNTO DE VENTA method
+        // PUNTO DE VENTA = destination in Finanzas (what receives the money)
         const [[posMethod]] = await pool.query(
-            `SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE '%PUNTO%' LIMIT 1`
+            `SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE '%PUNTO%' AND nb_metodo_pago NOT LIKE '%BANCO%' LIMIT 1`
         );
         const posId = posMethod ? posMethod.id_metodo_pago : 3;
+
+        // BANCO (POS) = virtual origin for Banco→Finanzas traspasos
+        const [[bancoMethod]] = await pool.query(
+            `SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago LIKE '%BANCO%' LIMIT 1`
+        );
+        const bancoId = bancoMethod ? bancoMethod.id_metodo_pago : null;
 
         // POS income per tienda (from sales payments)
         const [posIncome] = await pool.query(`
@@ -562,7 +568,8 @@ exports.getBankPosSummary = async (req, res) => {
             ORDER BY t.id_tienda
         `, [posId]);
 
-        // POS transfers OUT per tienda (traspasos where origin = POS, grouped by tienda)
+        // Traspasos from Banco per tienda (where origin = BANCO(POS) virtual method)
+        const bancoOriginId = bancoId || posId;
         const [posTransfers] = await pool.query(`
             SELECT
                 id_tienda,
@@ -570,7 +577,7 @@ exports.getBankPosSummary = async (req, res) => {
             FROM traspaso
             WHERE id_metodo_origen = ?
             GROUP BY id_tienda
-        `, [posId]);
+        `, [bancoOriginId]);
 
         // Merge into one response
         const transferMap = {};
@@ -584,7 +591,7 @@ exports.getBankPosSummary = async (req, res) => {
             neto_bs: parseFloat(row.total_pos_bs) - (transferMap[row.id_tienda] || 0)
         }));
 
-        res.json({ posMethodId: posId, stores: result });
+        res.json({ posMethodId: posId, bancoMethodId: bancoId || posId, stores: result });
 
     } catch (error) {
         console.error('Error getting bank POS summary:', error);

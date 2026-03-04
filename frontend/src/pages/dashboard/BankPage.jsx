@@ -21,6 +21,7 @@ const BankPage = () => {
 
     const [stores, setStores] = useState([]);
     const [posMethodId, setPosMethodId] = useState(3);
+    const [bancoMethodId, setBancoMethodId] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Traspaso modal
@@ -45,6 +46,7 @@ const BankPage = () => {
                 const data = await summaryRes.json();
                 setStores(data.stores || []);
                 setPosMethodId(data.posMethodId || 3);
+                setBancoMethodId(data.bancoMethodId || data.posMethodId || 3);
             }
         } catch (err) {
             console.error(err);
@@ -82,8 +84,8 @@ const BankPage = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
-                    id_metodo_origen: posMethodId,       // PUNTO DE VENTA (tagged to this tienda)
-                    id_metodo_destino: posMethodId,       // → PUNTO DE VENTA in Finanzas (global)
+                    id_metodo_origen: bancoMethodId || posMethodId, // BANCO(POS) virtual → no net-zero
+                    id_metodo_destino: posMethodId,                  // → PUNTO DE VENTA in Finanzas
                     monto: parseFloat(transferForm.monto),
                     tasa_dia: parseFloat(transferForm.tasa_dia),
                     id_tienda: selectedStore.id_tienda,
