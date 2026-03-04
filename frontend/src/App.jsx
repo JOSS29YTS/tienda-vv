@@ -18,6 +18,7 @@ import InvoicesPage from './pages/dashboard/InvoicesPage';
 import FinancesPage from './pages/dashboard/FinancesPage';
 import ProfitLossPage from './pages/dashboard/ProfitLossPage';
 import CommissionsPage from './pages/dashboard/CommissionsPage';
+import BankPage from './pages/dashboard/BankPage';
 
 
 const PlaceholderComponent = ({ title }) => (
@@ -76,6 +77,11 @@ function App() {
                 <Route path="commissions" element={
                   <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
                     <CommissionsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="bank" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <BankPage />
                   </ProtectedRoute>
                 } />
                 <Route path="finances" element={
