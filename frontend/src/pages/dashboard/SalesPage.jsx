@@ -939,11 +939,13 @@ const SalesPage = () => {
                                                         }`}
                                                 >
                                                     <option value="">- Seleccionar -</option>
-                                                    {paymentMethods.map(m => (
-                                                        <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>
-                                                            {m.nb_metodo_pago}
-                                                        </option>
-                                                    ))}
+                                                    {paymentMethods
+                                                        .filter(m => m.nb_metodo_pago !== 'BANCO (POS)')
+                                                        .map(m => (
+                                                            <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>
+                                                                {m.nb_metodo_pago}
+                                                            </option>
+                                                        ))}
                                                 </select>
                                                 {row.paymentMethod === 'MIXTO' && (
                                                     <button
@@ -1210,7 +1212,7 @@ const MixedPaymentContent = ({ totalUSD, rate, paymentMethods, onClose, onConfir
                         >
                             <option value="">Seleccionar...</option>
                             {paymentMethods
-                                .filter(m => m.nb_metodo_pago !== 'MIXTO')
+                                .filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'BANCO (POS)')
                                 .map(m => (
                                     <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
                                 ))}

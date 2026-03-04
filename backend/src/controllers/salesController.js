@@ -303,7 +303,10 @@ exports.closeSales = async (req, res) => {
                         for (const pay of row.paymentDetails) {
                             if (pay.method.toUpperCase() === 'PENDIENTE POR COBRAR') continue;
 
-                            const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [pay.method]);
+                            let targetMethodMixed = pay.method;
+                            if (targetMethodMixed.toUpperCase() === 'PUNTO DE VENTA') targetMethodMixed = 'BANCO (POS)';
+
+                            const [subMethods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [targetMethodMixed]);
                             const subMethodId = subMethods.length > 0 ? subMethods[0].id_metodo_pago : null;
 
                             if (subMethodId) {
@@ -321,7 +324,10 @@ exports.closeSales = async (req, res) => {
                     }
                 } else if (row.paymentMethod && row.paymentMethod !== 'PENDIENTE POR COBRAR') {
                     // Single Payment
-                    const [methods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [row.paymentMethod]);
+                    let targetMethodValue = row.paymentMethod;
+                    if (targetMethodValue.toUpperCase() === 'PUNTO DE VENTA') targetMethodValue = 'BANCO (POS)';
+
+                    const [methods] = await connection.query('SELECT id_metodo_pago FROM metodo_pago WHERE nb_metodo_pago = ?', [targetMethodValue]);
                     if (methods.length > 0) {
                         const paymentMethodId = methods[0].id_metodo_pago;
 

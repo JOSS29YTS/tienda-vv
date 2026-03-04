@@ -567,7 +567,7 @@ exports.getBankPosSummary = async (req, res) => {
             LEFT JOIN detalle_pago dp ON dp.id_pago = p.id_pago AND dp.id_metodo_pago = ?
             GROUP BY t.id_tienda, t.nb_tienda
             ORDER BY t.id_tienda
-        `, [posId]);
+        `, [bancoId || posId]);
 
         // Traspasos from Banco per tienda (where origin = BANCO(POS) virtual method)
         const bancoOriginId = bancoId || posId;
