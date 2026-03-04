@@ -29,6 +29,7 @@ const FinancesPage = () => {
         pendingInvoiceCount: 0,
         pendingInvoiceTotal: 0
     });
+    const [recentTxFilter, setRecentTxFilter] = useState('Todos');
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -967,9 +968,25 @@ const FinancesPage = () => {
                 transition={{ delay: 0.2 }}
                 className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"
             >
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <h3 className="font-bold text-slate-800 text-lg">Transacciones Recientes</h3>
-                    <button onClick={handleViewAllTransactions} className="text-sm text-emerald-600 font-medium hover:text-emerald-700">Ver Todo</button>
+                    <div className="flex items-center gap-3">
+                        <select
+                            value={recentTxFilter}
+                            onChange={e => setRecentTxFilter(e.target.value)}
+                            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-indigo-400 outline-none cursor-pointer"
+                        >
+                            <option value="Todos">Todas</option>
+                            <option value="Venta">Ventas</option>
+                            <option value="Compra">Compras</option>
+                            <option value="Gasto Fijo">Gastos Fijos</option>
+                            <option value="Gasto Variable">Gastos Variables</option>
+                            <option value="Préstamo">Préstamos</option>
+                            <option value="Pago Préstamo">Pago Préstamos</option>
+                            <option value="Traspaso">Traspasos</option>
+                        </select>
+                        <button onClick={handleViewAllTransactions} className="text-sm text-emerald-600 font-medium hover:text-emerald-700 whitespace-nowrap">Ver Todo</button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -986,8 +1003,8 @@ const FinancesPage = () => {
                         <tbody className="divide-y divide-slate-50">
                             {loading ? (
                                 <tr><td colSpan="6" className="p-8 text-center text-slate-400">Cargando datos...</td></tr>
-                            ) : transactions.length > 0 ? (
-                                transactions.map((tx, idx) => (
+                            ) : transactions.filter(tx => recentTxFilter === 'Todos' || tx.type.toLowerCase().includes(recentTxFilter.toLowerCase())).length > 0 ? (
+                                transactions.filter(tx => recentTxFilter === 'Todos' || tx.type.toLowerCase().includes(recentTxFilter.toLowerCase())).map((tx, idx) => (
                                     <tr key={`${tx.type}-${tx.id}-${idx}`} className="hover:bg-slate-50 transition-colors">
                                         <td className="p-4">
                                             <span className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold ${tx.category === 'Ingreso' ? 'bg-emerald-100 text-emerald-700' :
@@ -1040,7 +1057,7 @@ const FinancesPage = () => {
                                     <td colSpan="6" className="p-12 text-center text-slate-400">
                                         <div className="flex flex-col items-center gap-2">
                                             <FaChartLine className="text-4xl text-slate-200" />
-                                            <p>No hay transacciones registradas.</p>
+                                            <p>{recentTxFilter === 'Todos' ? 'No hay transacciones registradas.' : `No hay transacciones de tipo "${recentTxFilter}".`}</p>
                                         </div>
                                     </td>
                                 </tr>
