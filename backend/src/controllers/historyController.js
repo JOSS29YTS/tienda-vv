@@ -153,3 +153,105 @@ exports.getHistory = async (req, res) => {
         res.status(500).json({ message: 'Error al obtener historial: ' + error.message });
     }
 };
+
+// GET /api/history/day-detail?date=YYYY-MM-DD&tienda=X
+exports.getDayDetail = async (req, res) => {
+    try {
+        const { date, tienda } = req.query;
+        if (!date) return res.status(400).json({ message: 'Fecha requerida' });
+
+        const tiendaId = tienda && tienda !== 'global' ? parseInt(tienda) : null;
+        const tiendaFilter = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+
+        // Products soldgrouped by product name and category
+        const productsQuery = `
+            SELECT
+                p.nb_producto AS producto,
+                COALESCE(c.nb_categoria, 'Sin categoría') AS categoria,
+                SUM(dv.cantidad) AS cantidad_total,
+                dv.precio_unitario AS precio_unitario,
+                SUM(dv.cantidad * dv.precio_unitario) AS total_usd,
+                v.tasa_dia
+            FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
+            JOIN producto p ON dv.id_producto = p.id_producto
+            LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
+            WHERE DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') = ?
+            AND UPPER(p.nb_producto) != 'AVANCE DE EFECTIVO'
+            ${tiendaFilter}
+            GROUP BY p.nb_producto, c.nb_categoria, dv.precio_unitario, v.tasa_dia
+            ORDER BY cantidad_total DESC
+        `;
+
+        // Payment method summary for that day
+        const paymentQuery = `
+            SELECT
+                mp.nb_metodo_pago AS metodo,
+                SUM(dp.monto) AS total_usd,
+                ROUND(p.tasa_dia, 2) AS tasa_dia
+            FROM pago p
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
+            JOIN venta v ON dv.id_venta = v.id_venta
+            WHERE DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') = ?
+            AND UPPER(mp.nb_metodo_pago) != 'PENDIENTE POR COBRAR'
+            ${tiendaFilter}
+            GROUP BY mp.nb_metodo_pago, ROUND(p.tasa_dia, 2)
+        `;
+
+        // Overall summary stats
+        const summaryQuery = `
+            SELECT
+                COUNT(DISTINCT v.id_venta) AS total_ventas,
+                SUM(dv.cantidad) AS total_piezas,
+                SUM(dv.cantidad * dv.precio_unitario) AS ingreso_usd,
+                ROUND(v.tasa_dia, 2) AS tasa_dia
+            FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
+            JOIN producto p ON dv.id_producto = p.id_producto
+            WHERE DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') = ?
+            AND UPPER(p.nb_producto) != 'AVANCE DE EFECTIVO'
+            ${tiendaFilter}
+            GROUP BY ROUND(v.tasa_dia, 2)
+            LIMIT 1
+        `;
+
+        const [[products], [payments], [summaryRows]] = await Promise.all([
+            pool.query(productsQuery, [date]),
+            pool.query(paymentQuery, [date]),
+            pool.query(summaryQuery, [date])
+        ]);
+
+        const summary = summaryRows[0] || { total_ventas: 0, total_piezas: 0, ingreso_usd: 0, tasa_dia: 1 };
+
+        res.json({
+            date,
+            summary: {
+                totalVentas: parseInt(summary.total_ventas) || 0,
+                totalPiezas: parseInt(summary.total_piezas) || 0,
+                ingresoUSD: parseFloat(summary.ingreso_usd) || 0,
+                tasaDia: parseFloat(summary.tasa_dia) || 1,
+                ingresoBs: (parseFloat(summary.ingreso_usd) || 0) * (parseFloat(summary.tasa_dia) || 1)
+            },
+            products: products.map(p => ({
+                producto: p.producto,
+                categoria: p.categoria,
+                cantidad: parseInt(p.cantidad_total) || 0,
+                precioUnitario: parseFloat(p.precio_unitario) || 0,
+                totalUSD: parseFloat(p.total_usd) || 0,
+                totalBs: (parseFloat(p.total_usd) || 0) * (parseFloat(p.tasa_dia) || 1)
+            })),
+            payments: payments.map(pay => ({
+                metodo: pay.metodo,
+                totalUSD: parseFloat(pay.total_usd) || 0,
+                totalBs: (parseFloat(pay.total_usd) || 0) * (parseFloat(pay.tasa_dia) || 1),
+                tasa: parseFloat(pay.tasa_dia) || 1
+            }))
+        });
+
+    } catch (error) {
+        console.error('Error getting day detail:', error);
+        res.status(500).json({ message: 'Error al obtener detalle del día: ' + error.message });
+    }
+};

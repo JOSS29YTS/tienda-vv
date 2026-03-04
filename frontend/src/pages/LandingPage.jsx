@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { FaBoxOpen, FaChartLine, FaUsers, FaArrowRight } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
-import logo from '../assets/logo.jpg';
+
 
 const LandingPage = () => {
     const { user } = useAuth();
@@ -112,7 +112,7 @@ const LandingPage = () => {
 
                     <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-2xl shadow-black/50 overflow-hidden transform rotate-y-6 rotate-x-6 hover:rotate-0 transition-all duration-700 ease-out flex items-center justify-center">
                         <img
-                            src={logo}
+                            src="/img/LOGO.png"
                             alt="Ropa Mania Dashboard Logo"
                             className="w-full h-auto rounded-xl object-contain drop-shadow-2xl"
                         />
