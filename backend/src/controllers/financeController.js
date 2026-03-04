@@ -206,7 +206,7 @@ exports.getRecentTransactions = async (req, res) => {
 
         const query = `
             SELECT 'Venta' as type, v.id_venta as id, v.fecha_venta as date, SUM(dv.cantidad * dv.precio_unitario) as amount, u.nombre as user, 'Ingreso' as category, 
-            (SELECT GROUP_CONCAT(DISTINCT mp.nb_metodo_pago SEPARATOR ', ') FROM pago p JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta WHERE dv1.id_venta = v.id_venta) as payment_method, NULL as exchange_rate
+            (SELECT GROUP_CONCAT(DISTINCT REPLACE(mp.nb_metodo_pago, 'BANCO (POS)', 'PUNTO DE VENTA') SEPARATOR ', ') FROM pago p JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta WHERE dv1.id_venta = v.id_venta) as payment_method, NULL as exchange_rate
             FROM venta v JOIN detalle_venta dv ON v.id_venta = dv.id_venta JOIN usuario u ON v.id_usuario = u.id_usuario
             WHERE YEAR(v.fecha_venta) = YEAR(NOW()) AND MONTH(v.fecha_venta) = MONTH(NOW()) ${tiendaFilterV}
             GROUP BY v.id_venta, v.fecha_venta, u.nombre
