@@ -227,7 +227,7 @@ exports.getRecentTransactions = async (req, res) => {
             FROM traspaso tr JOIN usuario u ON tr.id_usuario = u.id_usuario JOIN metodo_pago mo ON tr.id_metodo_origen = mo.id_metodo_pago JOIN metodo_pago md ON tr.id_metodo_destino = md.id_metodo_pago
             WHERE YEAR(tr.fecha_traspaso) = YEAR(NOW()) AND MONTH(tr.fecha_traspaso) = MONTH(NOW()) ${tiendaFilterTR}
             UNION ALL
-            SELECT 'Préstamo' as type, p.id_prestamo as id, p.fecha_prestamo as date, p.monto_prestamo as amount, u.nombre as user, 'Ingreso' as category, mp.nb_metodo_pago as payment_method, p.tasa_dia as exchange_rate
+            SELECT 'Préstamo' as type, p.id_prestamo as id, p.fecha_prestamo as date, p.monto_prestamo as amount, u.nombre as user, 'Ingreso' as category, IF(p.motivo IS NOT NULL AND p.motivo != '', CONCAT(mp.nb_metodo_pago, ' - ', p.motivo), mp.nb_metodo_pago) as payment_method, p.tasa_dia as exchange_rate
             FROM prestamo p JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(p.fecha_prestamo) = YEAR(NOW()) AND MONTH(p.fecha_prestamo) = MONTH(NOW()) ${tiendaFilterPR}
             UNION ALL
@@ -342,6 +342,7 @@ exports.createLoan = async (req, res) => {
         const fecha_prestamo = req.body.fecha_prestamo || req.body.date;
         const userId = req.user.id;
         const tiendaId = req.body.id_tienda || req.user.id_tienda || 1;
+        const motivo = req.body.motivo || null;
 
         if (!id_metodo_pago || !monto_prestamo) {
             return res.status(400).json({ message: 'Debe seleccionar una cuenta y un monto.' });
@@ -355,7 +356,7 @@ exports.createLoan = async (req, res) => {
         }
         dateObj.setHours(dateObj.getHours() + 4);
         const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
-        await pool.query('INSERT INTO prestamo (id_usuario, id_tienda, id_metodo_pago, monto_prestamo, tasa_dia, fecha_prestamo) VALUES (?, ?, ?, ?, ?, ?)', [userId, tiendaId, id_metodo_pago, monto_prestamo, tasa_dia, formattedDate]);
+        await pool.query('INSERT INTO prestamo (id_usuario, id_tienda, id_metodo_pago, monto_prestamo, tasa_dia, fecha_prestamo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, id_metodo_pago, monto_prestamo, tasa_dia, formattedDate, motivo]);
         res.json({ message: 'Préstamo registrado exitosamente' });
     } catch (error) {
         console.error('Error creating loan:', error);

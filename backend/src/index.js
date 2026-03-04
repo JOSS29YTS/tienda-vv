@@ -100,6 +100,8 @@ app.listen(PORT, async () => {
             { q: "ALTER TABLE compra MODIFY COLUMN id_metodo_pago INT NULL" },
             // BANCO (POS): método virtual origen para traspasos desde Banco -> Punto de Venta
             { q: "INSERT IGNORE INTO metodo_pago (nb_metodo_pago, saldo_inicial) VALUES ('BANCO (POS)', 0)" },
+            // Motivo del préstamo
+            { q: "ALTER TABLE prestamo ADD COLUMN motivo VARCHAR(255) NULL" },
         ];
 
         for (const m of migrations) {

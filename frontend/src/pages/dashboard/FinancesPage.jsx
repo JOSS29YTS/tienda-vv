@@ -76,6 +76,7 @@ const FinancesPage = () => {
     const [loanForm, setLoanForm] = useState({ // New loan form state
         methodId: '',
         amount: '',
+        motivo: '',
         date: getLocalISOString()
     });
     const [variableExpenseForm, setVariableExpenseForm] = useState({
@@ -131,6 +132,7 @@ const FinancesPage = () => {
         setLoanForm({
             methodId: '',
             amount: '',
+            motivo: '',
             date: getLocalISOString()
         });
         setIsLoanModalOpen(true);
@@ -168,7 +170,7 @@ const FinancesPage = () => {
                 });
                 setIsLoanModalOpen(false);
                 fetchFinanceData(); // Refresh summary
-                setLoanForm({ methodId: '', amount: '', date: getLocalISOString() }); // Reset form
+                setLoanForm({ methodId: '', amount: '', motivo: '', date: getLocalISOString() }); // Reset form
             } else {
                 toast.error(data.message || 'Error al registrar préstamo', {
                     style: {
@@ -1112,6 +1114,19 @@ const FinancesPage = () => {
                                                 </option>
                                             ))}
                                         </select>
+                                    </div>
+
+                                    {/* Description Input */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motivo / Descripción (Opcional)</label>
+                                        <input
+                                            type="text"
+                                            value={loanForm.motivo}
+                                            onChange={e => setLoanForm({ ...loanForm, motivo: e.target.value })}
+                                            className="bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-3 transition-all outline-none"
+                                            placeholder="Ej: Inversión en mercancía"
+                                            maxLength="100"
+                                        />
                                     </div>
 
                                     {/* Amount Input */}
