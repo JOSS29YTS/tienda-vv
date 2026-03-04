@@ -145,13 +145,8 @@ exports.closeSales = async (req, res) => {
         if (isNaN(safeRate)) throw new Error('Tasa de cambio inválida.');
 
         // Validate Role
-        if (req.user.rol !== 'Administrador') { // Only Admin can close?
-            // Actually, sellers usually close sales too. Let's keep it restricted if that's the rule, 
-            // but traditionally any cashier can sell. 
-            // For now, keeping existing logic: "Solo el Administrador puede cerrar la venta" 
-            // Wait, users were sellers. Maybe I should relax this check if sellers need to sell.
-            // But the previous code had this check. I'll keep it for now unless requested otherwise.
-            return res.status(403).json({ message: 'Solo el Administrador puede cerrar la venta.' });
+        if (!['Administrador', 'Gerente', 'Vendedor'].includes(req.user.rol)) {
+            return res.status(403).json({ message: 'No tienes permiso para cerrar la venta.' });
         }
 
         // --- NEW MIXED PAYMENT LOGIC ---
