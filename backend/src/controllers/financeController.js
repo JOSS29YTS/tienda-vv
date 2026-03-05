@@ -574,7 +574,7 @@ exports.getBankPosSummary = async (req, res) => {
             SELECT
                 t.id_tienda,
                 t.nb_tienda,
-                COALESCE(SUM(dp.monto), 0) AS total_pos_bs
+                COALESCE(SUM(dp.monto * COALESCE(p.tasa_dia, 1)), 0) AS total_pos_bs
             FROM tienda t
             LEFT JOIN venta v ON v.id_tienda = t.id_tienda
             LEFT JOIN detalle_venta dv ON dv.id_venta = v.id_venta
