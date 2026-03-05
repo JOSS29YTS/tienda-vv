@@ -60,13 +60,16 @@ const BankPage = () => {
     }, []);
 
     useEffect(() => {
-        setTransferForm(prev => ({ ...prev, tasa_dia: rate ? parseFloat(rate).toFixed(2) : '' }));
+        const formattedTasa = rate ? parseFloat(rate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        setTransferForm(prev => ({ ...prev, tasa_dia: formattedTasa }));
     }, [rate]);
 
     // ── Open traspaso modal ────────────────────────────────────────────────────
     const openTransfer = (store) => {
         setSelectedStore(store);
-        setTransferForm({ monto: store.neto_bs > 0 ? store.neto_bs.toFixed(2) : '', tasa_dia: parseFloat(rate).toFixed(2) });
+        const formattedMonto = store.neto_bs > 0 ? store.neto_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        const formattedTasa = rate ? parseFloat(rate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        setTransferForm({ monto: formattedMonto, tasa_dia: formattedTasa });
         setIsTransferOpen(true);
     };
 
@@ -77,6 +80,15 @@ const BankPage = () => {
             toast.error('Ingresa el monto a traspasar');
             return;
         }
+
+        const parsedMonto = parseFloat(transferForm.monto.toString().replace(/\./g, '').replace(',', '.'));
+        const parsedTasa = parseFloat((transferForm.tasa_dia || '0').toString().replace(/\./g, '').replace(',', '.'));
+
+        if (isNaN(parsedMonto) || parsedMonto <= 0) {
+            toast.error('El monto ingresado no es válido');
+            return;
+        }
+
         setSubmitting(true);
         try {
             const token = localStorage.getItem('token');
@@ -86,8 +98,8 @@ const BankPage = () => {
                 body: JSON.stringify({
                     id_metodo_origen: bancoMethodId || posMethodId, // BANCO(POS) virtual → no net-zero
                     id_metodo_destino: posMethodId,                  // → PUNTO DE VENTA in Finanzas
-                    monto: parseFloat(transferForm.monto),
-                    tasa_dia: parseFloat(transferForm.tasa_dia),
+                    monto: parsedMonto,
+                    tasa_dia: parsedTasa,
                     id_tienda: selectedStore.id_tienda,
                 }),
             });
@@ -260,11 +272,14 @@ const BankPage = () => {
                                     Monto (Bs)
                                 </label>
                                 <input
-                                    type="number" step="0.01" min="0.01"
+                                    type="text"
                                     value={transferForm.monto}
-                                    onChange={e => setTransferForm(prev => ({ ...prev, monto: e.target.value }))}
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                        setTransferForm(prev => ({ ...prev, monto: val }));
+                                    }}
                                     className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                                    placeholder="Bs 0.00"
+                                    placeholder="Bs 0,00"
                                     required
                                 />
                             </div>
@@ -275,9 +290,12 @@ const BankPage = () => {
                                     Tasa del Día
                                 </label>
                                 <input
-                                    type="number" step="0.01"
+                                    type="text"
                                     value={transferForm.tasa_dia}
-                                    onChange={e => setTransferForm(prev => ({ ...prev, tasa_dia: e.target.value }))}
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/[^0-9.,]/g, '');
+                                        setTransferForm(prev => ({ ...prev, tasa_dia: val }));
+                                    }}
                                     className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                                 />
                             </div>
