@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaMoneyBillWave, FaSearch, FaTimes, FaPlus, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
+import { FaMoneyBillWave, FaSearch, FaTimes, FaPlus, FaCheckCircle, FaExclamationCircle, FaInfoCircle } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
@@ -13,6 +13,7 @@ const InvoicesPage = () => {
     const [pendingLoans, setPendingLoans] = useState([]); // New state
     const [searchTerm, setSearchTerm] = useState('');
     const [paymentMethods, setPaymentMethods] = useState([]);
+    const [openMotivoId, setOpenMotivoId] = useState(null);
 
     // Payment Modal State
     const [selectedItem, setSelectedItem] = useState(null); // Renamed from selectedInvoice
@@ -337,6 +338,30 @@ const InvoicesPage = () => {
                                             <div>
                                                 <h3 className="text-xl font-black text-slate-800">Préstamo {loan.nb_metodo_pago}</h3>
                                                 <span className="text-xs font-bold text-slate-400 uppercase">ID #{loan.id_prestamo}</span>
+                                                {loan.motivo && (
+                                                    <div className="mt-2">
+                                                        <button
+                                                            onClick={() => setOpenMotivoId(openMotivoId === loan.id_prestamo ? null : loan.id_prestamo)}
+                                                            className="text-[10px] font-black tracking-wide uppercase text-slate-600 hover:text-slate-800 flex items-center gap-1.5 transition-colors bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md w-fit"
+                                                        >
+                                                            <FaInfoCircle size={12} /> {openMotivoId === loan.id_prestamo ? 'Ocultar Motivo' : 'Ver Motivo'}
+                                                        </button>
+                                                        <AnimatePresence>
+                                                            {openMotivoId === loan.id_prestamo && (
+                                                                <motion.div
+                                                                    initial={{ height: 0, opacity: 0 }}
+                                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                                    exit={{ height: 0, opacity: 0 }}
+                                                                    className="overflow-hidden"
+                                                                >
+                                                                    <p className="mt-3 text-sm font-medium text-slate-700 italic bg-amber-50 p-3.5 rounded-xl border border-amber-200/60 shadow-inner">
+                                                                        "{loan.motivo}"
+                                                                    </p>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-xs font-black uppercase">
                                                 Pendiente
