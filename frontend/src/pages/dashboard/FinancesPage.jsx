@@ -874,7 +874,7 @@ const FinancesPage = () => {
                                                     {tx.payment_method?.toUpperCase()}
                                                 </span>
                                             ) : (
-                                                tx.payment_method || '-'
+                                                tx.payment_method === 'BANCO (POS)' ? 'PUNTO DE VENTA' : (tx.payment_method || '-')
                                             )}
                                         </td>
                                         <td className="p-4 text-slate-700 text-sm">{tx.user}</td>
@@ -1378,7 +1378,7 @@ const FinancesPage = () => {
                                                                 {tx.payment_method}
                                                             </span>
                                                         ) : (
-                                                            tx.payment_method || '-'
+                                                            tx.payment_method === 'BANCO (POS)' ? 'PUNTO DE VENTA' : (tx.payment_method || '-')
                                                         )}
                                                     </td>
                                                     <td className="p-4 text-slate-700 text-sm">{tx.user}</td>

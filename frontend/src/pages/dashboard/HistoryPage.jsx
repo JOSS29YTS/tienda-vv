@@ -118,7 +118,7 @@ const DayDetailModal = ({ detail, onClose, formatDate }) => {
             startY: nextY + 6,
             head: [['Método de Pago', 'Total $', 'Total Bs']],
             body: payments.map(pay => [
-                pay.metodo,
+                pay.metodo === 'BANCO (POS)' ? 'PUNTO DE VENTA' : pay.metodo,
                 `$ ${pay.totalUSD.toFixed(2)}`,
                 `Bs ${(pay.totalUSD * (summary.tasaDia || 1)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
             ]),
@@ -290,7 +290,9 @@ const DayDetailModal = ({ detail, onClose, formatDate }) => {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {payments.map((pay, i) => (
                                                 <div key={i} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
-                                                    <span className="text-sm font-semibold text-slate-700">{pay.metodo}</span>
+                                                    <span className="text-sm font-semibold text-slate-700">
+                                                        {pay.metodo === 'BANCO (POS)' ? 'PUNTO DE VENTA' : pay.metodo}
+                                                    </span>
                                                     <div className="text-right">
                                                         <div className="text-sm font-black text-slate-900">
                                                             $ {pay.totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -478,7 +480,9 @@ const HistoryCard = ({ day, formatDate, onViewDetail }) => {
                             >
                                 {day.breakdown.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-sm py-1 border-b border-slate-50 last:border-0">
-                                        <span className="text-slate-500">{item.method}</span>
+                                        <span className="text-slate-500">
+                                            {item.method === 'BANCO (POS)' ? 'PUNTO DE VENTA' : item.method}
+                                        </span>
                                         <span className="font-bold text-slate-700">
                                             {item.currency === 'USD' ? '$ ' : ''}
                                             {item.amount.toLocaleString(item.currency === 'USD' ? 'en-US' : 'es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -637,7 +641,7 @@ const HistoryPage = () => {
                 startY: nextY + 3,
                 head: [['Método de Pago', 'Monto']],
                 body: day.breakdown.map(item => [
-                    item.method,
+                    item.method === 'BANCO (POS)' ? 'PUNTO DE VENTA' : item.method,
                     item.currency === 'USD'
                         ? `$ ${item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                         : `Bs ${item.amount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
