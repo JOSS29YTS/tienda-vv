@@ -67,7 +67,8 @@ exports.getProfitLoss = async (req, res) => {
         const currentRate = Math.round(rawRate * 100) / 100;
 
         const [febRateConfig] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_inicial_febrero']);
-        const febRate = parseFloat(febRateConfig[0]?.valor) || currentRate;
+        // La tasa de febrero para el balance histórico debe ser 419.99 fija según el usuario.
+        const febRate = parseFloat(febRateConfig[0]?.valor) || 419.99;
 
         const [methods] = await pool.query('SELECT nb_metodo_pago, saldo_inicial FROM metodo_pago');
         let initialBalanceUSD = 0;
