@@ -249,36 +249,36 @@ exports.getRecentTransactions = async (req, res) => {
 
         const query = `
             SELECT 'Venta' as type, v.id_venta as id, v.fecha_venta as date, SUM(dv.cantidad * dv.precio_unitario) as amount, u.nombre as user, 'Ingreso' as category, 
-            (SELECT GROUP_CONCAT(DISTINCT REPLACE(mp.nb_metodo_pago, 'BANCO (POS)', 'PUNTO DE VENTA') SEPARATOR ', ') FROM pago p JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta WHERE dv1.id_venta = v.id_venta) as payment_method, NULL as exchange_rate, NULL as descripcion
+            (SELECT GROUP_CONCAT(DISTINCT REPLACE(mp.nb_metodo_pago, 'BANCO (POS)', 'PUNTO DE VENTA') SEPARATOR ', ') FROM pago p JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta WHERE dv1.id_venta = v.id_venta) as payment_method, NULL as exchange_rate, NULL as descripcion, 'venta' as source_module
             FROM venta v JOIN detalle_venta dv ON v.id_venta = dv.id_venta JOIN usuario u ON v.id_usuario = u.id_usuario
             WHERE YEAR(v.fecha_venta) = YEAR(NOW()) AND MONTH(v.fecha_venta) = MONTH(NOW()) ${tiendaFilterV}
             GROUP BY v.id_venta, v.fecha_venta, u.nombre
             UNION ALL
-            SELECT 'Compra' as type, c.id_compra as id, c.fecha_compra as date, c.total_compra as amount, u.nombre as user, 'Egreso' as category, COALESCE(ec.nb_estado_compra, 'PAGADA') as payment_method, NULL as exchange_rate, NULL as descripcion
+            SELECT 'Compra' as type, c.id_compra as id, c.fecha_compra as date, c.total_compra as amount, u.nombre as user, 'Egreso' as category, COALESCE(ec.nb_estado_compra, 'PAGADA') as payment_method, NULL as exchange_rate, NULL as descripcion, 'compra' as source_module
             FROM compra c JOIN usuario u ON c.id_usuario = u.id_usuario LEFT JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
             WHERE YEAR(c.fecha_compra) = YEAR(NOW()) AND MONTH(c.fecha_compra) = MONTH(NOW()) ${tiendaFilterC}
             UNION ALL
-            SELECT t.nb_tipo_pago_fijo as type, p.id_pago_fijo as id, p.fecha_pago_fijo as date, p.monto as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, p.tasa_dia as exchange_rate, p.descripcion as descripcion
+            SELECT t.nb_tipo_pago_fijo as type, p.id_pago_fijo as id, p.fecha_pago_fijo as date, p.monto as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, p.tasa_dia as exchange_rate, p.descripcion as descripcion, 'pago_fijo' as source_module
             FROM pago_fijo p JOIN tipo_pago_fijo t ON p.id_tipo_pago_fijo = t.id_tipo_pago_fijo JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(p.fecha_pago_fijo) = YEAR(NOW()) AND MONTH(p.fecha_pago_fijo) = MONTH(NOW()) ${tiendaFilterPF}
             UNION ALL
-            SELECT tgv.nb_gasto_variable as type, gv.id_gasto_variable as id, gv.fecha_gasto_variable as date, gv.monto_usd as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, gv.tasa_dia as exchange_rate, gv.descripcion as descripcion
+            SELECT tgv.nb_gasto_variable as type, gv.id_gasto_variable as id, gv.fecha_gasto_variable as date, gv.monto_usd as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, gv.tasa_dia as exchange_rate, gv.descripcion as descripcion, 'gasto_variable' as source_module
             FROM gasto_variable gv JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable JOIN usuario u ON gv.id_usuario = u.id_usuario JOIN metodo_pago mp ON gv.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(gv.fecha_gasto_variable) = YEAR(NOW()) AND MONTH(gv.fecha_gasto_variable) = MONTH(NOW()) ${tiendaFilterGV}
             UNION ALL
-            SELECT 'Traspaso' as type, tr.id_traspaso as id, tr.fecha_traspaso as date, tr.monto as amount, u.nombre as user, 'Traspaso' as category, IF(mo.nb_metodo_pago = 'BANCO (POS)', CONCAT(ti_tr.nb_tienda, ' -> ', md.nb_metodo_pago), CONCAT(mo.nb_metodo_pago, ' -> ', md.nb_metodo_pago)) as payment_method, tr.tasa_dia as exchange_rate, NULL as descripcion
+            SELECT 'Traspaso' as type, tr.id_traspaso as id, tr.fecha_traspaso as date, tr.monto as amount, u.nombre as user, 'Traspaso' as category, IF(mo.nb_metodo_pago = 'BANCO (POS)', CONCAT(ti_tr.nb_tienda, ' -> ', md.nb_metodo_pago), CONCAT(mo.nb_metodo_pago, ' -> ', md.nb_metodo_pago)) as payment_method, tr.tasa_dia as exchange_rate, NULL as descripcion, 'traspaso' as source_module
             FROM traspaso tr JOIN usuario u ON tr.id_usuario = u.id_usuario JOIN metodo_pago mo ON tr.id_metodo_origen = mo.id_metodo_pago JOIN metodo_pago md ON tr.id_metodo_destino = md.id_metodo_pago LEFT JOIN tienda ti_tr ON tr.id_tienda = ti_tr.id_tienda
             WHERE YEAR(tr.fecha_traspaso) = YEAR(NOW()) AND MONTH(tr.fecha_traspaso) = MONTH(NOW()) ${tiendaFilterTR}
             UNION ALL
-            SELECT 'Préstamo' as type, p.id_prestamo as id, p.fecha_prestamo as date, p.monto_prestamo as amount, u.nombre as user, 'Ingreso' as category, IF(p.motivo IS NOT NULL AND p.motivo != '', CONCAT(mp.nb_metodo_pago, ' - ', p.motivo), mp.nb_metodo_pago) as payment_method, p.tasa_dia as exchange_rate, p.motivo as descripcion
+            SELECT 'Préstamo' as type, p.id_prestamo as id, p.fecha_prestamo as date, p.monto_prestamo as amount, u.nombre as user, 'Ingreso' as category, IF(p.motivo IS NOT NULL AND p.motivo != '', CONCAT(mp.nb_metodo_pago, ' - ', p.motivo), mp.nb_metodo_pago) as payment_method, p.tasa_dia as exchange_rate, p.motivo as descripcion, 'prestamo' as source_module
             FROM prestamo p JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(p.fecha_prestamo) = YEAR(NOW()) AND MONTH(p.fecha_prestamo) = MONTH(NOW()) ${tiendaFilterPR}
             UNION ALL
-            SELECT 'Pago Préstamo' as type, pp.id_pago_prestamo as id, pp.fecha_pago as date, pp.monto as amount, u.nombre as user, 'Egreso' as category, CONCAT('Pago a Préstamo (', mp.nb_metodo_pago, ')') as payment_method, pp.tasa_dia as exchange_rate, NULL as descripcion
+            SELECT 'Pago Préstamo' as type, pp.id_pago_prestamo as id, pp.fecha_pago as date, pp.monto as amount, u.nombre as user, 'Egreso' as category, CONCAT('Pago a Préstamo (', mp.nb_metodo_pago, ')') as payment_method, pp.tasa_dia as exchange_rate, NULL as descripcion, 'pago_prestamo' as source_module
             FROM pago_prestamo pp JOIN prestamo p ON pp.id_prestamo = p.id_prestamo JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(pp.fecha_pago) = YEAR(NOW()) AND MONTH(pp.fecha_pago) = MONTH(NOW())
             UNION ALL
-            SELECT 'Pago Comisión' as type, pc.id_pago_comision as id, pc.fecha_pago as date, pc.monto_usd as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, pc.tasa_dia as exchange_rate, pc.nb_beneficiario as descripcion
+            SELECT 'Pago Comisión' as type, pc.id_pago_comision as id, pc.fecha_pago as date, pc.monto_usd as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, pc.tasa_dia as exchange_rate, pc.nb_beneficiario as descripcion, 'pago_comision' as source_module
             FROM pago_comision pc JOIN usuario u ON pc.id_usuario = u.id_usuario JOIN metodo_pago mp ON pc.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(pc.fecha_pago) = YEAR(NOW()) AND MONTH(pc.fecha_pago) = MONTH(NOW()) ${tiendaFilterPC}
             ORDER BY date DESC, id DESC LIMIT ?
@@ -293,10 +293,7 @@ exports.getRecentTransactions = async (req, res) => {
 
 exports.getFixedPaymentTypes = async (req, res) => {
     try {
-        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
-        // Si hay tienda seleccionada, buscamos las de esa tienda o las globales (id_tienda IS NULL)
-        const tiendaFilter = tiendaId ? `AND (id_tienda = ${tiendaId} OR id_tienda IS NULL)` : '';
-        const [types] = await pool.query(`SELECT * FROM tipo_pago_fijo WHERE (nb_tipo_pago_fijo NOT LIKE '%COMISIONES POR VENTA%' AND nb_tipo_pago_fijo NOT LIKE '%PAGO DE COMISIONES%') ${tiendaFilter} ORDER BY nb_tipo_pago_fijo ASC`);
+        const [types] = await pool.query(`SELECT * FROM tipo_pago_fijo WHERE (nb_tipo_pago_fijo NOT LIKE '%COMISIONES POR VENTA%' AND nb_tipo_pago_fijo NOT LIKE '%PAGO DE COMISIONES%') ORDER BY nb_tipo_pago_fijo ASC`);
         res.json(types);
     } catch (error) {
         console.error('Error getting fixed payment types:', error);
@@ -480,10 +477,7 @@ exports.buyCurrency = async (req, res) => {
 
 exports.getVariableExpenseTypes = async (req, res) => {
     try {
-        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
-        // Si hay tienda seleccionada, buscamos las de esa tienda o las globales (id_tienda IS NULL)
-        const tiendaFilter = tiendaId ? `WHERE (id_tienda = ${tiendaId} OR id_tienda IS NULL)` : '';
-        const [types] = await pool.query(`SELECT * FROM tipo_gasto_variable ${tiendaFilter} ORDER BY nb_gasto_variable ASC`);
+        const [types] = await pool.query(`SELECT * FROM tipo_gasto_variable ORDER BY nb_gasto_variable ASC`);
         res.json(types);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener tipos de gasto variable' });

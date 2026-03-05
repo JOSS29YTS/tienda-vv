@@ -148,10 +148,8 @@ const GastosPage = () => {
                 // Filtramos solo gastos fijos y variables
                 const filtered = all.filter(tx =>
                     activeTab === 'fijos'
-                        ? !['Venta', 'Compra', 'Traspaso', 'Préstamo', 'Pago Préstamo', 'Pago Comisión'].includes(tx.type) &&
-                        !tx.type.toLowerCase().includes('variable')
-                        : tx.type.toLowerCase().includes('variable') ||
-                        tx.type.toLowerCase().includes('gasto')
+                        ? tx.source_module === 'pago_fijo'
+                        : tx.source_module === 'gasto_variable'
                 );
                 setGastos(filtered);
             }
