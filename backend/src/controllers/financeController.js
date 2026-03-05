@@ -64,9 +64,12 @@ exports.getFinanceSummary = async (req, res) => {
         `);
 
         // 1.5 TOTAL Income from Loans (All time)
-        const tiendaFilterPR = tiendaId ? ` AND id_tienda = ${tiendaId}` : '';
+        const tiendaFilterPR = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
         const [loanResult] = await pool.query(`
-            SELECT COALESCE(SUM(monto_prestamo), 0) as total FROM prestamo WHERE 1=1 ${tiendaFilterPR}
+            SELECT p.monto_prestamo, p.tasa_dia, mp.nb_metodo_pago
+            FROM prestamo p
+            JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE 1=1 ${tiendaFilterPR}
         `);
 
         // 2. TOTAL Expenses (All time)
@@ -120,9 +123,19 @@ exports.getFinanceSummary = async (req, res) => {
             }
         }
 
+        let totalLoansUSD = 0;
+        for (const l of loanResult) {
+            const method = l.nb_metodo_pago.toUpperCase();
+            if (usdKeywords.some(k => method.includes(k))) {
+                totalLoansUSD += parseFloat(l.monto_prestamo);
+            } else {
+                totalLoansUSD += (parseFloat(l.monto_prestamo) / (parseFloat(l.tasa_dia) || currentRate));
+            }
+        }
+
         // Final Totals for Cards - Initial Balance only for Tienda 1 or Global
         const capitalToDisplay = (!tiendaId || tiendaId === 1) ? totalInitialBalanceUSD : 0;
-        const finalIncome = parseFloat(salesResult[0].total) + parseFloat(loanResult[0].total) + capitalToDisplay;
+        const finalIncome = parseFloat(salesResult[0].total) + totalLoansUSD + capitalToDisplay;
         const finalExpenses = totalExpenses;
         const finalBalance = finalIncome - finalExpenses - totalAvance;
 
