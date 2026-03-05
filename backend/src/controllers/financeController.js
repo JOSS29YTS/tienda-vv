@@ -184,8 +184,32 @@ exports.getFinanceSummary = async (req, res) => {
             WHERE (fp.monto_deuda - COALESCE(paid.total_paid, 0)) > 0.01
             ${tiendaFilterFP}
         `);
-        const pendingCount = parseInt(pendingInvoices[0]?.count || 0);
-        const pendingTotal = parseFloat(pendingInvoices[0]?.total || 0);
+        let pendingCount = parseInt(pendingInvoices[0]?.count || 0);
+        let pendingTotal = parseFloat(pendingInvoices[0]?.total || 0);
+
+        // --- PENDING LOANS ---
+        const [pendingLoansData] = await pool.query(`
+            SELECT p.id_prestamo, p.monto_prestamo, p.tasa_dia, mp.nb_metodo_pago
+            FROM prestamo p
+            JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE 1=1 ${tiendaFilterPR}
+        `);
+
+        for (const l of pendingLoansData) {
+            const [payments] = await pool.query('SELECT SUM(monto) as total FROM pago_prestamo WHERE id_prestamo = ?', [l.id_prestamo]);
+            const totalPagado = parseFloat(payments[0]?.total || 0);
+            const pendiente = parseFloat(l.monto_prestamo) - totalPagado;
+
+            if (pendiente > 0.05) {
+                pendingCount++;
+                const isUsd = usdKeywords.some(k => (l.nb_metodo_pago || '').toUpperCase().includes(k));
+                if (isUsd) {
+                    pendingTotal += pendiente;
+                } else {
+                    pendingTotal += (pendiente / (parseFloat(l.tasa_dia) || currentRate));
+                }
+            }
+        }
 
         res.json({
             stats: {

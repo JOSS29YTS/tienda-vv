@@ -750,7 +750,7 @@ const FinancesPage = () => {
                 />
 
                 <StatCard
-                    title={`Facturas Pendientes (${stats.pendingInvoiceCount})`}
+                    title={`Deudas Pendientes (${stats.pendingInvoiceCount})`}
                     value={stats.pendingInvoiceTotal}
                     icon={FaFileInvoiceDollar}
                     gradient="bg-gradient-to-br from-amber-500 to-orange-600"
