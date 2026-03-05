@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaChartLine, FaMoneyBillWave, FaArrowUp, FaArrowDown, FaFileInvoiceDollar, FaWallet, FaReceipt, FaShoppingCart, FaPlus, FaTimes, FaDollarSign, FaMobileAlt, FaCreditCard, FaFingerprint, FaExchangeAlt, FaMoneyBill, FaHandHoldingUsd } from 'react-icons/fa';
+import { FaChartLine, FaMoneyBillWave, FaArrowUp, FaArrowDown, FaFileInvoiceDollar, FaWallet, FaReceipt, FaShoppingCart, FaPlus, FaTimes, FaDollarSign, FaMobileAlt, FaCreditCard, FaFingerprint, FaExchangeAlt, FaMoneyBill } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
 import toast, { Toaster } from 'react-hot-toast';
@@ -34,7 +34,6 @@ const FinancesPage = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false); // New state for loan modal
     const [fixedPaymentTypes, setFixedPaymentTypes] = useState([]);
     const [isVariableExpenseModalOpen, setIsVariableExpenseModalOpen] = useState(false);
     const [variableExpenseTypes, setVariableExpenseTypes] = useState([]);
@@ -73,12 +72,6 @@ const FinancesPage = () => {
         fecha_traspaso: getLocalISODate()
     });
 
-    const [loanForm, setLoanForm] = useState({ // New loan form state
-        methodId: '',
-        amount: '',
-        motivo: '',
-        date: getLocalISOString()
-    });
     const [variableExpenseForm, setVariableExpenseForm] = useState({
         id_tipo_gasto_variable: 'new',
         nb_gasto_variable: '',
@@ -126,76 +119,6 @@ const FinancesPage = () => {
             fecha_traspaso: getLocalISODate()
         });
         setIsTransferModalOpen(true);
-    };
-
-    const handleLoanClick = () => {
-        setLoanForm({
-            methodId: '',
-            amount: '',
-            motivo: '',
-            date: getLocalISOString()
-        });
-        setIsLoanModalOpen(true);
-    };
-
-    const handleLoanSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/finances/loans`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    ...loanForm,
-                    rate: roundedRate,
-                    date: loanForm.date,
-                    id_tienda: effectiveTiendaId || 1
-                })
-            });
-
-            const data = await res.json();
-            if (res.ok) {
-                toast.success(data.message || 'Préstamo registrado exitosamente', {
-                    style: {
-                        background: '#10B981',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#10B981',
-                    },
-                });
-                setIsLoanModalOpen(false);
-                fetchFinanceData(); // Refresh summary
-                setLoanForm({ methodId: '', amount: '', motivo: '', date: getLocalISOString() }); // Reset form
-            } else {
-                toast.error(data.message || 'Error al registrar préstamo', {
-                    style: {
-                        background: '#EF4444',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#EF4444',
-                    },
-                });
-            }
-        } catch (err) {
-            console.error(err);
-            toast.error('Error de conexión', {
-                style: {
-                    background: '#EF4444',
-                    color: '#fff',
-                },
-                iconTheme: {
-                    primary: '#fff',
-                    secondary: '#EF4444',
-                },
-            });
-        }
     };
 
     useEffect(() => {
@@ -802,27 +725,6 @@ const FinancesPage = () => {
                         <FaFileInvoiceDollar />
                         Reporte
                     </button>
-                    <button
-                        onClick={() => {
-                            if (isGlobal) {
-                                toast.error('Seleccione una tienda específica antes de registrar un préstamo.', {
-                                    icon: '🏪',
-                                    style: { background: '#F59E0B', color: '#fff' }
-                                });
-                                return;
-                            }
-                            handleLoanClick();
-                        }}
-                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-xl font-bold transition-colors shadow-lg whitespace-nowrap ${isGlobal
-                            ? 'bg-amber-300 text-amber-700 cursor-not-allowed'
-                            : 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/30'
-                            }`}
-                        title={isGlobal ? 'Seleccione una tienda para registrar un préstamo' : 'Registrar préstamo'}
-                    >
-                        <FaHandHoldingUsd />
-                        Préstamo
-                    </button>
-
                 </div>
             </header>
 
@@ -1011,139 +913,6 @@ const FinancesPage = () => {
                     </table>
                 </div>
             </motion.div>
-
-            {/* Loan Modal */}
-            <AnimatePresence>
-                {isLoanModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-                        >
-                            <div className="bg-amber-500 text-white p-6 flex justify-between items-center relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-4 opacity-10">
-                                    <FaHandHoldingUsd size={80} />
-                                </div>
-                                <div className="relative z-10 w-full">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-black text-2xl tracking-tight">Registrar Préstamo</h3>
-                                        <button onClick={() => setIsLoanModalOpen(false)} className="text-white/80 hover:text-white transition-colors bg-white/10 p-1.5 rounded-lg hover:bg-white/20">
-                                            <FaTimes size={18} />
-                                        </button>
-                                    </div>
-                                    <p className="text-amber-100/90 text-sm font-medium">Ingreso de dinero a la bodega en calidad de préstamo.</p>
-                                </div>
-                            </div>
-
-                            <form onSubmit={handleLoanSubmit} className="p-6 space-y-6">
-                                <div className="space-y-4">
-                                    {/* Method Selection */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cuenta Destino</label>
-                                        <select
-                                            value={loanForm.methodId}
-                                            onChange={e => setLoanForm({ ...loanForm, methodId: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block p-3 font-bold transition-all outline-none"
-                                        >
-                                            <option value="">Seleccione cuenta...</option>
-                                            {paymentMethods.filter(m =>
-                                                ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL', 'MOVIL', 'M\u00d3VIL', 'TRANSFERENCIA', 'EFECTIVO', 'PUNTO'].some(k => m.nb_metodo_pago.toUpperCase().includes(k)) &&
-                                                !m.nb_metodo_pago.toUpperCase().includes('PENDIENTE')
-                                            ).map((method) => (
-                                                <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
-                                                    {method.nb_metodo_pago}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* Description Input */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motivo / Descripción (Opcional)</label>
-                                        <input
-                                            type="text"
-                                            value={loanForm.motivo}
-                                            onChange={e => setLoanForm({ ...loanForm, motivo: e.target.value })}
-                                            className="bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-3 transition-all outline-none"
-                                            placeholder="Ej: Inversión en mercancía"
-                                            maxLength="100"
-                                        />
-                                    </div>
-
-                                    {/* Amount Input */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                                            Monto del Préstamo
-                                            {loanForm.methodId && (() => {
-                                                const m = paymentMethods.find(pm => pm.id_metodo_pago == loanForm.methodId);
-                                                const isUsd = m && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => m.nb_metodo_pago.toUpperCase().includes(k));
-                                                return isUsd ? ' ($ USD)' : ' (Bs)';
-                                            })()}
-                                        </label>
-                                        <div className="relative">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <span className="text-slate-400 font-bold">
-                                                    {loanForm.methodId && (() => {
-                                                        const m = paymentMethods.find(pm => pm.id_metodo_pago == loanForm.methodId);
-                                                        const isUsd = m && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => m.nb_metodo_pago.toUpperCase().includes(k));
-                                                        return isUsd ? '$' : 'Bs';
-                                                    })()}
-                                                </span>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                value={loanForm.amount}
-                                                onChange={e => setLoanForm({ ...loanForm, amount: e.target.value })}
-                                                className="bg-slate-50 border border-slate-200 text-slate-900 text-lg rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full pl-10 p-3 font-black text-right outline-none transition-all"
-                                                placeholder="0.00"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Date and Rate */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fecha</label>
-                                            <input
-                                                type="datetime-local"
-                                                value={loanForm.date}
-                                                onChange={e => setLoanForm({ ...loanForm, date: e.target.value })}
-                                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-3 font-bold outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tasa del Día</label>
-                                            <div className="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-xl block w-full p-3 font-bold text-right cursor-not-allowed">
-                                                Bs {parseFloat(rate).toFixed(2)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsLoanModalOpen(false)}
-                                        className="flex-1 text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl px-5 py-3 transition-colors text-sm"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 text-white bg-amber-500 hover:bg-amber-600 font-bold rounded-xl px-5 py-3 shadow-lg shadow-amber-500/20 transition-all text-sm flex items-center justify-center gap-2"
-                                    >
-                                        Confirmar Préstamo
-                                        <FaHandHoldingUsd />
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
             {/* Modal */}
             <AnimatePresence>
                 {isModalOpen && (

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaReceipt, FaPlus, FaTimes, FaStore, FaCalendarAlt,
     FaDollarSign, FaMoneyBillWave, FaFilter, FaLayerGroup,
-    FaTag, FaCreditCard, FaMobileAlt, FaExchangeAlt, FaMoneyBill, FaSpinner
+    FaTag, FaCreditCard, FaMobileAlt, FaExchangeAlt, FaMoneyBill, FaSpinner, FaHandHoldingUsd
 } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
@@ -28,7 +28,14 @@ const GastosPage = () => {
 
     const [isFixedModalOpen, setIsFixedModalOpen] = useState(false);
     const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    const getLocalISOString = () => {
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
     const getLocalISODate = () => {
         const d = new Date();
@@ -55,6 +62,14 @@ const GastosPage = () => {
         moneda: 'USD',
         tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
         fecha: getLocalISODate(),
+        id_tienda: ''
+    });
+
+    const [loanForm, setLoanForm] = useState({
+        methodId: '',
+        amount: '',
+        motivo: '',
+        date: getLocalISOString(),
         id_tienda: ''
     });
 
@@ -292,6 +307,56 @@ const GastosPage = () => {
         fecha: getLocalISODate(), id_tienda: effectiveTiendaId || ''
     });
 
+    const handleLoanClick = () => {
+        setLoanForm({
+            methodId: '',
+            amount: '',
+            motivo: '',
+            date: getLocalISOString(),
+            id_tienda: effectiveTiendaId || (tiendasList.length === 1 ? tiendasList[0].id_tienda : '')
+        });
+        setIsLoanModalOpen(true);
+    };
+
+    const handleLoanSubmit = async (e) => {
+        e.preventDefault();
+        const tiendaId = loanForm.id_tienda || effectiveTiendaId || 1;
+        if (!tiendaId || tiendaId === 'all') {
+            toast.error('Seleccione una tienda para registrar el préstamo.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const res = await fetch(`${API_URL}/api/finances/loans`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token()}`
+                },
+                body: JSON.stringify({
+                    ...loanForm,
+                    rate: parseFloat(rate).toFixed(2),
+                    date: loanForm.date,
+                    id_tienda: tiendaId
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                toast.success(data.message || 'Préstamo registrado exitosamente', { style: { background: '#10B981', color: '#fff' } });
+                setIsLoanModalOpen(false);
+                fetchGastos(); // Update list if applicable
+            } else {
+                toast.error(data.message || 'Error al registrar préstamo', { style: { background: '#EF4444', color: '#fff' } });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error de conexión');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     // ── Formatters ─────────────────────────────────────────────────────────────
     const fmt$ = v => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
     const fmtBs = v => new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(v).replace('Bs.S', 'Bs.');
@@ -345,9 +410,15 @@ const GastosPage = () => {
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Gastos</h2>
-                    <p className="text-slate-500 text-sm">Registro de gastos fijos y variables por tienda.</p>
+                    <p className="text-slate-500 text-sm">Registro de gastos fijos, variables y préstamos.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
+                    <button
+                        onClick={handleLoanClick}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20"
+                    >
+                        <FaHandHoldingUsd /> Préstamo
+                    </button>
                     <button
                         onClick={openFixedModal}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20"
@@ -817,6 +888,149 @@ const GastosPage = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* ══════════════════════════════════════════════════════════
+                MODAL: Préstamo
+            ══════════════════════════════════════════════════════════ */}
+            <AnimatePresence>
+                {isLoanModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        >
+                            <div className="bg-amber-500 text-white p-6 flex justify-between items-center relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-10">
+                                    <FaHandHoldingUsd size={80} />
+                                </div>
+                                <div className="relative z-10 w-full">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-black text-2xl tracking-tight">Registrar Préstamo</h3>
+                                        <button onClick={() => setIsLoanModalOpen(false)} className="text-white/80 hover:text-white transition-colors bg-white/10 p-1.5 rounded-lg hover:bg-white/20">
+                                            <FaTimes size={18} />
+                                        </button>
+                                    </div>
+                                    <p className="text-amber-100/90 text-sm font-medium">Ingreso de dinero en calidad de préstamo.</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleLoanSubmit} className="p-6 space-y-6">
+                                <div className="space-y-4">
+                                    {isGlobal && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tienda Destino</label>
+                                            <select
+                                                value={loanForm.id_tienda}
+                                                onChange={e => setLoanForm({ ...loanForm, id_tienda: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block p-3 font-bold transition-all outline-none"
+                                                required
+                                            >
+                                                <option value="">Seleccione tienda...</option>
+                                                {tiendasList.map(t => (
+                                                    <option key={t.id_tienda} value={t.id_tienda}>{t.nb_tienda}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cuenta Destino</label>
+                                        <select
+                                            value={loanForm.methodId}
+                                            onChange={e => setLoanForm({ ...loanForm, methodId: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block p-3 font-bold transition-all outline-none"
+                                            required
+                                        >
+                                            <option value="">Seleccione cuenta...</option>
+                                            {paymentMethods.filter(m =>
+                                                ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL', 'MOVIL', 'MÓVIL', 'TRANSFERENCIA', 'EFECTIVO', 'PUNTO'].some(k => m.nb_metodo_pago.toUpperCase().includes(k)) &&
+                                                !m.nb_metodo_pago.toUpperCase().includes('PENDIENTE')
+                                            ).map((method) => (
+                                                <option key={method.id_metodo_pago} value={method.id_metodo_pago}>
+                                                    {method.nb_metodo_pago}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motivo / Descripción (Opcional)</label>
+                                        <input
+                                            type="text"
+                                            value={loanForm.motivo}
+                                            onChange={e => setLoanForm({ ...loanForm, motivo: e.target.value })}
+                                            className="bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-3 transition-all outline-none"
+                                            placeholder="Ej: Inversión en mercancía"
+                                            maxLength="100"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                            Monto del Préstamo
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span className="text-slate-400 font-bold">
+                                                    {loanForm.methodId && paymentMethods.find(pm => pm.id_metodo_pago == loanForm.methodId && ['USD', 'DIVISA', 'ZELLE', 'BINANCE', 'PAYPAL'].some(k => pm.nb_metodo_pago.toUpperCase().includes(k))) ? '$' : 'Bs'}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                value={loanForm.amount}
+                                                onChange={e => setLoanForm({ ...loanForm, amount: e.target.value })}
+                                                className="bg-slate-50 border border-slate-200 text-slate-900 text-lg rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full pl-10 p-3 font-black text-right outline-none transition-all"
+                                                placeholder="0.00"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Fecha</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={loanForm.date}
+                                                onChange={e => setLoanForm({ ...loanForm, date: e.target.value })}
+                                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-3 font-bold outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tasa del Día</label>
+                                            <div className="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-xl block w-full p-3 font-bold text-right cursor-not-allowed">
+                                                Bs {parseFloat(rate).toFixed(2)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLoanModalOpen(false)}
+                                        className="flex-1 text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl px-5 py-3 transition-colors text-sm"
+                                        disabled={submitting}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={submitting}
+                                        className="flex-1 text-white bg-amber-500 hover:bg-amber-600 font-bold rounded-xl px-5 py-3 shadow-lg shadow-amber-500/20 transition-all text-sm flex items-center justify-center gap-2"
+                                    >
+                                        {submitting ? '...' : 'Confirmar Préstamo'}
+                                        {!submitting && <FaHandHoldingUsd />}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 };
