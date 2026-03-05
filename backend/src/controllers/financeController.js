@@ -63,6 +63,12 @@ exports.getFinanceSummary = async (req, res) => {
             ${tiendaFilterV}
         `);
 
+        // 1.5 TOTAL Income from Loans (All time)
+        const tiendaFilterPR = tiendaId ? ` AND id_tienda = ${tiendaId}` : '';
+        const [loanResult] = await pool.query(`
+            SELECT COALESCE(SUM(monto_prestamo), 0) as total FROM prestamo WHERE 1=1 ${tiendaFilterPR}
+        `);
+
         // 2. TOTAL Expenses (All time)
         // Fixed Payments
         const [fixedResult] = await pool.query(`
@@ -116,7 +122,7 @@ exports.getFinanceSummary = async (req, res) => {
 
         // Final Totals for Cards - Initial Balance only for Tienda 1 or Global
         const capitalToDisplay = (!tiendaId || tiendaId === 1) ? totalInitialBalanceUSD : 0;
-        const finalIncome = parseFloat(salesResult[0].total) + capitalToDisplay;
+        const finalIncome = parseFloat(salesResult[0].total) + parseFloat(loanResult[0].total) + capitalToDisplay;
         const finalExpenses = totalExpenses;
         const finalBalance = finalIncome - finalExpenses - totalAvance;
 
