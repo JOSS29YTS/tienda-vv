@@ -86,7 +86,7 @@ exports.getProfitLoss = async (req, res) => {
             }
             initialBalanceUSD += valUSD;
             initialBreakdown.push({
-                metodo: m.nb_metodo_pago,
+                metodo: m.nb_metodo_pago === 'BANCO (POS)' ? 'PUNTO DE VENTA' : m.nb_metodo_pago,
                 total: parseFloat(valUSD.toFixed(10)),
                 montoOriginalBs: !isUsdMethod(m.nb_metodo_pago) ? val : null
             });
@@ -111,7 +111,8 @@ exports.getProfitLoss = async (req, res) => {
         const loanBreakdown = {};
 
         for (const l of loanRows) {
-            const method = (l.nb_metodo_pago || '').toUpperCase();
+            let method = (l.nb_metodo_pago || '').toUpperCase();
+            if (method === 'BANCO (POS)') method = 'PUNTO DE VENTA';
             let amountUSD = 0;
             if (isUsdMethod(method)) {
                 amountUSD = parseFloat(l.monto_prestamo);
@@ -147,7 +148,8 @@ exports.getProfitLoss = async (req, res) => {
 
         const mergedSalesBreakdownMap = {};
         salesBreakdown.forEach(item => {
-            const m = (item.metodo || '').toUpperCase();
+            let m = (item.metodo || '').toUpperCase();
+            if (m === 'BANCO (POS)') m = 'PUNTO DE VENTA';
             mergedSalesBreakdownMap[m] = (mergedSalesBreakdownMap[m] || 0) + parseFloat(item.total);
         });
 
