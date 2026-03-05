@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaReceipt, FaPlus, FaTimes, FaStore, FaCalendarAlt,
     FaDollarSign, FaMoneyBillWave, FaFilter, FaLayerGroup,
-    FaTag, FaCreditCard, FaMobileAlt, FaExchangeAlt, FaMoneyBill, FaSpinner, FaHandHoldingUsd
+    FaTag, FaCreditCard, FaMobileAlt, FaExchangeAlt, FaMoneyBill, FaSpinner, FaHandHoldingUsd, FaFilePdf
 } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
 import toast, { Toaster } from 'react-hot-toast';
 import API_URL from '../../config/api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const GastosPage = () => {
     const { rate } = useRate();
@@ -374,6 +376,74 @@ const GastosPage = () => {
     // Tiendas para selector
     const tiendasList = tiendas || [];
 
+    const handleGenerateReport = () => {
+        if (!displayGastos || displayGastos.length === 0) {
+            toast.error('No hay gastos para generar el reporte');
+            return;
+        }
+
+        const doc = new jsPDF();
+        const date = new Date().toLocaleDateString('es-VE');
+        const time = new Date().toLocaleTimeString('es-VE');
+        const tiendaName = selectedTienda ? selectedTienda.nb_tienda.toUpperCase() : 'ROPA MANIA - TODAS LAS TIENDAS';
+        const isFijos = activeTab === 'fijos';
+
+        // Header
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(0, 0, 210, 42, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`REPORTE DE GASTOS ${isFijos ? 'FIJOS' : 'VARIABLES'}`, 15, 20);
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Tienda: ${tiendaName}`, 15, 28);
+        doc.text(`Generado: ${date} ${time} por ${user?.nombre || 'Admin'}`, 15, 34);
+
+        // Calculate Totals
+        const totalUSD = displayGastos.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
+        const r = parseFloat(rate) || 1;
+        const totalBS = totalUSD * r;
+
+        // Resumen
+        doc.setFillColor(isFijos ? 16 : 59, isFijos ? 185 : 130, isFijos ? 129 : 246);
+        doc.roundedRect(15, 48, 180, 25, 3, 3, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('TOTAL RECAUDADO', 25, 58);
+        doc.setFontSize(16);
+        doc.text(`$ ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 25, 67);
+        doc.setFontSize(11);
+        doc.text(`Bs ${(Math.round(totalBS * 100) / 100).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`, 100, 67);
+
+        // Table
+        autoTable(doc, {
+            startY: 85,
+            head: [['Tipo / Descripción', 'Método', 'Usuario', 'Fecha', 'Monto (USD)']],
+            body: displayGastos.map(g => [
+                `${g.type} ${g.descripcion ? '- ' + g.descripcion : ''}`,
+                g.payment_method || '-',
+                g.user,
+                new Date(g.date).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }),
+                `$ ${parseFloat(g.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+            styles: { fontSize: 8, cellPadding: 3 },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+
+        const pageH = doc.internal.pageSize.height;
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text('Reporte generado automáticamente por el sistema.', 105, pageH - 8, { align: 'center' });
+
+        doc.save(`Reporte_Gastos_${isFijos ? 'Fijos' : 'Variables'}_${date.replace(/\//g, '-')}.pdf`);
+        toast.success('Reporte PDF descargado exitosamente');
+    };
+
     // Método icono
     const methodIcon = (method = '') => {
         const m = method.toUpperCase();
@@ -413,6 +483,13 @@ const GastosPage = () => {
                     <p className="text-slate-500 text-sm">Registro de gastos fijos, variables y préstamos.</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
+                    <button
+                        onClick={handleGenerateReport}
+                        disabled={loadingGastos || displayGastos.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 text-white font-bold text-sm hover:bg-slate-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <FaFilePdf /> Reporte
+                    </button>
                     <button
                         onClick={handleLoanClick}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20"
