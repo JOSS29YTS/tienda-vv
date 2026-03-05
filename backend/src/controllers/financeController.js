@@ -223,8 +223,8 @@ exports.getRecentTransactions = async (req, res) => {
             FROM gasto_variable gv JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable JOIN usuario u ON gv.id_usuario = u.id_usuario JOIN metodo_pago mp ON gv.id_metodo_pago = mp.id_metodo_pago
             WHERE YEAR(gv.fecha_gasto_variable) = YEAR(NOW()) AND MONTH(gv.fecha_gasto_variable) = MONTH(NOW()) ${tiendaFilterGV}
             UNION ALL
-            SELECT 'Traspaso' as type, tr.id_traspaso as id, tr.fecha_traspaso as date, tr.monto as amount, u.nombre as user, 'Traspaso' as category, CONCAT(mo.nb_metodo_pago, ' -> ', md.nb_metodo_pago) as payment_method, tr.tasa_dia as exchange_rate, NULL as descripcion
-            FROM traspaso tr JOIN usuario u ON tr.id_usuario = u.id_usuario JOIN metodo_pago mo ON tr.id_metodo_origen = mo.id_metodo_pago JOIN metodo_pago md ON tr.id_metodo_destino = md.id_metodo_pago
+            SELECT 'Traspaso' as type, tr.id_traspaso as id, tr.fecha_traspaso as date, tr.monto as amount, u.nombre as user, 'Traspaso' as category, IF(mo.nb_metodo_pago = 'BANCO (POS)', CONCAT('TRASPASO - ', ti_tr.nb_tienda, ' -> ', md.nb_metodo_pago), CONCAT(mo.nb_metodo_pago, ' -> ', md.nb_metodo_pago)) as payment_method, tr.tasa_dia as exchange_rate, NULL as descripcion
+            FROM traspaso tr JOIN usuario u ON tr.id_usuario = u.id_usuario JOIN metodo_pago mo ON tr.id_metodo_origen = mo.id_metodo_pago JOIN metodo_pago md ON tr.id_metodo_destino = md.id_metodo_pago LEFT JOIN tienda ti_tr ON tr.id_tienda = ti_tr.id_tienda
             WHERE YEAR(tr.fecha_traspaso) = YEAR(NOW()) AND MONTH(tr.fecha_traspaso) = MONTH(NOW()) ${tiendaFilterTR}
             UNION ALL
             SELECT 'Préstamo' as type, p.id_prestamo as id, p.fecha_prestamo as date, p.monto_prestamo as amount, u.nombre as user, 'Ingreso' as category, IF(p.motivo IS NOT NULL AND p.motivo != '', CONCAT(mp.nb_metodo_pago, ' - ', p.motivo), mp.nb_metodo_pago) as payment_method, p.tasa_dia as exchange_rate, p.motivo as descripcion
