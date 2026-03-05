@@ -62,10 +62,12 @@ exports.getProfitLoss = async (req, res) => {
             WHERE ${applyFilter('v.fecha_venta')}${tiendaFilter}
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
         `, dateParams);
-        // Initial Balance calculation (Capitalization)
         const [config] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_dolar']);
         const rawRate = parseFloat(config[0]?.valor) || 1;
         const currentRate = Math.round(rawRate * 100) / 100;
+
+        const [febRateConfig] = await pool.query('SELECT valor FROM configuracion WHERE clave = ?', ['tasa_inicial_febrero']);
+        const febRate = parseFloat(febRateConfig[0]?.valor) || currentRate;
 
         const [methods] = await pool.query('SELECT nb_metodo_pago, saldo_inicial FROM metodo_pago');
         let initialBalanceUSD = 0;
@@ -77,7 +79,9 @@ exports.getProfitLoss = async (req, res) => {
 
             let valUSD = val;
             if (!isUsdMethod(m.nb_metodo_pago)) {
-                valUSD = val / currentRate;
+                // Si estamos viendo el balance de febrero (donde se muestra el capital inicial),
+                // usamos la tasa histórica de 419.99 que nos dio el usuario para que no cambie.
+                valUSD = val / (period === 'prev_month' || (period === 'year' && currentMonth <= 12) ? febRate : currentRate);
             }
             initialBalanceUSD += valUSD;
             initialBreakdown.push({
