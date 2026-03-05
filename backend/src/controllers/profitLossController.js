@@ -99,7 +99,35 @@ exports.getProfitLoss = async (req, res) => {
         if (period === 'year') showInitialInThisReport = true;
         if (period === 'custom') showInitialInThisReport = false; // Usually for specific date range
 
-        const totalIngresos = parseFloat(salesRows[0].total) + (showInitialInThisReport && (!tiendaId || tiendaId === 1) ? initialBalanceUSD : 0);
+        // 1.5 INGRESOS: Préstamos
+        const [loanRows] = await pool.query(`
+            SELECT p.monto_prestamo, p.tasa_dia, mp.nb_metodo_pago
+            FROM prestamo p
+            JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE ${applyFilter('p.fecha_prestamo')}${tiendaFilterPP.replace('pr.', 'p.')}
+        `, dateParams);
+
+        let totalLoansUSD = 0;
+        const loanBreakdown = {};
+
+        for (const l of loanRows) {
+            const method = (l.nb_metodo_pago || '').toUpperCase();
+            let amountUSD = 0;
+            if (isUsdMethod(method)) {
+                amountUSD = parseFloat(l.monto_prestamo);
+            } else {
+                amountUSD = parseFloat(l.monto_prestamo) / (parseFloat(l.tasa_dia) || currentRate);
+            }
+            totalLoansUSD += amountUSD;
+
+            if (loanBreakdown[method]) {
+                loanBreakdown[method] += amountUSD;
+            } else {
+                loanBreakdown[method] = amountUSD;
+            }
+        }
+
+        const totalIngresos = parseFloat(salesRows[0].total) + totalLoansUSD + (showInitialInThisReport && (!tiendaId || tiendaId === 1) ? initialBalanceUSD : 0);
 
         // Desglose de ingresos por método de pago
         const [salesBreakdown] = await pool.query(`
@@ -116,6 +144,23 @@ exports.getProfitLoss = async (req, res) => {
             GROUP BY mp.id_metodo_pago, mp.nb_metodo_pago
             ORDER BY total DESC
         `, dateParams);
+
+        const mergedSalesBreakdownMap = {};
+        salesBreakdown.forEach(item => {
+            const m = (item.metodo || '').toUpperCase();
+            mergedSalesBreakdownMap[m] = (mergedSalesBreakdownMap[m] || 0) + parseFloat(item.total);
+        });
+
+        // Add loans to breakdown map
+        Object.entries(loanBreakdown).forEach(([method, amountUSD]) => {
+            mergedSalesBreakdownMap[method] = (mergedSalesBreakdownMap[method] || 0) + amountUSD;
+        });
+
+        const mergedSalesBreakdown = Object.keys(mergedSalesBreakdownMap).map(metodo => ({
+            metodo,
+            total: mergedSalesBreakdownMap[metodo]
+        })).sort((a, b) => b.total - a.total);
+
 
         // ─────────────────────────────────────────────
         // 2. EGRESOS: Compras de mercancía
@@ -229,17 +274,41 @@ exports.getProfitLoss = async (req, res) => {
         // Add initial balance to February's income for the chart
         const [monthlyIncome] = await pool.query(`
             SELECT 
-                DATE_FORMAT(v.fecha_venta, '%Y-%m') as mes,
-                DATE_FORMAT(MIN(v.fecha_venta), '%b %Y') as mes_label,
-                COALESCE(SUM(dp.monto), 0) as ingresos
-            FROM venta v
-            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
-            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
-            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
-            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
-            WHERE YEAR(v.fecha_venta) = 2026 ${tiendaFilter}
-            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
-            GROUP BY DATE_FORMAT(v.fecha_venta, '%Y-%m')
+                mes,
+                DATE_FORMAT(CONCAT(mes, '-01'), '%b %Y') as mes_label,
+                SUM(ingresos) as ingresos
+            FROM (
+                SELECT 
+                    DATE_FORMAT(v.fecha_venta, '%Y-%m') as mes,
+                    dp.monto as ingresos
+                FROM venta v
+                JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+                JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+                JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                WHERE YEAR(v.fecha_venta) = 2026 ${tiendaFilter}
+                AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+
+                UNION ALL
+
+                SELECT 
+                    DATE_FORMAT(pr.fecha_prestamo, '%Y-%m') as mes,
+                    CASE 
+                        WHEN mp.nb_metodo_pago LIKE '%DIVISA%' 
+                          OR mp.nb_metodo_pago LIKE '%ZELLE%' 
+                          OR mp.nb_metodo_pago LIKE '%BINANCE%' 
+                          OR mp.nb_metodo_pago LIKE '%PAYPAL%' 
+                          OR mp.nb_metodo_pago LIKE '%USD%' 
+                          OR mp.nb_metodo_pago LIKE '%DOLAR%' 
+                          OR mp.nb_metodo_pago LIKE '%EFECTIVO ($)%' 
+                        THEN pr.monto_prestamo
+                        ELSE ROUND(pr.monto_prestamo / COALESCE(NULLIF(pr.tasa_dia, 0), 1), 2)
+                    END as ingresos
+                FROM prestamo pr
+                JOIN metodo_pago mp ON pr.id_metodo_pago = mp.id_metodo_pago
+                WHERE YEAR(pr.fecha_prestamo) = 2026 ${tiendaFilterPP}
+            ) as all_income
+            GROUP BY mes
             ORDER BY mes ASC
         `);
 
@@ -355,9 +424,9 @@ exports.getProfitLoss = async (req, res) => {
             },
             ingresosDetalle: [
                 ...(showInitialInThisReport ? initialBreakdown : []),
-                ...salesBreakdown.map(r => ({
-                    metodo: r.metodo,
-                    total: parseFloat(parseFloat(r.total).toFixed(2)),
+                ...mergedSalesBreakdown.map(item => ({
+                    metodo: item.metodo,
+                    total: parseFloat(parseFloat(item.total).toFixed(2)),
                     montoOriginalBs: null
                 }))
             ],
