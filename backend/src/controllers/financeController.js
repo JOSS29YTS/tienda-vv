@@ -332,15 +332,16 @@ exports.createFixedPayment = async (req, res) => {
         if (method && method.type === 'BS') requiredAmount = amount * rate;
         const check = await balanceUtils.checkSufficientFunds(methodId, requiredAmount);
         if (!check.ok) return res.status(400).json({ message: check.message });
-        let dateObj = new Date();
-        dateObj.setHours(dateObj.getHours() - 4);
+        let formattedDate;
         if (fecha) {
-            const datePart = fecha.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) { dateObj.setFullYear(y); dateObj.setMonth(m - 1); dateObj.setDate(d); }
+            formattedDate = fecha.replace('T', ' ');
+            if (formattedDate.length === 16) formattedDate += ':00';
+            else formattedDate = formattedDate.slice(0, 19);
+        } else {
+            let d = new Date();
+            d.setHours(d.getHours() - 4);
+            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        dateObj.setHours(dateObj.getHours() + 4);
-        const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
         await pool.query('INSERT INTO pago_fijo (id_usuario, id_tienda, id_tipo_pago_fijo, id_metodo_pago, monto, tasa_dia, fecha_pago_fijo, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, typeId, methodId, amount, rate, formattedDate, descripcion || null]);
         res.json({ message: 'Pago fijo registrado exitosamente' });
     } catch (error) {
@@ -359,15 +360,16 @@ exports.createTraspaso = async (req, res) => {
         const rate = parseFloat(tasa_dia);
         const check = await balanceUtils.checkSufficientFunds(id_metodo_origen, amount);
         if (!check.ok) return res.status(400).json({ message: check.message });
-        let dateObj = new Date();
-        dateObj.setHours(dateObj.getHours() - 4);
+        let formattedDate;
         if (fecha_traspaso) {
-            const datePart = fecha_traspaso.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) { dateObj.setFullYear(y); dateObj.setMonth(m - 1); dateObj.setDate(d); }
+            formattedDate = fecha_traspaso.replace('T', ' ');
+            if (formattedDate.length === 16) formattedDate += ':00';
+            else formattedDate = formattedDate.slice(0, 19);
+        } else {
+            let d = new Date();
+            d.setHours(d.getHours() - 4);
+            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        dateObj.setHours(dateObj.getHours() + 4);
-        const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
         await pool.query('INSERT INTO traspaso (id_usuario, id_tienda, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, id_metodo_origen, id_metodo_destino, amount, rate, formattedDate]);
         res.json({ message: 'Traspaso realizado exitosamente' });
     } catch (error) {
@@ -390,15 +392,16 @@ exports.createLoan = async (req, res) => {
         if (!id_metodo_pago || !monto_prestamo) {
             return res.status(400).json({ message: 'Debe seleccionar una cuenta y un monto.' });
         }
-        let dateObj = new Date();
-        dateObj.setHours(dateObj.getHours() - 4);
+        let formattedDate;
         if (fecha_prestamo) {
-            const datePart = fecha_prestamo.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) { dateObj.setFullYear(y); dateObj.setMonth(m - 1); dateObj.setDate(d); }
+            formattedDate = fecha_prestamo.replace('T', ' ');
+            if (formattedDate.length === 16) formattedDate += ':00';
+            else formattedDate = formattedDate.slice(0, 19);
+        } else {
+            let d = new Date();
+            d.setHours(d.getHours() - 4);
+            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        dateObj.setHours(dateObj.getHours() + 4);
-        const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
         await pool.query('INSERT INTO prestamo (id_usuario, id_tienda, id_metodo_pago, monto_prestamo, tasa_dia, fecha_prestamo, motivo) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, id_metodo_pago, monto_prestamo, tasa_dia, formattedDate, motivo]);
         res.json({ message: 'Préstamo registrado exitosamente' });
     } catch (error) {
@@ -434,15 +437,16 @@ exports.payLoan = async (req, res) => {
     try {
         const { id_prestamo, id_metodo_pago, monto, tasa_dia, fecha_pago, id_tienda } = req.body;
         const tiendaId = id_tienda || req.user.id_tienda || 1;
-        let dateObj = new Date();
-        dateObj.setHours(dateObj.getHours() - 4);
+        let formattedDate;
         if (fecha_pago) {
-            const datePart = fecha_pago.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) { dateObj.setFullYear(y); dateObj.setMonth(m - 1); dateObj.setDate(d); }
+            formattedDate = fecha_pago.replace('T', ' ');
+            if (formattedDate.length === 16) formattedDate += ':00';
+            else formattedDate = formattedDate.slice(0, 19);
+        } else {
+            let d = new Date();
+            d.setHours(d.getHours() - 4);
+            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        dateObj.setHours(dateObj.getHours() + 4);
-        const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
         await pool.query('INSERT INTO pago_prestamo (id_prestamo, id_metodo_pago, monto, tasa_dia, fecha_pago, id_tienda) VALUES (?, ?, ?, ?, ?, ?)', [id_prestamo, id_metodo_pago, monto, tasa_dia, formattedDate, tiendaId]);
         res.json({ message: 'Pago de préstamo registrado exitosamente' });
     } catch (error) {
@@ -456,15 +460,16 @@ exports.buyCurrency = async (req, res) => {
         const { id_metodo_origen, id_metodo_destino, monto_bs, tasa_dia, fecha_compra } = req.body;
         const userId = req.user.id;
         const amountUsd = monto_bs / tasa_dia;
-        let dateObj = new Date();
-        dateObj.setHours(dateObj.getHours() - 4);
+        let formattedDate;
         if (fecha_compra) {
-            const datePart = fecha_compra.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) { dateObj.setFullYear(y); dateObj.setMonth(m - 1); dateObj.setDate(d); }
+            formattedDate = fecha_compra.replace('T', ' ');
+            if (formattedDate.length === 16) formattedDate += ':00';
+            else formattedDate = formattedDate.slice(0, 19);
+        } else {
+            let d = new Date();
+            d.setHours(d.getHours() - 4);
+            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        dateObj.setHours(dateObj.getHours() + 4);
-        const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
         await pool.query('INSERT INTO traspaso (id_usuario, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?)', [userId, id_metodo_origen, id_metodo_destino, monto_bs, tasa_dia, formattedDate]);
         res.json({ message: 'Compra de divisas registrada exitosamente' });
     } catch (error) {
@@ -502,15 +507,16 @@ exports.createVariableExpense = async (req, res) => {
             }
         }
 
-        let dateObj = new Date();
-        dateObj.setHours(dateObj.getHours() - 4);
+        let formattedDate;
         if (fecha) {
-            const datePart = fecha.split(' ')[0];
-            const [y, m, d] = datePart.split('-').map(Number);
-            if (y && m && d) { dateObj.setFullYear(y); dateObj.setMonth(m - 1); dateObj.setDate(d); }
+            formattedDate = fecha.replace('T', ' ');
+            if (formattedDate.length === 16) formattedDate += ':00';
+            else formattedDate = formattedDate.slice(0, 19);
+        } else {
+            let d = new Date();
+            d.setHours(d.getHours() - 4);
+            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        dateObj.setHours(dateObj.getHours() + 4);
-        const formattedDate = dateObj.toISOString().slice(0, 19).replace('T', ' ');
         await pool.query('INSERT INTO gasto_variable (id_usuario, id_tipo_gasto_variable, id_metodo_pago, monto_usd, tasa_dia, fecha_gasto_variable, id_tienda, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [userId, typeId, id_metodo_pago, monto_usd, tasa_dia, formattedDate, tiendaId, descripcion || null]);
         res.json({ message: 'Gasto variable registrado exitosamente' });
     } catch (error) {
