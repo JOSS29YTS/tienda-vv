@@ -823,63 +823,6 @@ const FinancesPage = () => {
                         Préstamo
                     </button>
 
-                    <button
-                        onClick={() => {
-                            if (isGlobal) {
-                                toast.error('Seleccione una tienda específica antes de registrar un gasto fijo.', {
-                                    icon: '🏪',
-                                    style: { background: '#10B981', color: '#fff' }
-                                });
-                                return;
-                            }
-                            setFormData({
-                                id_tipo_pago_fijo: '',
-                                id_metodo_pago: '',
-                                monto: '',
-                                moneda: 'USD',
-                                tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
-                                fecha: getLocalISODate()
-                            });
-                            setIsModalOpen(true);
-                        }}
-                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-xl font-bold transition-colors shadow-lg whitespace-nowrap ${isGlobal
-                            ? 'bg-emerald-200 text-emerald-700 cursor-not-allowed'
-                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/30'
-                            }`}
-                        title={isGlobal ? 'Seleccione una tienda para registrar un gasto fijo' : 'Registrar gasto fijo'}
-                    >
-                        <FaPlus />
-                        Fijos
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (isGlobal) {
-                                toast.error('Seleccione una tienda específica antes de registrar un gasto variable.', {
-                                    icon: '🏪',
-                                    style: { background: '#3B82F6', color: '#fff' }
-                                });
-                                return;
-                            }
-                            setVariableExpenseForm({
-                                id_tipo_gasto_variable: 'new',
-                                nb_gasto_variable: '',
-                                id_metodo_pago: '',
-                                monto: '',
-                                moneda: 'USD',
-                                tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
-                                fecha: getLocalISODate()
-                            });
-                            setIsVariableExpenseModalOpen(true);
-                        }}
-                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-xl font-bold transition-colors shadow-lg whitespace-nowrap ${isGlobal
-                            ? 'bg-blue-200 text-blue-700 cursor-not-allowed'
-                            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/30'
-                            }`}
-                        title={isGlobal ? 'Seleccione una tienda para registrar un gasto variable' : 'Registrar gasto variable'}
-                    >
-                        <FaPlus />
-                        Variables
-                    </button>
                 </div>
             </header>
 

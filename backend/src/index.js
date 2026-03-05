@@ -102,6 +102,11 @@ app.listen(PORT, async () => {
             { q: "INSERT IGNORE INTO metodo_pago (nb_metodo_pago, saldo_inicial) VALUES ('BANCO (POS)', 0)" },
             // Motivo del préstamo
             { q: "ALTER TABLE prestamo ADD COLUMN motivo VARCHAR(255) NULL" },
+            // Descripciones de gastos
+            { q: "ALTER TABLE pago_fijo ADD COLUMN descripcion VARCHAR(255) NULL" },
+            { q: "ALTER TABLE gasto_variable ADD COLUMN descripcion VARCHAR(255) NULL" },
+            // Tipos de gasto por tienda
+            { q: "ALTER TABLE tipo_pago_fijo ADD COLUMN id_tienda INT NULL" },
         ];
 
         for (const m of migrations) {

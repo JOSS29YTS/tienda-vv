@@ -19,6 +19,7 @@ import FinancesPage from './pages/dashboard/FinancesPage';
 import ProfitLossPage from './pages/dashboard/ProfitLossPage';
 import CommissionsPage from './pages/dashboard/CommissionsPage';
 import BankPage from './pages/dashboard/BankPage';
+import GastosPage from './pages/dashboard/GastosPage';
 
 
 const PlaceholderComponent = ({ title }) => (
@@ -92,6 +93,11 @@ function App() {
                 <Route path="profit-loss" element={
                   <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
                     <ProfitLossPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="gastos" element={
+                  <ProtectedRoute allowedRoles={['administrador', 'gerente']}>
+                    <GastosPage />
                   </ProtectedRoute>
                 } />
                 <Route path="users" element={<UsersPage />} />

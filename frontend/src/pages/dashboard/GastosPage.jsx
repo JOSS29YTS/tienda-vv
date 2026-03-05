@@ -1,0 +1,824 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    FaReceipt, FaPlus, FaTimes, FaStore, FaCalendarAlt,
+    FaDollarSign, FaMoneyBillWave, FaFilter, FaLayerGroup,
+    FaTag, FaCreditCard, FaMobileAlt, FaExchangeAlt, FaMoneyBill, FaSpinner
+} from 'react-icons/fa';
+import { useRate } from '../../context/RateContext';
+import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
+import toast, { Toaster } from 'react-hot-toast';
+import API_URL from '../../config/api';
+
+const GastosPage = () => {
+    const { rate } = useRate();
+    const { effectiveTiendaId, isGlobal, tiendas, selectedTienda } = useStore();
+    const { user } = useAuth();
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    const [activeTab, setActiveTab] = useState('fijos'); // 'variables' | 'fijos'
+    const [paymentMethods, setPaymentMethods] = useState([]);
+    const [fixedPaymentTypes, setFixedPaymentTypes] = useState([]);
+    const [variableExpenseTypes, setVariableExpenseTypes] = useState([]);
+    const [gastos, setGastos] = useState([]);
+    const [loadingGastos, setLoadingGastos] = useState(true);
+    const [filterTienda, setFilterTienda] = useState('all');
+    const [filterTipo, setFilterTipo] = useState('all');
+
+    const [isFixedModalOpen, setIsFixedModalOpen] = useState(false);
+    const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    const getLocalISODate = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const [fixedForm, setFixedForm] = useState({
+        id_tipo_pago_fijo: '',
+        descripcion: '',
+        id_metodo_pago: '',
+        monto: '',
+        moneda: 'USD',
+        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+        fecha: getLocalISODate(),
+        id_tienda: ''
+    });
+
+    const [variableForm, setVariableForm] = useState({
+        id_tipo_gasto_variable: 'new',
+        nb_gasto_variable: '',
+        descripcion: '',
+        id_metodo_pago: '',
+        monto: '',
+        moneda: 'USD',
+        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+        fecha: getLocalISODate(),
+        id_tienda: ''
+    });
+
+    // ── Effects ────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        fetchPaymentMethods();
+    }, [effectiveTiendaId]);
+
+    useEffect(() => {
+        if (fixedForm.id_tienda) {
+            fetchFixedPaymentTypes(fixedForm.id_tienda);
+        }
+    }, [fixedForm.id_tienda]);
+
+    useEffect(() => {
+        if (variableForm.id_tienda) {
+            fetchVariableExpenseTypes(variableForm.id_tienda);
+        }
+    }, [variableForm.id_tienda]);
+
+    useEffect(() => {
+        fetchGastos();
+    }, [effectiveTiendaId, activeTab]);
+
+    useEffect(() => {
+        const r = rate ? parseFloat(rate).toFixed(2) : '';
+        setFixedForm(prev => ({ ...prev, tasa_dia: r }));
+        setVariableForm(prev => ({ ...prev, tasa_dia: r }));
+    }, [rate]);
+
+    // ── Fetch helpers ──────────────────────────────────────────────────────────
+    const token = () => localStorage.getItem('token');
+
+    const fetchPaymentMethods = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/finances/payment-methods`, {
+                headers: { 'Authorization': `Bearer ${token()}` }
+            });
+            if (res.ok) setPaymentMethods(await res.json());
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchFixedPaymentTypes = async (tiendaIdToFetch) => {
+        try {
+            const tId = tiendaIdToFetch || effectiveTiendaId;
+            const tiendaParam = tId ? `?tienda=${tId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/fixed-payment-types${tiendaParam}`, {
+                headers: { 'Authorization': `Bearer ${token()}` }
+            });
+            if (res.ok) setFixedPaymentTypes(await res.json());
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchVariableExpenseTypes = async (tiendaIdToFetch) => {
+        try {
+            const tId = tiendaIdToFetch || effectiveTiendaId;
+            const tiendaParam = tId ? `?tienda=${tId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/variable-expense-types${tiendaParam}`, {
+                headers: { 'Authorization': `Bearer ${token()}` }
+            });
+            if (res.ok) setVariableExpenseTypes(await res.json());
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchGastos = async () => {
+        setLoadingGastos(true);
+        try {
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const res = await fetch(`${API_URL}/api/finances/transactions${tiendaParam}&limit=500`, {
+                headers: { 'Authorization': `Bearer ${token()}` }
+            });
+            if (res.ok) {
+                const all = await res.json();
+                // Filtramos solo gastos fijos y variables
+                const filtered = all.filter(tx =>
+                    activeTab === 'fijos'
+                        ? !['Venta', 'Compra', 'Traspaso', 'Préstamo', 'Pago Préstamo', 'Pago Comisión'].includes(tx.type) &&
+                        !tx.type.toLowerCase().includes('variable')
+                        : tx.type.toLowerCase().includes('variable') ||
+                        tx.type.toLowerCase().includes('gasto')
+                );
+                setGastos(filtered);
+            }
+        } catch (e) { console.error(e); }
+        finally { setLoadingGastos(false); }
+    };
+
+    // ── Handlers Fixed ─────────────────────────────────────────────────────────
+    const handleFixedInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'id_metodo_pago') {
+            const m = paymentMethods.find(pm => pm.id_metodo_pago === parseInt(value));
+            const moneda = m && ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL']
+                .some(k => m.nb_metodo_pago.toUpperCase().includes(k)) ? 'USD' : 'BS';
+            setFixedForm(prev => ({ ...prev, [name]: value, moneda }));
+        } else {
+            setFixedForm(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const handleFixedSubmit = async (e) => {
+        e.preventDefault();
+        const tiendaId = fixedForm.id_tienda || effectiveTiendaId || 1;
+        if (!tiendaId || tiendaId === 'all') {
+            toast.error('Seleccione una tienda para registrar el gasto.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const now = new Date();
+            const [y, m, d] = fixedForm.fecha.split('-').map(Number);
+            const dt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+            const pad = n => n.toString().padStart(2, '0');
+            const fechaStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+
+            let monto = parseFloat(fixedForm.monto);
+            if (fixedForm.moneda === 'BS') {
+                const r = parseFloat(fixedForm.tasa_dia);
+                if (r > 0) monto = monto / r;
+            }
+
+            const payload = {
+                id_tipo_pago_fijo: fixedForm.id_tipo_pago_fijo,
+                id_metodo_pago: fixedForm.id_metodo_pago,
+                monto,
+                tasa_dia: fixedForm.tasa_dia,
+                fecha: fechaStr,
+                id_tienda: tiendaId,
+                descripcion: fixedForm.descripcion || null
+            };
+
+            const res = await fetch(`${API_URL}/api/finances/fixed-payments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                toast.success('Gasto fijo registrado exitosamente', { style: { background: '#10B981', color: '#fff' } });
+                setIsFixedModalOpen(false);
+                resetFixedForm();
+                fetchGastos();
+                fetchFixedPaymentTypes(fixedForm.id_tienda);
+            } else {
+                const err = await res.json();
+                toast.error(err.message || 'Error al registrar gasto fijo', { style: { background: '#EF4444', color: '#fff' } });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error de conexión');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const resetFixedForm = () => setFixedForm({
+        id_tipo_pago_fijo: '', descripcion: '', id_metodo_pago: '',
+        monto: '', moneda: 'USD', tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+        fecha: getLocalISODate(), id_tienda: effectiveTiendaId || ''
+    });
+
+    // ── Handlers Variable ──────────────────────────────────────────────────────
+    const handleVariableInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'id_metodo_pago') {
+            const m = paymentMethods.find(pm => pm.id_metodo_pago === parseInt(value));
+            const moneda = m && ['DIVISA', 'USD', 'ZELLE', 'BINANCE', 'PAYPAL']
+                .some(k => m.nb_metodo_pago.toUpperCase().includes(k)) ? 'USD' : 'BS';
+            setVariableForm(prev => ({ ...prev, [name]: value, moneda }));
+        } else {
+            setVariableForm(prev => ({ ...prev, [name]: value }));
+        }
+    };
+
+    const handleVariableSubmit = async (e) => {
+        e.preventDefault();
+        const tiendaId = variableForm.id_tienda || effectiveTiendaId || 1;
+        if (!tiendaId || tiendaId === 'all') {
+            toast.error('Seleccione una tienda para registrar el gasto.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const now = new Date();
+            const [y, m, d] = variableForm.fecha.split('-').map(Number);
+            const dt = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+            const pad = n => n.toString().padStart(2, '0');
+            const fechaStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+
+            let monto = parseFloat(variableForm.monto);
+            if (variableForm.moneda === 'BS') {
+                const r = parseFloat(variableForm.tasa_dia);
+                if (r > 0) monto = monto / r;
+            }
+
+            const payload = {
+                id_tipo_gasto_variable: variableForm.id_tipo_gasto_variable === 'new' ? null : variableForm.id_tipo_gasto_variable,
+                nb_gasto_variable: variableForm.nb_gasto_variable,
+                id_metodo_pago: variableForm.id_metodo_pago,
+                monto_usd: monto,
+                tasa_dia: variableForm.tasa_dia,
+                fecha: fechaStr,
+                id_tienda: tiendaId,
+                descripcion: variableForm.descripcion || null
+            };
+
+            const res = await fetch(`${API_URL}/api/finances/variable-expenses`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                toast.success('Gasto variable registrado exitosamente', { style: { background: '#10B981', color: '#fff' } });
+                setIsVariableModalOpen(false);
+                resetVariableForm();
+                fetchGastos();
+                fetchVariableExpenseTypes(variableForm.id_tienda);
+            } else {
+                const err = await res.json();
+                toast.error(err.message || 'Error al registrar gasto variable', { style: { background: '#EF4444', color: '#fff' } });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error de conexión');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const resetVariableForm = () => setVariableForm({
+        id_tipo_gasto_variable: 'new', nb_gasto_variable: '', descripcion: '',
+        id_metodo_pago: '', monto: '', moneda: 'USD',
+        tasa_dia: rate ? parseFloat(rate).toFixed(2) : '',
+        fecha: getLocalISODate(), id_tienda: effectiveTiendaId || ''
+    });
+
+    // ── Formatters ─────────────────────────────────────────────────────────────
+    const fmt$ = v => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+    const fmtBs = v => new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(v).replace('Bs.S', 'Bs.');
+    const fmtDate = d => d ? new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+    // Filtrado de gastos display
+    const displayGastos = gastos.filter(g => {
+        if (filterTienda !== 'all') {
+            // no tenemos tienda en la transacción directamente, omitir filtro por ahora
+        }
+        if (filterTipo !== 'all' && !g.type.toLowerCase().includes(filterTipo.toLowerCase())) return false;
+        return true;
+    });
+
+    // Tiendas para selector
+    const tiendasList = tiendas || [];
+
+    // Método icono
+    const methodIcon = (method = '') => {
+        const m = method.toUpperCase();
+        if (m.includes('ZELLE') || m.includes('DIVISA') || m.includes('USD')) return <FaDollarSign className="text-purple-500" />;
+        if (m.includes('PUNTO') || m.includes('POS')) return <FaCreditCard className="text-blue-500" />;
+        if (m.includes('MOVIL') || m.includes('MÓVIL')) return <FaMobileAlt className="text-indigo-500" />;
+        if (m.includes('TRANSFERENCIA')) return <FaExchangeAlt className="text-cyan-500" />;
+        return <FaMoneyBill className="text-green-500" />;
+    };
+
+    const openFixedModal = () => {
+        setFixedForm(prev => ({
+            ...prev,
+            id_tienda: effectiveTiendaId || (tiendasList.length === 1 ? tiendasList[0].id_tienda : ''),
+            tasa_dia: rate ? parseFloat(rate).toFixed(2) : ''
+        }));
+        setIsFixedModalOpen(true);
+    };
+
+    const openVariableModal = () => {
+        setVariableForm(prev => ({
+            ...prev,
+            id_tienda: effectiveTiendaId || (tiendasList.length === 1 ? tiendasList[0].id_tienda : ''),
+            tasa_dia: rate ? parseFloat(rate).toFixed(2) : ''
+        }));
+        setIsVariableModalOpen(true);
+    };
+
+    return (
+        <div className="space-y-6 relative">
+            <Toaster position="top-right" />
+
+            {/* ── Header ─────────────────────────────────────────────── */}
+            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 font-heading">Gastos</h2>
+                    <p className="text-slate-500 text-sm">Registro de gastos fijos y variables por tienda.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                    <button
+                        onClick={openFixedModal}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                        <FaPlus /> Gasto Fijo
+                    </button>
+                    <button
+                        onClick={openVariableModal}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                    >
+                        <FaPlus /> Gasto Variable
+                    </button>
+                </div>
+            </header>
+
+            {/* ── Tabs ───────────────────────────────────────────────── */}
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+                {[
+                    { key: 'fijos', label: 'Gastos Fijos', icon: FaTag },
+                    { key: 'variables', label: 'Gastos Variables', icon: FaLayerGroup }
+                ].map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === tab.key
+                            ? 'bg-white text-slate-800 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <tab.icon size={13} />
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Tabla de gastos ─────────────────────────────────────── */}
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"
+            >
+                <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <FaReceipt className="text-orange-500" />
+                        {activeTab === 'variables' ? 'Gastos Variables Registrados' : 'Gastos Fijos Registrados'}
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm">
+                        <FaFilter className="text-slate-400" />
+                        <span className="text-slate-400 text-xs font-medium">
+                            {displayGastos.length} registro{displayGastos.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[600px]">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold tracking-wider">
+                            <tr>
+                                <th className="p-4">Tipo / Descripción</th>
+                                <th className="p-4">Método de Pago</th>
+                                <th className="p-4">Usuario</th>
+                                <th className="p-4">Fecha</th>
+                                <th className="p-4 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {loadingGastos ? (
+                                <tr>
+                                    <td colSpan="5" className="p-10 text-center text-slate-400">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <FaSpinner className="animate-spin text-2xl text-orange-400" />
+                                            <span>Cargando gastos...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : displayGastos.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="p-12 text-center text-slate-400">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <FaReceipt className="text-5xl text-slate-200" />
+                                            <p className="font-medium">No hay gastos {activeTab === 'variables' ? 'variables' : 'fijos'} registrados.</p>
+                                            <p className="text-xs">Usa el botón de arriba para registrar uno.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                displayGastos.map((g, idx) => (
+                                    <tr key={`${g.type}-${g.id}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                                                    <FaReceipt size={9} />
+                                                    {g.type}
+                                                </span>
+                                            </div>
+                                            {g.descripcion && (
+                                                <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={g.descripcion}>
+                                                    {g.descripcion}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-2 text-sm text-slate-700">
+                                                {methodIcon(g.payment_method)}
+                                                <span className="font-medium">{g.payment_method || '-'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-slate-600 text-sm font-medium">{g.user}</td>
+                                        <td className="p-4 text-slate-500 text-xs">{fmtDate(g.date)}</td>
+                                        <td className="p-4 text-right font-bold font-mono text-slate-800">
+                                            {fmt$(g.amount)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Totales */}
+                {!loadingGastos && displayGastos.length > 0 && (
+                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                        <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Total {activeTab === 'variables' ? 'Variables' : 'Fijos'}</span>
+                        <span className="text-xl font-black text-slate-800 font-mono">
+                            {fmt$(displayGastos.reduce((s, g) => s + parseFloat(g.amount || 0), 0))}
+                        </span>
+                    </div>
+                )}
+            </motion.div>
+
+            {/* ══════════════════════════════════════════════════════════
+                MODAL: Gasto Fijo
+            ══════════════════════════════════════════════════════════ */}
+            <AnimatePresence>
+                {isFixedModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        >
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 flex justify-between items-center relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 opacity-10">
+                                    <FaTag size={80} />
+                                </div>
+                                <div className="relative z-10">
+                                    <h3 className="font-black text-xl">Registrar Gasto Fijo</h3>
+                                    <p className="text-emerald-100 text-sm mt-0.5">Gasto recurrente o programado.</p>
+                                </div>
+                                <button onClick={() => setIsFixedModalOpen(false)} className="relative z-10 p-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
+                                    <FaTimes size={16} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleFixedSubmit} className="p-6 space-y-4">
+                                {/* Tienda */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                        <FaStore className="inline mr-1" /> Tienda
+                                    </label>
+                                    <select
+                                        value={fixedForm.id_tienda}
+                                        onChange={e => setFixedForm(prev => ({ ...prev, id_tienda: e.target.value }))}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all text-sm font-medium"
+                                        required
+                                    >
+                                        <option value="">Seleccione tienda...</option>
+                                        {tiendasList.map(t => (
+                                            <option key={t.id_tienda} value={t.id_tienda}>{t.nb_tienda}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Tipo de Pago */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de Gasto</label>
+                                    <select
+                                        name="id_tipo_pago_fijo"
+                                        value={fixedForm.id_tipo_pago_fijo}
+                                        onChange={handleFixedInputChange}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all text-sm"
+                                        required
+                                    >
+                                        <option value="">Seleccione tipo...</option>
+                                        {fixedPaymentTypes.map(t => (
+                                            <option key={t.id_tipo_pago_fijo} value={t.id_tipo_pago_fijo}>{t.nb_tipo_pago_fijo}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Descripción */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Descripción (Opcional)</label>
+                                    <input
+                                        type="text" name="descripcion" value={fixedForm.descripcion}
+                                        onChange={handleFixedInputChange}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all text-sm"
+                                        placeholder="Detalle adicional del gasto fijo..."
+                                        maxLength="200"
+                                    />
+                                </div>
+
+                                {/* Método de Pago */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Método de Pago</label>
+                                    <select
+                                        name="id_metodo_pago"
+                                        value={fixedForm.id_metodo_pago}
+                                        onChange={handleFixedInputChange}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all text-sm"
+                                        required
+                                    >
+                                        <option value="">Seleccione método...</option>
+                                        {paymentMethods
+                                            .filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO', 'BANCO (POS)'].includes(m.nb_metodo_pago.toUpperCase()))
+                                            .map(m => (
+                                                <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nb_metodo_pago}</option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {/* Monto + Moneda */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                            Monto {fixedForm.moneda === 'BS' ? '(Bs)' : '($)'}
+                                        </label>
+                                        <input
+                                            type="number" name="monto" value={fixedForm.monto}
+                                            onChange={handleFixedInputChange}
+                                            step="0.01" min="0"
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all font-mono font-bold text-sm"
+                                            placeholder="0.00" required
+                                        />
+                                        {fixedForm.moneda === 'BS' && fixedForm.monto && parseFloat(fixedForm.tasa_dia) > 0 && (
+                                            <p className="text-xs text-emerald-600 mt-1 font-bold">
+                                                ≈ {fmt$(parseFloat(fixedForm.monto) / parseFloat(fixedForm.tasa_dia))}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Moneda</label>
+                                        <select
+                                            name="moneda" value={fixedForm.moneda}
+                                            onChange={handleFixedInputChange}
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all text-sm font-bold text-slate-600"
+                                        >
+                                            <option value="USD">USD ($)</option>
+                                            <option value="BS">Bolívares (Bs)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Fecha + Tasa */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                            <FaCalendarAlt className="inline mr-1" /> Fecha
+                                        </label>
+                                        <input
+                                            type="date" name="fecha" value={fixedForm.fecha}
+                                            onChange={handleFixedInputChange}
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition-all text-sm"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tasa del Día</label>
+                                        <div className="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-xl px-4 py-2.5 font-bold text-right cursor-not-allowed">
+                                            Bs {parseFloat(rate || 0).toFixed(2)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Botones */}
+                                <div className="flex gap-3 pt-2">
+                                    <button type="button" onClick={() => setIsFixedModalOpen(false)}
+                                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors text-sm">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" disabled={submitting}
+                                        className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:shadow-lg hover:shadow-emerald-500/30 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                                        {submitting ? <FaSpinner className="animate-spin" /> : <FaPlus />}
+                                        Guardar Gasto
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ══════════════════════════════════════════════════════════
+                MODAL: Gasto Variable
+            ══════════════════════════════════════════════════════════ */}
+            <AnimatePresence>
+                {isVariableModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        >
+                            {/* Header */}
+                            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 flex justify-between items-center relative overflow-hidden">
+                                <div className="absolute -right-4 -top-4 opacity-10">
+                                    <FaLayerGroup size={80} />
+                                </div>
+                                <div className="relative z-10">
+                                    <h3 className="font-black text-xl">Registrar Gasto Variable</h3>
+                                    <p className="text-blue-100 text-sm mt-0.5">Gastos operativos no recurrentes.</p>
+                                </div>
+                                <button onClick={() => setIsVariableModalOpen(false)} className="relative z-10 p-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
+                                    <FaTimes size={16} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleVariableSubmit} className="p-6 space-y-4">
+                                {/* Tienda */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                        <FaStore className="inline mr-1" /> Tienda
+                                    </label>
+                                    <select
+                                        value={variableForm.id_tienda}
+                                        onChange={e => setVariableForm(prev => ({ ...prev, id_tienda: e.target.value }))}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm font-medium"
+                                        required
+                                    >
+                                        <option value="">Seleccione tienda...</option>
+                                        {tiendasList.map(t => (
+                                            <option key={t.id_tienda} value={t.id_tienda}>{t.nb_tienda}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Tipo de Gasto */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de Gasto</label>
+                                    <select
+                                        name="id_tipo_gasto_variable"
+                                        value={variableForm.id_tipo_gasto_variable}
+                                        onChange={handleVariableInputChange}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm"
+                                        required
+                                    >
+                                        <option value="new">+ Nuevo Tipo de Gasto</option>
+                                        {variableExpenseTypes.map(t => (
+                                            <option key={t.id_tipo_gasto_variable} value={t.id_tipo_gasto_variable}>{t.nb_gasto_variable}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {variableForm.id_tipo_gasto_variable === 'new' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre del Gasto</label>
+                                        <input
+                                            type="text" name="nb_gasto_variable" value={variableForm.nb_gasto_variable}
+                                            onChange={handleVariableInputChange}
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm"
+                                            placeholder="Ej: Internet, Papelería..."
+                                            required={variableForm.id_tipo_gasto_variable === 'new'}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Descripción */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Descripción (Opcional)</label>
+                                    <input
+                                        type="text" name="descripcion" value={variableForm.descripcion}
+                                        onChange={handleVariableInputChange}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm"
+                                        placeholder="Detalle adicional del gasto..."
+                                        maxLength="200"
+                                    />
+                                </div>
+
+                                {/* Método de Pago */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Método de Pago</label>
+                                    <select
+                                        name="id_metodo_pago"
+                                        value={variableForm.id_metodo_pago}
+                                        onChange={handleVariableInputChange}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm"
+                                        required
+                                    >
+                                        <option value="">Seleccione método...</option>
+                                        {paymentMethods
+                                            .filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO', 'BANCO (POS)'].includes(m.nb_metodo_pago.toUpperCase()))
+                                            .map(m => (
+                                                <option key={m.id_metodo_pago} value={m.id_metodo_pago}>{m.nb_metodo_pago}</option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {/* Monto + Moneda */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                            Monto {variableForm.moneda === 'BS' ? '(Bs)' : '($)'}
+                                        </label>
+                                        <input
+                                            type="number" name="monto" value={variableForm.monto}
+                                            onChange={handleVariableInputChange}
+                                            step="0.01" min="0"
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all font-mono font-bold text-sm"
+                                            placeholder="0.00" required
+                                        />
+                                        {variableForm.moneda === 'BS' && variableForm.monto && parseFloat(variableForm.tasa_dia) > 0 && (
+                                            <p className="text-xs text-blue-600 mt-1 font-bold">
+                                                ≈ {fmt$(parseFloat(variableForm.monto) / parseFloat(variableForm.tasa_dia))}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Moneda</label>
+                                        <select
+                                            name="moneda" value={variableForm.moneda}
+                                            onChange={handleVariableInputChange}
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm font-bold text-slate-600"
+                                        >
+                                            <option value="USD">USD ($)</option>
+                                            <option value="BS">Bolívares (Bs)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Fecha + Tasa */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                            <FaCalendarAlt className="inline mr-1" /> Fecha
+                                        </label>
+                                        <input
+                                            type="date" name="fecha" value={variableForm.fecha}
+                                            onChange={handleVariableInputChange}
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all text-sm"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tasa del Día</label>
+                                        <div className="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-xl px-4 py-2.5 font-bold text-right cursor-not-allowed">
+                                            Bs {parseFloat(rate || 0).toFixed(2)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Botones */}
+                                <div className="flex gap-3 pt-2">
+                                    <button type="button" onClick={() => setIsVariableModalOpen(false)}
+                                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors text-sm">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" disabled={submitting}
+                                        className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:shadow-lg hover:shadow-blue-500/30 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                                        {submitting ? <FaSpinner className="animate-spin" /> : <FaPlus />}
+                                        Guardar Gasto
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
+
+export default GastosPage;

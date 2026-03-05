@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale, FaPercentage, FaStore, FaGlobe, FaChevronDown, FaUniversity } from 'react-icons/fa';
+import { FaHome, FaBox, FaCashRegister, FaShoppingCart, FaUserFriends, FaHistory, FaSignOutAlt, FaBars, FaTimes, FaChartLine, FaFileInvoiceDollar, FaBalanceScale, FaPercentage, FaStore, FaGlobe, FaChevronDown, FaUniversity, FaReceipt } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useRate } from '../../context/RateContext';
@@ -77,25 +77,27 @@ const DashboardLayout = () => {
         if (role === 'vendedor') {
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
         } else if (role === 'gerente') {
-            navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
+            navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
+            navItems.push({ to: "/dashboard/bank", icon: FaUniversity, label: "Banco" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
+            navItems.push({ to: "/dashboard/gastos", icon: FaReceipt, label: "Gastos" });
+            navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
             navItems.push({ to: "/dashboard/commissions", icon: FaPercentage, label: "Comisión" });
-            navItems.push({ to: "/dashboard/bank", icon: FaUniversity, label: "Banco" });
-            navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
         } else if (role === 'administrador') {
-            navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
+            navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
+            navItems.push({ to: "/dashboard/bank", icon: FaUniversity, label: "Banco" });
             navItems.push({ to: "/dashboard/sales", icon: FaCashRegister, label: "Ventas" });
+            navItems.push({ to: "/dashboard/gastos", icon: FaReceipt, label: "Gastos" });
+            navItems.push({ to: "/dashboard/products", icon: FaBox, label: "Productos" });
             navItems.push({ to: "/dashboard/purchases", icon: FaShoppingCart, label: "Compras" });
             navItems.push({ to: "/dashboard/inventory", icon: FaBox, label: "Inventario" });
             navItems.push({ to: "/dashboard/invoices", icon: FaFileInvoiceDollar, label: "Facturas" });
             navItems.push({ to: "/dashboard/commissions", icon: FaPercentage, label: "Comisión" });
-            navItems.push({ to: "/dashboard/bank", icon: FaUniversity, label: "Banco" });
-            navItems.push({ to: "/dashboard/finances", icon: FaChartLine, label: "Finanzas" });
             navItems.push({ to: "/dashboard/profit-loss", icon: FaBalanceScale, label: "Balance" });
             navItems.push({ to: "/dashboard/history", icon: FaHistory, label: "Historial" });
             navItems.push({ to: "/dashboard/users", icon: FaUserFriends, label: "Usuarios" });
