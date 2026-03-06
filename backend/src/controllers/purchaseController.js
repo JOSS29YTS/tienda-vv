@@ -37,9 +37,8 @@ exports.createPurchase = async (req, res) => {
                 if (!USD_KEYWORDS.some(k => nm.includes(k))) { allUsd = false; break; }
             }
 
-            // USD payments: $0.005 tolerance (floating point only)
-            // Bs payments: Bs 0.05 → in USD = 0.05 / rate
-            const toleranceUsd = allUsd ? 0.005 : (0.05 / parseFloat(rate));
+            // Tolerancia de 5 centavos de dólar para cubrir cualquier desfase decimal entre Bs y USD
+            const toleranceUsd = 0.05;
 
             const totalPaidUsd = payments.reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
             if (Math.abs(totalPaidUsd - totalPurchaseCost) > toleranceUsd) {

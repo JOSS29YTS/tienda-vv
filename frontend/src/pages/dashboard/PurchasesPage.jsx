@@ -450,9 +450,8 @@ const PurchasesPage = () => {
         });
 
         const currentRate = parseFloat(rate);
-        // USD: $0.005 tolerance (half a cent, only for floating point errors)
-        // Bs: Bs 0.05 → in USD that's 0.05/rate (at Bs 405, ≈ $0.00012)
-        const toleranceUsd = allUsd ? 0.005 : (0.05 / currentRate);
+        // Amplia tolerancia (5 centavos) para compensar desfases por conversiones Bs <-> USD y redondeos
+        const toleranceUsd = 0.05;
 
         const diff = totalPaidUsd - totalCompasUsd;
         if (Math.abs(diff) > toleranceUsd) {
