@@ -293,7 +293,10 @@ exports.getRecentTransactions = async (req, res) => {
 
 exports.getFixedPaymentTypes = async (req, res) => {
     try {
-        const [types] = await pool.query(`SELECT * FROM tipo_pago_fijo WHERE (nb_tipo_pago_fijo NOT LIKE '%COMISIONES POR VENTA%' AND nb_tipo_pago_fijo NOT LIKE '%PAGO DE COMISIONES%') ORDER BY nb_tipo_pago_fijo ASC`);
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        // Si hay tienda seleccionada, buscamos las de esa tienda o las globales (id_tienda IS NULL)
+        const tiendaFilter = tiendaId ? `AND (id_tienda = ${tiendaId} OR id_tienda IS NULL)` : '';
+        const [types] = await pool.query(`SELECT * FROM tipo_pago_fijo WHERE (nb_tipo_pago_fijo NOT LIKE '%COMISIONES POR VENTA%' AND nb_tipo_pago_fijo NOT LIKE '%PAGO DE COMISIONES%') ${tiendaFilter} ORDER BY nb_tipo_pago_fijo ASC`);
         res.json(types);
     } catch (error) {
         console.error('Error getting fixed payment types:', error);
@@ -477,7 +480,10 @@ exports.buyCurrency = async (req, res) => {
 
 exports.getVariableExpenseTypes = async (req, res) => {
     try {
-        const [types] = await pool.query(`SELECT * FROM tipo_gasto_variable ORDER BY nb_gasto_variable ASC`);
+        const tiendaId = req.query.tienda && req.query.tienda !== 'global' ? parseInt(req.query.tienda) : null;
+        // Si hay tienda seleccionada, buscamos las de esa tienda o las globales (id_tienda IS NULL)
+        const tiendaFilter = tiendaId ? `WHERE (id_tienda = ${tiendaId} OR id_tienda IS NULL)` : '';
+        const [types] = await pool.query(`SELECT * FROM tipo_gasto_variable ${tiendaFilter} ORDER BY nb_gasto_variable ASC`);
         res.json(types);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener tipos de gasto variable' });
@@ -492,11 +498,11 @@ exports.createVariableExpense = async (req, res) => {
 
         let typeId = id_tipo_gasto_variable;
         if (!typeId && nb_gasto_variable) {
-            const [existing] = await pool.query('SELECT id_tipo_gasto_variable FROM tipo_gasto_variable WHERE nb_gasto_variable = ?', [nb_gasto_variable]);
+            const [existing] = await pool.query('SELECT id_tipo_gasto_variable FROM tipo_gasto_variable WHERE nb_gasto_variable = ? AND (id_tienda = ? OR id_tienda IS NULL)', [nb_gasto_variable, tiendaId]);
             if (existing.length > 0) {
                 typeId = existing[0].id_tipo_gasto_variable;
             } else {
-                const [result] = await pool.query('INSERT INTO tipo_gasto_variable (nb_gasto_variable) VALUES (?)', [nb_gasto_variable]);
+                const [result] = await pool.query('INSERT INTO tipo_gasto_variable (nb_gasto_variable, id_tienda) VALUES (?, ?)', [nb_gasto_variable, tiendaId]);
                 typeId = result.insertId;
             }
         }

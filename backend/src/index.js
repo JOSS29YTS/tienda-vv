@@ -107,6 +107,10 @@ app.listen(PORT, async () => {
             { q: "ALTER TABLE gasto_variable ADD COLUMN descripcion VARCHAR(255) NULL" },
             // Tipos de gasto por tienda
             { q: "ALTER TABLE tipo_pago_fijo ADD COLUMN id_tienda INT NULL" },
+            { q: "ALTER TABLE tipo_gasto_variable ADD COLUMN id_tienda INT NULL" },
+            // Quitar índices únicos para permitir mismo nombre en distintas tiendas
+            { q: "ALTER TABLE tipo_gasto_variable DROP INDEX nb_gasto_variable" },
+            { q: "ALTER TABLE tipo_pago_fijo DROP INDEX nb_tipo_pago_fijo" },
         ];
 
         for (const m of migrations) {
