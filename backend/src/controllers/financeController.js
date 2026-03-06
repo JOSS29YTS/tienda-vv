@@ -464,7 +464,7 @@ exports.buyCurrency = async (req, res) => {
         const destId = id_metodo_destino || destinationId;
         const currentRate = tasa_dia || rate;
         const amountBs = monto_bs || (parseFloat(amountUSD || 0) * parseFloat(currentRate || 1));
-        const finalDate = fecha_compra || date;
+        const inputDate = fecha_compra || date;
 
         const userId = req.user.id;
         const tiendaId = id_tienda || req.user.id_tienda || 1;
@@ -473,18 +473,19 @@ exports.buyCurrency = async (req, res) => {
             return res.status(400).json({ message: 'Faltan datos requeridos para la compra de divisas' });
         }
 
-        let formattedDate;
-        if (finalDate) {
-            formattedDate = finalDate.replace('T', ' ');
-            if (formattedDate.length === 16) formattedDate += ':00';
-            else formattedDate = formattedDate.slice(0, 19);
-        } else {
-            let d = new Date();
-            d.setHours(d.getHours() - 4);
-            formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
+        let dbDate = new Date();
+        if (inputDate) {
+            if (inputDate.includes('T') || inputDate.includes(' ')) {
+                dbDate = new Date(inputDate);
+            } else {
+                const parts = inputDate.split('-');
+                if (parts.length === 3) {
+                    dbDate.setFullYear(parts[0], parts[1] - 1, parts[2]);
+                }
+            }
         }
 
-        await pool.query('INSERT INTO traspaso (id_usuario, id_tienda, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, originId, destId, amountBs, currentRate, formattedDate]);
+        await pool.query('INSERT INTO traspaso (id_usuario, id_tienda, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, originId, destId, amountBs, currentRate, dbDate]);
         res.json({ message: 'Compra de divisas registrada exitosamente' });
     } catch (error) {
         console.error('Error buying currency:', error);
