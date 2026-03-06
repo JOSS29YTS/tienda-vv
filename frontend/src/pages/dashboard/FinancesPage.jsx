@@ -229,7 +229,7 @@ const FinancesPage = () => {
             }
             if (res.ok) {
                 const data = await res.json();
-                setPaymentMethods(data);
+                setPaymentMethods(data.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO', 'BANCO (POS)'].includes(m.nb_metodo_pago.toUpperCase())));
             }
         } catch (error) {
             console.error("Error fetching payment methods:", error);

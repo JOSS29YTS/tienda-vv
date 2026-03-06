@@ -70,7 +70,7 @@ const ClientsPage = () => {
         try {
             const response = await fetch(`${API_URL}/api/sales/payment-methods`);
             const data = await response.json();
-            setPaymentMethods(data);
+            setPaymentMethods(data.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO', 'BANCO (POS)'].includes(m.nb_metodo_pago.toUpperCase())));
         } catch (err) {
             console.error(err);
         }
@@ -480,7 +480,7 @@ const ClientsPage = () => {
                                                 }}
                                                 className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-1/3 p-2.5 font-bold"
                                             >
-                                                {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'PENDIENTE POR COBRAR').map(m => (
+                                                {paymentMethods.filter(m => m.nb_metodo_pago !== 'MIXTO' && m.nb_metodo_pago !== 'PENDIENTE POR COBRAR' && m.nb_metodo_pago !== 'BANCO (POS)').map(m => (
                                                     <option key={m.id_metodo_pago} value={m.nb_metodo_pago}>{m.nb_metodo_pago}</option>
                                                 ))}
                                             </select>

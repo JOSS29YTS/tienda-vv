@@ -126,7 +126,7 @@ const CommissionsPage = () => {
             });
             if (res.ok) {
                 const methodsData = await res.json();
-                setMethods(methodsData);
+                setMethods(methodsData.filter(m => !['PENDIENTE POR COBRAR', 'MIXTO', 'BIOPAGO', 'BANCO (POS)'].includes(m.nb_metodo_pago.toUpperCase())));
                 if (methodsData.length > 0) setSelectedMethod(methodsData[0].id_metodo_pago);
             }
         } catch (error) {

@@ -77,7 +77,8 @@ const InvoicesPage = () => {
                 setPaymentMethods(data.filter(m =>
                     !m.nb_metodo_pago.toLowerCase().includes('mixto') &&
                     !m.nb_metodo_pago.toUpperCase().includes('PENDIENTE') &&
-                    !m.nb_metodo_pago.toUpperCase().includes('BIOPAGO')
+                    !m.nb_metodo_pago.toUpperCase().includes('BIOPAGO') &&
+                    !m.nb_metodo_pago.toUpperCase().includes('BANCO (POS)')
                 ));
             }
         } catch (err) {
