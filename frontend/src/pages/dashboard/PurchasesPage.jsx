@@ -191,7 +191,7 @@ const PurchasesPage = () => {
                 const data = await res.json();
                 const filtered = data.filter(m => {
                     const name = m.nb_metodo_pago.toUpperCase();
-                    return !name.includes('PENDIENTE') && !name.includes('MIXTO') && !name.includes('BIOPAGO');
+                    return !name.includes('PENDIENTE') && !name.includes('MIXTO') && !name.includes('BIOPAGO') && !name.includes('BANCO (POS)');
                 });
                 setPaymentMethods(filtered);
                 return filtered; // Return for immediate use
