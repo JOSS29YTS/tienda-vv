@@ -439,7 +439,10 @@ const GastosPage = () => {
         doc.text('Reporte generado automáticamente por el sistema.', 105, pageH - 8, { align: 'center' });
 
         doc.save(`Reporte_Gastos_${isFijos ? 'Fijos' : 'Variables'}_${date.replace(/\//g, '-')}.pdf`);
-        toast.success('Reporte PDF descargado exitosamente', { style: { background: '#10B981', color: '#FFFFFF' } });
+        toast.success('Reporte PDF descargado exitosamente', {
+            style: { background: '#10B981', color: '#FFFFFF' },
+            iconTheme: { primary: '#FFFFFF', secondary: '#10B981' }
+        });
     };
 
     // Método icono
