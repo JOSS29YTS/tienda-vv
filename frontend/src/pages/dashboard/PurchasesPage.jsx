@@ -450,8 +450,9 @@ const PurchasesPage = () => {
         });
 
         const currentRate = parseFloat(rate);
-        // Amplia tolerancia (5 centavos) para compensar desfases por conversiones Bs <-> USD y redondeos
-        const toleranceUsd = 0.05;
+        // Margen de 0.001 USD (~0.40 Bolívares) para absorber redondeos automáticos.
+        // Cierra la puerta a errores de tipeo de bolívares enteros.
+        const toleranceUsd = 0.001;
 
         const diff = totalPaidUsd - totalCompasUsd;
         if (Math.abs(diff) > toleranceUsd) {

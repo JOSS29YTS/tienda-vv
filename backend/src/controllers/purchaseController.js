@@ -37,8 +37,10 @@ exports.createPurchase = async (req, res) => {
                 if (!USD_KEYWORDS.some(k => nm.includes(k))) { allUsd = false; break; }
             }
 
-            // Tolerancia de 5 centavos de dólar para cubrir cualquier desfase decimal entre Bs y USD
-            const toleranceUsd = 0.05;
+            // Tolerancia de $0.001 (1 décima de centavo).
+            // Esto permite variaciones de redondeo decimal de hasta ~0.40 Bolívares.
+            // Si el desfase es mayor a $0.001, la validación falla (ej. $0.05 de margen es demasiado).
+            const toleranceUsd = 0.001;
 
             const totalPaidUsd = payments.reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
             if (Math.abs(totalPaidUsd - totalPurchaseCost) > toleranceUsd) {
