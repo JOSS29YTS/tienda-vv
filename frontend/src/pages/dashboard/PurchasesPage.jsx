@@ -450,9 +450,9 @@ const PurchasesPage = () => {
         });
 
         const currentRate = parseFloat(rate);
-        // Margen de 0.001 USD (~0.40 Bolívares) para absorber redondeos automáticos.
-        // Cierra la puerta a errores de tipeo de bolívares enteros.
-        const toleranceUsd = 0.001;
+        // Margen ultrafino de 5 decimales de dólar (0.00005) o ~0.02 Bs de error,
+        // esto bloquea que 31500 pase (diferencia 0.073 > 0.02) pero aprueba 31499.93
+        const toleranceUsd = 0.00005;
 
         const diff = totalPaidUsd - totalCompasUsd;
         if (Math.abs(diff) > toleranceUsd) {

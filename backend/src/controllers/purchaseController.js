@@ -37,10 +37,9 @@ exports.createPurchase = async (req, res) => {
                 if (!USD_KEYWORDS.some(k => nm.includes(k))) { allUsd = false; break; }
             }
 
-            // Tolerancia de $0.001 (1 décima de centavo).
-            // Esto permite variaciones de redondeo decimal de hasta ~0.40 Bolívares.
-            // Si el desfase es mayor a $0.001, la validación falla (ej. $0.05 de margen es demasiado).
-            const toleranceUsd = 0.001;
+            // Tolerancia ultrarigurosa de 5 decimales (0.00005 USD) equivalente a ~0.02 Bs.
+            // Esto permite redondeos de fracciones correctas (como .93) pero bloquea cualquier número entero (ej 31500)
+            const toleranceUsd = 0.00005;
 
             const totalPaidUsd = payments.reduce((acc, p) => acc + parseFloat(p.amount || 0), 0);
             if (Math.abs(totalPaidUsd - totalPurchaseCost) > toleranceUsd) {
