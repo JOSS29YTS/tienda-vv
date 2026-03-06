@@ -457,12 +457,25 @@ exports.payLoan = async (req, res) => {
 
 exports.buyCurrency = async (req, res) => {
     try {
-        const { id_metodo_origen, id_metodo_destino, monto_bs, tasa_dia, fecha_compra } = req.body;
+        const { id_metodo_origen, methodId, id_metodo_destino, destinationId, monto_bs, amountUSD, tasa_dia, rate, fecha_compra, date, id_tienda } = req.body;
+
+        // Adaptabilidad para ambos formatos (antiguo y nuevo desde frontend)
+        const originId = id_metodo_origen || methodId;
+        const destId = id_metodo_destino || destinationId;
+        const currentRate = tasa_dia || rate;
+        const amountBs = monto_bs || (parseFloat(amountUSD || 0) * parseFloat(currentRate || 1));
+        const finalDate = fecha_compra || date;
+
         const userId = req.user.id;
-        const amountUsd = monto_bs / tasa_dia;
+        const tiendaId = id_tienda || req.user.id_tienda || 1;
+
+        if (!originId || !destId || !amountBs || !currentRate) {
+            return res.status(400).json({ message: 'Faltan datos requeridos para la compra de divisas' });
+        }
+
         let formattedDate;
-        if (fecha_compra) {
-            formattedDate = fecha_compra.replace('T', ' ');
+        if (finalDate) {
+            formattedDate = finalDate.replace('T', ' ');
             if (formattedDate.length === 16) formattedDate += ':00';
             else formattedDate = formattedDate.slice(0, 19);
         } else {
@@ -470,7 +483,8 @@ exports.buyCurrency = async (req, res) => {
             d.setHours(d.getHours() - 4);
             formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
         }
-        await pool.query('INSERT INTO traspaso (id_usuario, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?)', [userId, id_metodo_origen, id_metodo_destino, monto_bs, tasa_dia, formattedDate]);
+
+        await pool.query('INSERT INTO traspaso (id_usuario, id_tienda, id_metodo_origen, id_metodo_destino, monto, tasa_dia, fecha_traspaso) VALUES (?, ?, ?, ?, ?, ?, ?)', [userId, tiendaId, originId, destId, amountBs, currentRate, formattedDate]);
         res.json({ message: 'Compra de divisas registrada exitosamente' });
     } catch (error) {
         console.error('Error buying currency:', error);
