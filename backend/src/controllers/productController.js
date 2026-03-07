@@ -68,8 +68,15 @@ exports.getCategories = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
     try {
-        const { nombre, precio, estado, id_categoria, codigo_de_barra, id_tienda } = req.body;
-        const targetTienda = req.user.id_tienda || id_tienda || null;
+        const { nombre, precio, estado, id_categoria, codigo_de_barra, tienda } = req.body;
+
+        // Use the tienda param passed from frontend, unless it's global
+        let targetTienda = null;
+        if (tienda && tienda !== 'global') {
+            targetTienda = parseInt(tienda);
+        } else if (req.user.id_tienda) {
+            targetTienda = req.user.id_tienda; // Fallback to user's store if not explicitly set
+        }
 
         if (!nombre || !precio || !id_categoria) {
             return res.status(400).json({ message: 'Nombre, precio y categoría son requeridos' });

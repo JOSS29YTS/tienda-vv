@@ -8,7 +8,7 @@ import {
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import API_URL from '../../config/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -215,7 +215,7 @@ const GastosPage = () => {
                 fetchFixedPaymentTypes(fixedForm.id_tienda);
             } else {
                 const err = await res.json();
-                toast.error(err.message || 'Error al registrar gasto fijo', { style: { background: '#EF4444', color: '#fff' } });
+                toast.error(err.message || 'Error al registrar gasto fijo');
             }
         } catch (err) {
             console.error(err);
@@ -283,14 +283,14 @@ const GastosPage = () => {
             });
 
             if (res.ok) {
-                toast.success('Gasto variable registrado exitosamente', { style: { background: '#10B981', color: '#fff' } });
+                toast.success('Gasto variable registrado exitosamente');
                 setIsVariableModalOpen(false);
                 resetVariableForm();
                 fetchGastos();
                 fetchVariableExpenseTypes(variableForm.id_tienda);
             } else {
                 const err = await res.json();
-                toast.error(err.message || 'Error al registrar gasto variable', { style: { background: '#EF4444', color: '#fff' } });
+                toast.error(err.message || 'Error al registrar gasto variable');
             }
         } catch (err) {
             console.error(err);
@@ -343,11 +343,11 @@ const GastosPage = () => {
 
             const data = await res.json();
             if (res.ok) {
-                toast.success(data.message || 'Préstamo registrado exitosamente', { style: { background: '#10B981', color: '#fff' } });
+                toast.success(data.message || 'Préstamo registrado exitosamente');
                 setIsLoanModalOpen(false);
                 fetchGastos(); // Update list if applicable
             } else {
-                toast.error(data.message || 'Error al registrar préstamo', { style: { background: '#EF4444', color: '#fff' } });
+                toast.error(data.message || 'Error al registrar préstamo');
             }
         } catch (err) {
             console.error(err);
@@ -439,10 +439,7 @@ const GastosPage = () => {
         doc.text('Reporte generado automáticamente por el sistema.', 105, pageH - 8, { align: 'center' });
 
         doc.save(`Reporte_Gastos_${isFijos ? 'Fijos' : 'Variables'}_${date.replace(/\//g, '-')}.pdf`);
-        toast.success('Reporte PDF descargado exitosamente', {
-            style: { background: '#10B981', color: '#FFFFFF' },
-            iconTheme: { primary: '#FFFFFF', secondary: '#10B981' }
-        });
+        toast.success('Reporte PDF descargado exitosamente');
     };
 
     // Método icono
@@ -475,7 +472,7 @@ const GastosPage = () => {
 
     return (
         <div className="space-y-6 relative">
-            <Toaster position="top-right" />
+
 
             {/* ── Header ─────────────────────────────────────────────── */}
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

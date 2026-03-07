@@ -42,12 +42,36 @@ import { StoreProvider } from './context/StoreContext';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
+import { Toaster } from 'react-hot-toast';
+
 function App() {
   return (
     <AuthProvider>
       <RateProvider>
         <StoreProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              className: 'font-primary font-bold rounded-xl shadow-lg py-3 px-5 max-w-md text-white',
+              duration: 4000,
+              success: {
+                style: {
+                  background: '#10B981', // green / emerald
+                  color: '#FFFFFF',      // white text
+                },
+                iconTheme: { primary: '#FFFFFF', secondary: '#10B981' },
+              },
+              error: {
+                style: {
+                  background: '#EF4444', // red
+                  color: '#FFFFFF',      // white text
+                },
+                iconTheme: { primary: '#FFFFFF', secondary: '#EF4444' },
+              },
+            }}
+          />
           <BrowserRouter>
+
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />

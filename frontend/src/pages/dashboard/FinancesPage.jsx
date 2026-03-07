@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaChartLine, FaMoneyBillWave, FaArrowUp, FaArrowDown, FaFileInvoiceDollar, FaWallet, FaReceipt, FaShoppingCart, FaPlus, FaTimes, FaDollarSign, FaMobileAlt, FaCreditCard, FaFingerprint, FaExchangeAlt, FaMoneyBill } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../../context/AuthContext';
@@ -308,10 +308,7 @@ const FinancesPage = () => {
                     monto: '',
                     fecha: getLocalISODate()
                 }));
-                toast.success('Gasto variable registrado exitosamente', {
-                    style: { background: '#10B981', color: '#fff' },
-                    iconTheme: { primary: '#fff', secondary: '#10B981' }
-                });
+                toast.success('Gasto variable registrado exitosamente');
             } else {
                 const errorData = await res.json();
                 toast.error(errorData.message || 'Error al registrar gasto variable');
@@ -393,41 +390,14 @@ const FinancesPage = () => {
                     monto: '',
                     fecha: getLocalISODate()
                 }));
-                toast.success('Pago registrado exitosamente', {
-                    style: {
-                        background: '#10B981',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#10B981',
-                    },
-                });
+                toast.success('Pago registrado exitosamente');
             } else {
                 const errorData = await res.json();
-                toast.error(errorData.message || 'Error al registrar pago fijo', {
-                    style: {
-                        background: '#EF4444',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#EF4444',
-                    },
-                });
+                toast.error(errorData.message || 'Error al registrar pago fijo');
             }
         } catch (error) {
             console.error(error);
-            toast.error('Error al registrar', {
-                style: {
-                    background: '#EF4444',
-                    color: '#fff',
-                },
-                iconTheme: {
-                    primary: '#fff',
-                    secondary: '#EF4444',
-                },
-            });
+            toast.error('Error al registrar');
         }
     };
 
@@ -439,16 +409,7 @@ const FinancesPage = () => {
     const handleTransferSubmit = async (e) => {
         e.preventDefault();
         if (transferFormData.id_metodo_origen === transferFormData.id_metodo_destino) {
-            toast.error('El origen y destino no pueden ser el mismo', {
-                style: {
-                    background: '#EF4444',
-                    color: '#fff',
-                },
-                iconTheme: {
-                    primary: '#fff',
-                    secondary: '#EF4444',
-                },
-            });
+            toast.error('El origen y destino no pueden ser el mismo');
             return;
         }
         try {
@@ -488,41 +449,14 @@ const FinancesPage = () => {
                     fecha_traspaso: getLocalISODate(),
                     tasa_dia: roundedRate ? roundedRate.toFixed(2) : ''
                 }));
-                toast.success('Traspaso realizado exitosamente', {
-                    style: {
-                        background: '#10B981',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#10B981',
-                    },
-                });
+                toast.success('Traspaso realizado exitosamente');
             } else {
                 const errorData = await res.json();
-                toast.error(errorData.message || 'Error al realizar traspaso', {
-                    style: {
-                        background: '#EF4444',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#EF4444',
-                    },
-                });
+                toast.error(errorData.message || 'Error al realizar traspaso');
             }
         } catch (error) {
             console.error(error);
-            toast.error('Error de conexión', {
-                style: {
-                    background: '#EF4444',
-                    color: '#fff',
-                },
-                iconTheme: {
-                    primary: '#fff',
-                    secondary: '#EF4444',
-                },
-            });
+            toast.error('Error de conexión');
         }
     };
 
@@ -663,16 +597,7 @@ const FinancesPage = () => {
         doc.text('Reporte generado automáticamente por Ropa Mania System.', 105, footerY, { align: 'center' });
 
         doc.save(`Reporte_Financiero_${date.replace(/\//g, '-')}.pdf`);
-        toast.success('Reporte financiero descargado', {
-            style: {
-                background: '#10B981',
-                color: '#fff',
-            },
-            iconTheme: {
-                primary: '#fff',
-                secondary: '#10B981',
-            },
-        });
+        toast.success('Reporte financiero descargado');
     };
 
     const StatCard = ({ title, value, icon: Icon, gradient, trend, isBs = false }) => (
@@ -711,7 +636,7 @@ const FinancesPage = () => {
 
     return (
         <div className="space-y-8 relative">
-            <Toaster position="top-right" reverseOrder={false} />
+
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Finanzas</h2>

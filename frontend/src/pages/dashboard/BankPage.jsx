@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { FaUniversity, FaExchangeAlt, FaArrowDown, FaArrowUp, FaMinus, FaCreditCard } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
 import { useAuth } from '../../context/AuthContext';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import API_URL from '../../config/api';
 
 // Store accent colors by id_tienda
@@ -105,10 +105,7 @@ const BankPage = () => {
             });
             const data = await res.json();
             if (res.ok) {
-                toast.success(data.message || 'Traspaso registrado', {
-                    style: { background: '#10B981', color: '#fff' },
-                    iconTheme: { primary: '#fff', secondary: '#10B981' }
-                });
+                toast.success('Retiro/Entrada registrado exitosamente');
                 setIsTransferOpen(false);
                 fetchData();
             } else {
@@ -131,7 +128,7 @@ const BankPage = () => {
 
     return (
         <div className="space-y-8">
-            <Toaster position="top-right" />
+
 
             {/* Header */}
             <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}

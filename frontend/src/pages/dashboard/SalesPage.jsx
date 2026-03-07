@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCalendarAlt, FaDollarSign, FaMoneyBillWave, FaTrash, FaExclamationCircle, FaCheckCircle, FaFilePdf, FaFileInvoice, FaPlus, FaEdit, FaCheck, FaTimes, FaBarcode } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -44,9 +45,7 @@ const SalesPage = () => {
         rowsToUpdate: []
     });
 
-    // Notification State
-    const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState(null);
+
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
     const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
@@ -60,16 +59,7 @@ const SalesPage = () => {
     };
 
 
-    // Auto-clear notifications
-    useEffect(() => {
-        if (error || successMessage) {
-            const timer = setTimeout(() => {
-                setError(null);
-                setSuccessMessage(null);
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [error, successMessage]);
+
 
     // Global Key Listener for Barcode Scanner in Main Sales Page
     useEffect(() => {
@@ -114,9 +104,9 @@ const SalesPage = () => {
                             }
                             return newRows;
                         });
-                        setSuccessMessage(`Producto agregado: ${product.nombre}`);
+                        toast.success(`Producto agregado: ${product.nombre}`);
                     } else {
-                        setError('Producto no encontrado');
+                        toast.error('Producto no encontrado');
                         // console.log('Producto no encontrado');
                     }
                     touchInteraction();
@@ -283,16 +273,24 @@ const SalesPage = () => {
 
     const fetchProducts = async () => {
         try {
+            const token = localStorage.getItem('token');
             const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
-            const response = await fetch(`${API_URL}/api/products${tiendaParam}`);
+            const response = await fetch(`${API_URL}/api/products${tiendaParam}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Error al cargar productos');
+            }
+
             // Filter only active products
             const activeProducts = data.filter(p => p.estado === 'activo');
             setProducts(activeProducts);
             console.log("Productos activos cargados:", activeProducts);
         } catch (err) {
             console.error(err);
-            setError('Error al cargar productos');
+            toast.error('Error al cargar productos');
         }
     };
 
@@ -315,7 +313,7 @@ const SalesPage = () => {
             setPaymentMethods(sortedData);
         } catch (err) {
             console.error(err);
-            setError('Error al cargar métodos de pago');
+            toast.error('Error al cargar métodos de pago');
         }
     };
 
@@ -361,10 +359,10 @@ const SalesPage = () => {
                     }
                     setRows(newRows);
                     touchInteraction();
-                    setSuccessMessage(`Producto agregado: ${product.nombre}`);
+                    toast.success(`Producto agregado: ${product.nombre}`);
                 } else {
                     setScanCode('');
-                    setError('Producto no encontrado con ese código');
+                    toast.error('Producto no encontrado con ese código');
                     // console.log('Producto no encontrado con ese código');
                 }
             } finally {
@@ -493,7 +491,7 @@ const SalesPage = () => {
         // Validation
         const validRows = rows.filter(r => r.productId && r.quantity > 0 && r.paymentMethod);
         if (validRows.length === 0) {
-            setError('No hay ventas válidas para registrar. Verifique productos y métodos de pago.');
+            toast.error('No hay ventas válidas para registrar. Verifique productos y métodos de pago.');
             return;
         }
         setShowConfirmationModal(true);
@@ -550,7 +548,7 @@ const SalesPage = () => {
             }
 
             // Success
-            setSuccessMessage('¡Venta cerrada exitosamente! Se han guardado los registros.');
+            toast.success('¡Venta cerrada exitosamente! Se han guardado los registros.');
             setRows([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
             setSelectedRows([]);
             localStorage.removeItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`);
@@ -558,7 +556,7 @@ const SalesPage = () => {
 
         } catch (err) {
             console.error(err);
-            setError(err.message);
+            toast.error(err.message);
             setShowConfirmationModal(false);
         }
     };
@@ -645,31 +643,7 @@ const SalesPage = () => {
 
     return (
         <div className="space-y-6 relative">
-            {/* Error Notification Toast */}
-            <AnimatePresence>
-                {error && (
-                    <motion.div
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 50 }}
-                        className="fixed top-6 right-6 bg-red-500 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3 font-bold border border-red-600 backdrop-blur-sm bg-opacity-90"
-                    >
-                        <FaExclamationCircle className="text-2xl" />
-                        <span>{error}</span>
-                    </motion.div>
-                )}
-                {successMessage && (
-                    <motion.div
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 50 }}
-                        className="fixed top-6 right-6 bg-emerald-500 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-3 font-bold border border-emerald-600 backdrop-blur-sm bg-opacity-90"
-                    >
-                        <FaCheckCircle className="text-2xl" />
-                        <span>{successMessage}</span>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             {/* Confirmation Modal */}
             {/* Confirmation Modal */}

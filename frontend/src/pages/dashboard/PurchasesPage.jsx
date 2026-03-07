@@ -228,6 +228,8 @@ const PurchasesPage = () => {
             if (res.ok) {
                 const data = await res.json();
                 setProducts(data);
+            } else {
+                console.error("Failed to load products:", res.status);
             }
         } catch (err) {
             console.error(err);

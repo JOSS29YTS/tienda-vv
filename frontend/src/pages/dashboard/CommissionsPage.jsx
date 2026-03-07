@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaMoneyBillWave, FaUserTie, FaUserTag } from 'react-icons/fa';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
@@ -215,29 +215,11 @@ const CommissionsPage = () => {
 
             const result = await res.json();
             if (res.ok) {
-                toast.success(`Comisión de ${payInfo.recipient} pagada exitosamente`, {
-                    style: {
-                        background: '#10B981',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#10B981',
-                    },
-                });
+                toast.success('Pago de comisión registrado');
                 setIsPayModalOpen(false);
                 fetchCommissions();
             } else {
-                toast.error(result.message || 'Error al procesar el pago', {
-                    style: {
-                        background: '#EF4444',
-                        color: '#fff',
-                    },
-                    iconTheme: {
-                        primary: '#fff',
-                        secondary: '#EF4444',
-                    },
-                });
+                toast.error(result.message || 'Error al pagar');
             }
         } catch (error) {
             console.error(error);
@@ -257,7 +239,7 @@ const CommissionsPage = () => {
 
     return (
         <div className="space-y-8 relative">
-            <Toaster position="top-right" />
+
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 font-heading">Comisiones</h2>

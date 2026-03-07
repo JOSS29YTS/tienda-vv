@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaBox, FaSearch, FaPlus, FaCheckCircle, FaTimesCircle, FaDollarSign, FaTag, FaPen, FaTrash, FaBarcode, FaHistory, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import API_URL from '../../config/api';
 
 const ProductsPage = () => {
@@ -72,17 +72,17 @@ const ProductsPage = () => {
         setEditingProduct(null);
 
         try {
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products/${productId}/price`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ precio: editPriceValue })
             });
 
             if (!response.ok) throw new Error('Error al actualizar precio');
 
         } catch (err) {
-            setProducts(originalProducts);
-            alert('Error al actualizar el precio: ' + err.message);
+            toast.error('Error al actualizar precio: ' + err.message);
         }
     };
 
@@ -99,15 +99,15 @@ const ProductsPage = () => {
         setEditingNameProduct(null);
 
         try {
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products/${productId}/name`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ nombre: newName })
             });
             if (!response.ok) throw new Error('Error al actualizar nombre');
         } catch (err) {
-            setProducts(originalProducts);
-            alert('Error al actualizar el nombre: ' + err.message);
+            toast.error('Error al actualizar el nombre: ' + err.message);
         }
     };
 
@@ -122,9 +122,10 @@ const ProductsPage = () => {
         setEditingBarcodeProduct(null);
 
         try {
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products/${productId}/barcode`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ codigo_de_barra: editBarcodeValue })
             });
 
@@ -134,8 +135,7 @@ const ProductsPage = () => {
             }
 
         } catch (err) {
-            setProducts(originalProducts);
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 
@@ -152,17 +152,17 @@ const ProductsPage = () => {
         setEditingCategoryProduct(null);
 
         try {
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products/${productId}/category`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ id_categoria: editCategoryValue })
             });
 
             if (!response.ok) throw new Error('Error al actualizar categoría');
 
         } catch (err) {
-            setProducts(originalProducts);
-            alert('Error al actualizar la categoría: ' + err.message);
+            toast.error('Error al actualizar la categoría: ' + err.message);
         }
     };
 
@@ -211,24 +211,35 @@ const ProductsPage = () => {
         e.preventDefault();
         try {
             if (!formData.id_categoria) {
-                alert("Por favor seleccione una categoría");
+                toast.error("Por favor seleccione una categoría");
                 return;
             }
 
+            const payload = {
+                ...formData,
+                tienda: effectiveTiendaId // Send the currently selected store
+            };
+
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error('Error al crear producto');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error al crear producto');
+            }
+
+            toast.success('Producto creado con éxito');
 
             fetchProducts();
             setIsModalOpen(false);
             setFormData({ nombre: '', precio: '', estado: 'activo', id_categoria: categories.length > 0 ? categories[0].id_categoria : '', codigo_de_barra: '' });
 
         } catch (err) {
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 
@@ -238,9 +249,10 @@ const ProductsPage = () => {
         setProducts(products.map(p => p.id_producto === productId ? { ...p, estado: newStatus } : p));
 
         try {
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products/${productId}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ estado: newStatus })
             });
 
@@ -248,8 +260,7 @@ const ProductsPage = () => {
 
         } catch (err) {
             // Revert on error
-            setProducts(originalProducts);
-            alert('Error al actualizar el estado: ' + err.message);
+            toast.error('Error al actualizar el estado: ' + err.message);
         }
     };
 
@@ -259,7 +270,10 @@ const ProductsPage = () => {
         setHistoryLoading(true);
         setPriceHistory([]);
         try {
-            const response = await fetch(`${API_URL}/api/products/${product.id_producto}/history`);
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/api/products/${product.id_producto}/history`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (response.ok) {
                 const data = await response.json();
                 setPriceHistory(data);
@@ -280,8 +294,10 @@ const ProductsPage = () => {
         if (!productToDelete) return;
 
         try {
+            const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/api/products/${productToDelete.id_producto}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             const data = await response.json();
@@ -293,7 +309,7 @@ const ProductsPage = () => {
             setProductToDelete(null);
 
         } catch (err) {
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 
