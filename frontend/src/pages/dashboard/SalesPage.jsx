@@ -299,8 +299,11 @@ const SalesPage = () => {
             const response = await fetch(`${API_URL}/api/sales/payment-methods`);
             const data = await response.json();
 
+            // Filter out BANCO (POS)
+            const filteredData = data.filter(m => !['BANCO (POS)'].includes(m.nb_metodo_pago.toUpperCase()));
+
             // Reorder: Put ZELLE before MIXTO if both exist
-            const sortedData = [...data].sort((a, b) => {
+            const sortedData = [...filteredData].sort((a, b) => {
                 const nameA = a.nb_metodo_pago.toUpperCase();
                 const nameB = b.nb_metodo_pago.toUpperCase();
 

@@ -560,16 +560,38 @@ exports.getCommissions = async (req, res) => {
         // Gerente: 1% + $20
         // Vendedor: 0.5% + $10
         // (This is what the UI shows as single cards)
+
+        const [paymentsResult] = await pool.query(`
+            SELECT nb_beneficiario, COALESCE(SUM(monto_usd), 0) as total_pagado
+            FROM pago_comision
+            WHERE MONTH(fecha_pago) = ? AND YEAR(fecha_pago) = ?${tiendaId ? ` AND id_tienda = ${tiendaId}` : ''}
+            GROUP BY nb_beneficiario
+        `, [month, year]);
+
+        let pagadoGerente = 0;
+        let pagadoVendedor = 0;
+
+        paymentsResult.forEach(row => {
+            if (row.nb_beneficiario?.toUpperCase() === 'GERENTE') {
+                pagadoGerente = parseFloat(row.total_pagado);
+            } else if (row.nb_beneficiario?.toUpperCase() === 'VENDEDOR') {
+                pagadoVendedor = parseFloat(row.total_pagado);
+            }
+        });
+
+        const bonifGerente = tiendaId === null ? 60 : 20;
+        const bonifVendedor = tiendaId === null ? 30 : 10;
+
         const response = {
             gerente: {
                 comision: totalSales * 0.01,
-                bonificacion: 20,
-                total: (totalSales * 0.01) + 20
+                bonificacion: bonifGerente,
+                total: Math.max(0, (totalSales * 0.01) + bonifGerente - pagadoGerente)
             },
             vendedor: {
                 comision: totalSales * 0.005,
-                bonificacion: 10,
-                total: (totalSales * 0.005) + 10
+                bonificacion: bonifVendedor,
+                total: Math.max(0, (totalSales * 0.005) + bonifVendedor - pagadoVendedor)
             },
             totalSales: totalSales
         };
@@ -586,7 +608,7 @@ exports.payCommission = async (req, res) => {
     try {
         const { nb_beneficiario, id_metodo_pago, monto_usd, tasa_dia } = req.body;
         const userId = req.user.id;
-        const tiendaId = req.user.id_tienda || req.body.id_tienda || 1;
+        const tiendaId = req.body.id_tienda || req.user.id_tienda || 1;
 
         if (!nb_beneficiario || !id_metodo_pago || !monto_usd || !tasa_dia) {
             return res.status(400).json({ message: 'Todos los campos son obligatorios' });

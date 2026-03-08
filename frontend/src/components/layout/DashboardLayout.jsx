@@ -282,7 +282,11 @@ const DashboardLayout = () => {
                         <div className="flex items-center gap-3 pl-2 pr-2 py-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
                             <div className="text-right hidden sm:block">
                                 <div className="text-sm font-bold text-slate-700 group-hover:text-orange-700 transition-colors">
-                                    {user ? `${user.nombre} ${user.apellido}` : 'Usuario'}
+                                    {user
+                                        ? user.rol.toLowerCase() === 'vendedor'
+                                            ? user.nombre.charAt(0).toUpperCase() + user.nombre.slice(1).toLowerCase()
+                                            : `${user.nombre.charAt(0).toUpperCase() + user.nombre.slice(1).toLowerCase()} ${user.apellido ? user.apellido.charAt(0).toUpperCase() + user.apellido.slice(1).toLowerCase() : ''}`
+                                        : 'Usuario'}
                                 </div>
                                 <div className="text-xs text-slate-400 font-medium capitalize">
                                     {user ? user.rol : 'Invitado'}

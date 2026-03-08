@@ -190,7 +190,7 @@ const DashboardHome = () => {
             <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <h1 className="text-4xl font-black text-slate-800 font-heading tracking-tight">
-                        Hola, <span className="text-orange-600">{user ? user.nombre : 'Usuario'}</span>
+                        Hola, <span className="text-orange-600">{user ? user.nombre.charAt(0).toUpperCase() + user.nombre.slice(1).toLowerCase() : 'Usuario'}</span>
                     </h1>
                     <p className="text-slate-500 mt-2 text-lg">Aquí tienes el resumen de tu tienda hoy.</p>
                     {/* Badge de tienda activa */}

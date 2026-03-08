@@ -141,7 +141,8 @@ const PurchasesPage = () => {
                     methodId: buyCurrencyData.methodId,
                     destinationId: buyCurrencyData.destMethodId, // Send destination method
                     rate: roundedRate, // Use rounded rate
-                    date: date
+                    date: date,
+                    id_tienda: effectiveTiendaId
                 })
             });
 
