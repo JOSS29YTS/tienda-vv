@@ -162,7 +162,7 @@ const ProfitLossPage = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
-        const tiendaName = selectedTienda ? selectedTienda.nb_tienda.toUpperCase() : 'ROPA MANIA';
+        const tiendaName = selectedTienda ? selectedTienda.nb_tienda.toUpperCase() : 'TIENDA VV';
         doc.text(`${tiendaName} — BALANCE FINANCIERO`, 15, 18);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
@@ -271,9 +271,9 @@ const ProfitLossPage = () => {
         const pageH = doc.internal.pageSize.height;
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text('Reporte generado automáticamente por Ropa Mania System.', 105, pageH - 8, { align: 'center' });
+        doc.text('Reporte generado automáticamente por Tienda VV System.', 105, pageH - 8, { align: 'center' });
 
-        doc.save(`Balance_RopaMania_${label.replace(/\s/g, '_')}_${date.replace(/\//g, '-')}.pdf`);
+        doc.save(`Balance_TiendaVV_${label.replace(/\s/g, '_')}_${date.replace(/\//g, '-')}.pdf`);
         toast.success('Reporte PDF descargado exitosamente');
     };
 

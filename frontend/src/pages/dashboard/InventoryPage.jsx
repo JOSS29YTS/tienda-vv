@@ -132,6 +132,8 @@ const InventoryPage = () => {
         return sum + (parseInt(product.current_stock) || 0);
     }, 0);
 
+    const formattedTotalDisponible = totalDisponible.toLocaleString('de-DE');
+
     const months = [
         { val: 1, name: "Enero" }, { val: 2, name: "Febrero" }, { val: 3, name: "Marzo" },
         { val: 4, name: "Abril" }, { val: 5, name: "Mayo" }, { val: 6, name: "Junio" },
@@ -153,7 +155,7 @@ const InventoryPage = () => {
                     </div>
                     <div>
                         <div className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-0.5">TOTAL DISPONIBLE</div>
-                        <div className="text-2xl font-black text-emerald-600 leading-none">{totalDisponible}</div>
+                        <div className="text-2xl font-black text-emerald-600 leading-none">{formattedTotalDisponible}</div>
                     </div>
                 </div>
             </div>

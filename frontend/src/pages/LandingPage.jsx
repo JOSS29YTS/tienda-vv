@@ -19,13 +19,13 @@ const LandingPage = () => {
             {/* Navbar */}
             <nav className="relative z-10 flex justify-between items-center px-6 md:px-12 py-6 w-full max-w-7xl mx-auto">
                 <div className="flex items-center gap-3">
-                    {/* Logo - Ropa Mania Style */}
+                    {/* Logo - Tienda VV Style */}
                     <div className="relative group cursor-pointer">
                         <div className="absolute -inset-1 bg-gradient-to-r from-orange-600 to-amber-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-200"></div>
                         <div className="relative px-4 py-2 bg-slate-950 ring-1 ring-white/10 rounded-lg leading-none flex items-center gap-2">
-                            <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">RM</div>
+                            <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">TV</div>
                             <span className="text-xl font-bold font-heading tracking-wide text-white">
-                                Ropa <span className="text-orange-500">Mania</span>
+                                Tienda <span className="text-orange-500">VV</span>
                             </span>
                         </div>
                     </div>
@@ -113,7 +113,7 @@ const LandingPage = () => {
                     <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-2xl shadow-black/50 overflow-hidden transform rotate-y-6 rotate-x-6 hover:rotate-0 transition-all duration-700 ease-out flex items-center justify-center">
                         <img
                             src="/img/LOGO.png"
-                            alt="Ropa Mania Dashboard Logo"
+                            alt="Tienda VV Dashboard Logo"
                             className="w-full h-auto rounded-xl object-contain drop-shadow-2xl"
                         />
                     </div>

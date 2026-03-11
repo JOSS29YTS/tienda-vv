@@ -144,18 +144,18 @@ const RegisterPage = () => {
             >
                 <div className="bg-slate-900 p-8 md:p-10 rounded-3xl shadow-2xl border border-slate-800/50">
                     <div className="text-center mb-6">
-                        {/* Logo - Ropa Mania Style */}
+                        {/* Logo - Tienda VV Style */}
                         <div className="mx-auto inline-flex items-center justify-center mb-6">
                             <div className="relative px-3 py-3 bg-slate-950 ring-1 ring-white/5 rounded-xl leading-none flex items-center gap-2 shadow-lg">
-                                <div className="p-1.5 bg-orange-500 rounded text-slate-950 font-bold text-sm font-heading">RM</div>
+                                <div className="p-1.5 bg-orange-500 rounded text-slate-950 font-bold text-sm font-heading">TV</div>
                                 <span className="text-2xl font-bold font-heading tracking-wide text-white">
-                                    Ropa <span className="text-orange-500">Mania</span>
+                                    Tienda <span className="text-orange-500">VV</span>
                                 </span>
                             </div>
                         </div>
                         <h2 className="text-3xl font-bold text-white font-heading tracking-tight">Crear Cuenta</h2>
                         <p className="text-slate-400 mt-2 font-light text-sm">
-                            {step === 1 ? "Únete al equipo de Ropa Mania" : "Verifica tu identidad"}
+                            {step === 1 ? "Únete al equipo de Tienda VV" : "Verifica tu identidad"}
                         </p>
                     </div>
 
@@ -377,7 +377,7 @@ const RegisterPage = () => {
                     )}
                 </div>
                 <div className="mt-6 text-center">
-                    <p className="text-[10px] text-slate-600">© 2026 Ropa Mania. Todos los derechos reservados.</p>
+                    <p className="text-[10px] text-slate-600">© 2026 Tienda VV. Todos los derechos reservados.</p>
                 </div>
             </motion.div>
 

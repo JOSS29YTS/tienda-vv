@@ -132,9 +132,9 @@ const DashboardLayout = () => {
             >
                 <Link to="/" className="p-6 flex items-center gap-4 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors group">
                     <div className="relative px-3 py-2 bg-slate-950 ring-1 ring-white/10 rounded-lg leading-none flex items-center gap-2 w-full justify-center">
-                        <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">TT</div>
+                        <div className="p-1 bg-orange-500 rounded text-slate-950 font-bold text-xs font-heading">TV</div>
                         <span className="text-xl font-bold font-heading tracking-wide text-white">
-                            Todas las <span className="text-orange-500">Tiendas</span>
+                            Tienda <span className="text-orange-500">VV</span>
                         </span>
                     </div>
                 </Link>
@@ -164,7 +164,7 @@ const DashboardLayout = () => {
                         <span>Cerrar Sesión</span>
                     </button>
                     <div className="px-4 py-3 mt-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 font-medium">Todas las Tiendas v1.0</div>
+                        <div className="text-xs text-slate-400 font-medium">Tienda VV v1.0</div>
                         <div className="text-[10px] text-slate-600">Multi-Store Business System</div>
                     </div>
                 </div>

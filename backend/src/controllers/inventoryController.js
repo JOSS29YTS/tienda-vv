@@ -17,9 +17,11 @@ exports.getInventory = async (req, res) => {
                 e.nb_estado as estado,
                 COALESCE(purchased.total_bought, 0) as real_bought,
                 COALESCE(sold.total_sold, 0) as real_sold,
-                (COALESCE(purchased.total_bought, 0) - COALESCE(sold.total_sold, 0)) as current_stock
+                (COALESCE(purchased.total_bought, 0) - COALESCE(sold.total_sold, 0)) as current_stock,
+                COALESCE(purchased_real.total_bought, 0) as display_bought
             FROM producto p
             LEFT JOIN estado e ON p.id_estado = e.id_estado
+            -- Total histórico absoluto para calcular el stock real
             LEFT JOIN (
                 SELECT dc.id_producto, SUM(dc.cantidad) as total_bought
                 FROM detalle_compra dc
@@ -27,6 +29,14 @@ exports.getInventory = async (req, res) => {
                 WHERE 1=1 ${tiendaFilterSub}
                 GROUP BY dc.id_producto
             ) purchased ON p.id_producto = purchased.id_producto
+            -- Total comprado este mes/año (excluyendo la carga inicial del 2020) para mostrar en UI
+            LEFT JOIN (
+                SELECT dc.id_producto, SUM(dc.cantidad) as total_bought
+                FROM detalle_compra dc
+                JOIN compra c ON dc.id_compra = c.id_compra
+                WHERE YEAR(c.fecha_compra) > 2020 ${tiendaFilterSub}
+                GROUP BY dc.id_producto
+            ) purchased_real ON p.id_producto = purchased_real.id_producto
             LEFT JOIN (
                 SELECT dv.id_producto, SUM(dv.cantidad) as total_sold
                 FROM detalle_venta dv
@@ -40,12 +50,14 @@ exports.getInventory = async (req, res) => {
 
         const [rows] = await pool.query(query);
 
-        // Transform the results according to user request:
-        // "Disponible podrias colocarlo en Total Comprado y en TOTAL VENDIDO pon todo en 0"
+        // Retornar las columnas mapeadas para la Vista Principal:
+        // - "Disponible" (current_stock) usará el total absoluto.
+        // - "Total Comprado" (total_bought) usará lo que se ha comprado real sin contar el inventario inicial.
+        // - "Total Vendido" (total_sold) permanece normal.
         const transformedRows = rows.map(row => ({
             ...row,
-            total_bought: row.current_stock,
-            total_sold: 0
+            total_bought: row.display_bought,
+            total_sold: row.real_sold
         }));
 
         res.json(transformedRows);

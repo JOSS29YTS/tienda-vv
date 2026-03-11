@@ -99,10 +99,10 @@ const DashboardHome = () => {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text('ROPA MANIA SYSTEM', 20, 20);
+        doc.text('TIENDA VV SYSTEM', 20, 20);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
-        doc.text('REPORTE EJECUTIVO DE ROPA MANIA', 20, 30);
+        doc.text('REPORTE EJECUTIVO DE TIENDA VV', 20, 30);
 
         // Metadata
         const date = new Date().toLocaleDateString('es-VE');
@@ -177,9 +177,9 @@ const DashboardHome = () => {
         const footerY = doc.internal.pageSize.height - 10;
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text('Este documento es un reporte generado automáticamente por Ropa Mania System.', 105, footerY, { align: 'center' });
+        doc.text('Este documento es un reporte generado automáticamente por Tienda VV System.', 105, footerY, { align: 'center' });
 
-        doc.save(`Reporte_RopaMania_${date.replace(/\//g, '-')}.pdf`);
+        doc.save(`Reporte_TiendaVV_${date.replace(/\//g, '-')}.pdf`);
         toast.success('Reporte PDF descargado exitosamente');
     };
 
