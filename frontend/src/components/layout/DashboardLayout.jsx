@@ -60,12 +60,15 @@ const DashboardLayout = () => {
         const isOperationalRoute = location.pathname.includes('/sales') || location.pathname.includes('/purchases');
         const isInGlobal = !selectedTienda;
         const hasTiendas = tiendas.length > 0;
+        const savedTiendaId = localStorage.getItem('selectedTiendaId');
 
-        if (isOperationalRoute && isInGlobal && hasTiendas && canSwitchStore) {
+        // Solo auto-selecciona si el usuario realmente no tiene una tienda seleccionada 
+        // ni guardada de una sesión anterior
+        if (isOperationalRoute && isInGlobal && hasTiendas && canSwitchStore && !savedTiendaId) {
             // Seleccionar la primera tienda automáticamente (ej: Ropa Mania)
             setSelectedTienda(tiendas[0]);
         }
-    }, [location.pathname, tiendas]);
+    }, [location.pathname, tiendas, selectedTienda, canSwitchStore]);
 
     let navItems = [
         { to: "/dashboard", icon: FaHome, label: "Inicio" }

@@ -9,7 +9,16 @@ export const useStore = () => useContext(StoreContext);
 export const StoreProvider = ({ children }) => {
     const { user } = useAuth();
     const [tiendas, setTiendas] = useState([]);
-    const [selectedTienda, setSelectedTienda] = useState(null); // null = Global
+    const [selectedTienda, _setSelectedTienda] = useState(null); // null = Global
+
+    const setSelectedTienda = (tienda) => {
+        _setSelectedTienda(tienda);
+        if (tienda) {
+            localStorage.setItem('selectedTiendaId', tienda.id_tienda);
+        } else {
+            localStorage.removeItem('selectedTiendaId');
+        }
+    };
 
     // Cargar tiendas disponibles
     useEffect(() => {
@@ -31,15 +40,28 @@ export const StoreProvider = ({ children }) => {
         fetchTiendas();
     }, [user]);
 
-    // Si el usuario tiene tienda asignada, forzar esa tienda
+    // Restaurar la tienda seleccionada al cargar las tiendas
     useEffect(() => {
+        if (tiendas.length === 0) return;
+
         if (user?.id_tienda) {
             // Usuario de tienda específica: solo puede ver su tienda
             const tienda = tiendas.find(t => t.id_tienda === user.id_tienda);
             if (tienda) setSelectedTienda(tienda);
         } else {
-            // Admin/Dueño con acceso global: inicia en Global (null)
-            setSelectedTienda(null);
+            // Admin/Dueño con acceso global: intentar restaurar de localStorage
+            const savedTiendaId = localStorage.getItem('selectedTiendaId');
+            if (savedTiendaId) {
+                const tienda = tiendas.find(t => t.id_tienda === parseInt(savedTiendaId));
+                if (tienda) {
+                    _setSelectedTienda(tienda); // Set directly without overwriting localStorage again unnecessarily
+                } else {
+                    setSelectedTienda(null);
+                }
+            } else {
+                // Inicia en Global por defecto si no hay nada guardado
+                setSelectedTienda(null);
+            }
         }
     }, [user, tiendas]);
 
