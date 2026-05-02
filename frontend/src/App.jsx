@@ -39,6 +39,7 @@ const PlaceholderComponent = ({ title }) => (
 import { AuthProvider } from './context/AuthContext';
 import { RateProvider } from './context/RateContext';
 import { StoreProvider } from './context/StoreContext';
+import { SocketProvider } from './context/SocketContext';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
@@ -49,6 +50,7 @@ function App() {
     <AuthProvider>
       <RateProvider>
         <StoreProvider>
+          <SocketProvider>
           <Toaster
             position="top-right"
             toastOptions={{
@@ -133,6 +135,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes >
           </BrowserRouter >
+          </SocketProvider>
         </StoreProvider>
       </RateProvider>
     </AuthProvider >

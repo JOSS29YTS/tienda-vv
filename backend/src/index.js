@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 const app = express();
@@ -26,6 +28,40 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Socket.io setup
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "DELETE"]
+    }
+});
+
+// Guardamos io en app para usarlo en los controladores (ej. req.app.get('io'))
+app.set('io', io);
+
+io.on('connection', (socket) => {
+    console.log(`🔵 Cliente conectado a Socket.io: ${socket.id}`);
+
+    // Cuando un usuario entra a una tienda, se une a la "sala" de esa tienda
+    socket.on('join_tienda', (tienda_id) => {
+        const roomName = `tienda_${tienda_id}`;
+        socket.join(roomName);
+        console.log(`📥 Socket ${socket.id} se unió a ${roomName}`);
+    });
+
+    // Cuando cambia de tienda o se va
+    socket.on('leave_tienda', (tienda_id) => {
+        const roomName = `tienda_${tienda_id}`;
+        socket.leave(roomName);
+        console.log(`📤 Socket ${socket.id} abandonó ${roomName}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`🔴 Cliente desconectado: ${socket.id}`);
+    });
+});
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -59,7 +95,7 @@ const whatsappService = require('./services/whatsappService');
 const exchangeRateService = require('./services/exchangeRateService');
 
 // Start server
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
 
     // Start Services

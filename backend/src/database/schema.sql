@@ -294,10 +294,12 @@ CREATE TABLE pago_comision (
 CREATE TABLE venta_borrador (
     id_venta_borrador INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT NOT NULL,
+    id_tienda INT NULL,
     fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     datos_venta JSON NOT NULL,
     tasa_dia DECIMAL(14, 4) NOT NULL,
-    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda)
 );
 
 -- ==========================================================

@@ -10,6 +10,7 @@ import autoTable from 'jspdf-autotable';
 import { useRate } from '../../context/RateContext';
 import API_URL from '../../config/api';
 import { useStore } from '../../context/StoreContext';
+import { useSocket } from '../../context/SocketContext';
 
 const SalesPage = () => {
     const { user } = useAuth();
@@ -28,14 +29,11 @@ const SalesPage = () => {
     const [paymentMethods, setPaymentMethods] = useState([]);
 
 
-    // Rows State (The Sheet)
-    const getInitialRows = () => {
-        const savedRows = localStorage.getItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`);
-        if (savedRows) return JSON.parse(savedRows);
-        return [{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }];
-    };
+    // Socket
+    const { socket } = useSocket();
 
-    const [rows, setRows] = useState(getInitialRows());
+    // Rows State (The Sheet)
+    const [rows, setRows] = useState([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }]);
     const [selectedRows, setSelectedRows] = useState([]);
 
     // Mixed Payment Modal State
@@ -127,28 +125,37 @@ const SalesPage = () => {
     }, [isNewInvoiceModalOpen, showConfirmationModal, products]);
 
     useEffect(() => {
-        setRows(getInitialRows()); // Instantly switch local state
+        setRows([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }]); // Reset
         fetchProducts();
         fetchPaymentMethods();
-
         fetchDraftSales(); // Load initial drafts
-
-        // Poll for updates every 15 seconds to avoid saturation
-        const interval = setInterval(() => {
-            fetchDraftSales();
-        }, 15000);
-
-        return () => clearInterval(interval);
     }, [effectiveTiendaId]);
 
-    // Save rows to server AND localStorage whenever they change (with debounce)
+    // Socket listeners
     useEffect(() => {
-        localStorage.setItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`, JSON.stringify(rows));
+        if (!socket) return;
+        
+        socket.on('borrador_actualizado', () => {
+            fetchDraftSales();
+        });
+        
+        socket.on('dia_cerrado', () => {
+            setRows([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '' }]);
+            setSelectedRows([]);
+        });
 
-        // Debounce server save to avoid too many requests
+        return () => {
+            socket.off('borrador_actualizado');
+            socket.off('dia_cerrado');
+        };
+    }, [socket]);
+
+    // Save rows to server whenever they change
+    useEffect(() => {
+        // Debounce server save
         const timeoutId = setTimeout(() => {
             saveDraftToServer();
-        }, 1000); // Wait 1 second after last change (reduced from 5s)
+        }, 500); // 500ms for fast sync
 
         return () => clearTimeout(timeoutId);
     }, [rows, rate]);
@@ -554,7 +561,6 @@ const SalesPage = () => {
             toast.success('¡Venta cerrada exitosamente! Se han guardado los registros.');
             setRows([{ id: Date.now(), productId: '', quantity: 0, unitPrice: 0, paymentMethod: '', client: '', clientPhone: '', isNewClient: false }]);
             setSelectedRows([]);
-            localStorage.removeItem(`bodega_sales_rows_${effectiveTiendaId || 'global'}`);
             setShowConfirmationModal(false);
 
         } catch (err) {

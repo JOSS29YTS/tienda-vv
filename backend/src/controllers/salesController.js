@@ -30,6 +30,12 @@ exports.saveDraftSales = async (req, res) => {
             [userId, tiendaId, JSON.stringify(rows), rate]
         );
 
+        const io = req.app.get('io');
+        if (io) {
+            if (tiendaId) io.to(`tienda_${tiendaId}`).emit('borrador_actualizado');
+            else io.emit('borrador_actualizado');
+        }
+
         res.json({ message: 'Borrador guardado exitosamente' });
     } catch (error) {
         console.error('Error saving draft sales:', error);
@@ -349,7 +355,18 @@ exports.closeSales = async (req, res) => {
         await connection.commit();
 
         // Clear all drafts upon closing the day's sales
-        await pool.query('DELETE FROM venta_borrador');
+        await pool.query('DELETE FROM venta_borrador WHERE id_tienda = ? OR (id_tienda IS NULL AND ? IS NULL)', [tiendaId, tiendaId]);
+
+        const io = req.app.get('io');
+        if (io) {
+            if (tiendaId) {
+                io.to(`tienda_${tiendaId}`).emit('borrador_actualizado');
+                io.to(`tienda_${tiendaId}`).emit('dia_cerrado');
+            } else {
+                io.emit('borrador_actualizado');
+                io.emit('dia_cerrado');
+            }
+        }
 
         res.json({ message: 'Ventas cerradas exitosamente' });
 
