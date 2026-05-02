@@ -12,7 +12,7 @@ export const useSocket = () => {
 
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
-    const { currentStore } = useStore();
+    const { effectiveTiendaId } = useStore();
     const { user } = useAuth();
 
     useEffect(() => {
@@ -42,18 +42,16 @@ export const SocketProvider = ({ children }) => {
 
     // Efecto separado para manejar los "Rooms" cuando cambia la tienda seleccionada
     useEffect(() => {
-        if (!socket || !currentStore) return;
+        if (!socket || !effectiveTiendaId) return;
 
-        const tiendaId = currentStore.id_tienda;
-        
         // Nos unimos a la sala de la tienda actual
-        socket.emit('join_tienda', tiendaId);
+        socket.emit('join_tienda', effectiveTiendaId);
 
         // Cuando la tienda cambie, nos salimos de la sala anterior (limpieza)
         return () => {
-            socket.emit('leave_tienda', tiendaId);
+            socket.emit('leave_tienda', effectiveTiendaId);
         };
-    }, [socket, currentStore]);
+    }, [socket, effectiveTiendaId]);
 
     return (
         <SocketContext.Provider value={{ socket }}>
