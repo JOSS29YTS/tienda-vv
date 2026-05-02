@@ -33,6 +33,13 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: 'Credenciales inválidas' });
         }
 
+        // Bloquear acceso a vendedores o gerentes que aún no tienen una tienda asignada
+        if (user.rol !== 'Administrador' && user.id_tienda === null) {
+            return res.status(403).json({ 
+                message: 'Tu cuenta está pendiente. Por favor, contacta al administrador para más información.' 
+            });
+        }
+
 
 
         // Generar Token JWT
