@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaBox, FaSearch, FaFileDownload, FaCalendarAlt } from 'react-icons/fa';
+import { FaBox, FaSearch, FaFileDownload, FaCalendarAlt, FaEdit, FaTimes } from 'react-icons/fa';
 import API_URL from '../../config/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 
 const InventoryPage = () => {
     const [products, setProducts] = useState([]);
@@ -17,7 +18,14 @@ const InventoryPage = () => {
     const [reportYear, setReportYear] = useState(new Date().getFullYear());
     const [generatingReport, setGeneratingReport] = useState(false);
 
+    const { user } = useAuth();
     const { effectiveTiendaId, tiendas } = useStore();
+
+    // Adjust Inventory States
+    const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+    const [productToAdjust, setProductToAdjust] = useState(null);
+    const [newStock, setNewStock] = useState('');
+    const [adjusting, setAdjusting] = useState(false);
 
     useEffect(() => {
         fetchInventory();
@@ -120,6 +128,46 @@ const InventoryPage = () => {
             toast.error('Error al generar reporte');
         } finally {
             setGeneratingReport(false);
+        }
+    };
+
+    const handleAdjustSubmit = async (e) => {
+        e.preventDefault();
+        if (newStock === '' || isNaN(newStock)) return;
+
+        setAdjusting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/api/inventory/adjust`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    id_producto: productToAdjust.id_producto,
+                    currentStock: productToAdjust.current_stock,
+                    newStock: parseInt(newStock),
+                    id_tienda: effectiveTiendaId
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Error al ajustar inventario');
+            }
+
+            toast.success('Inventario ajustado correctamente');
+            setAdjustModalOpen(false);
+            setProductToAdjust(null);
+            setNewStock('');
+            fetchInventory(); // Reload data
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error(error.message);
+        } finally {
+            setAdjusting(false);
         }
     };
 
@@ -264,12 +312,27 @@ const InventoryPage = () => {
                                                 {product.total_sold}
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`px-4 py-2 rounded-lg font-bold text-sm ${isOutOfStock
-                                                    ? 'bg-red-200 text-red-700'
-                                                    : 'bg-emerald-100 text-emerald-700'
-                                                    }`}>
-                                                    {product.current_stock}
-                                                </span>
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <span className={`px-4 py-2 rounded-lg font-bold text-sm ${isOutOfStock
+                                                        ? 'bg-red-200 text-red-700'
+                                                        : 'bg-emerald-100 text-emerald-700'
+                                                        }`}>
+                                                        {product.current_stock}
+                                                    </span>
+                                                    {user && user.rol === 'Administrador' && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                setProductToAdjust(product);
+                                                                setNewStock(product.current_stock);
+                                                                setAdjustModalOpen(true);
+                                                            }}
+                                                            className="text-slate-400 hover:text-emerald-600 transition-colors p-1"
+                                                            title="Ajustar Inventario"
+                                                        >
+                                                            <FaEdit size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${product.estado === 'Activo'
@@ -292,6 +355,64 @@ const InventoryPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Adjust Inventory Modal */}
+            <AnimatePresence>
+                {adjustModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+                        >
+                            <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50">
+                                <h3 className="text-xl font-bold text-slate-800">Ajuste Manual de Inventario</h3>
+                                <button onClick={() => setAdjustModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                    <FaTimes size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6">
+                                {productToAdjust && (
+                                    <div className="mb-6 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                        <p className="text-sm text-emerald-800 font-bold mb-1">{productToAdjust.nb_producto}</p>
+                                        <p className="text-xs text-emerald-600">Stock Actual del Sistema: <span className="font-black text-lg">{productToAdjust.current_stock}</span></p>
+                                    </div>
+                                )}
+                                <form onSubmit={handleAdjustSubmit}>
+                                    <div className="mb-6">
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Nuevo Stock Físico (Real)</label>
+                                        <input
+                                            type="number"
+                                            value={newStock}
+                                            onChange={(e) => setNewStock(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all font-bold text-xl text-center"
+                                            required
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2 text-center">El sistema creará un registro de ajuste para cuadrar la diferencia.</p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAdjustModalOpen(false)}
+                                            className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={adjusting}
+                                            className="flex-1 px-4 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                                        >
+                                            {adjusting ? 'Guardando...' : 'Aplicar Ajuste'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

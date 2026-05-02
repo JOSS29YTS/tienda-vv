@@ -132,6 +132,7 @@ server.listen(PORT, async () => {
             // venta_borrador para drafts
             { q: "CREATE TABLE IF NOT EXISTS venta_borrador (id_venta_borrador INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT NOT NULL, id_tienda INT NULL, datos_venta JSON, tasa_dia DECIMAL(14,4), fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario))" },
             { q: "ALTER TABLE venta_borrador ADD COLUMN id_tienda INT NULL", post: "DELETE FROM venta_borrador WHERE id_tienda IS NULL" },
+            { q: "CREATE TABLE IF NOT EXISTS ajuste_inventario (id_ajuste INT AUTO_INCREMENT PRIMARY KEY, id_producto INT NOT NULL, id_tienda INT NULL, id_usuario INT NOT NULL, cantidad_ajuste INT NOT NULL, observacion VARCHAR(255), fecha_ajuste DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (id_producto) REFERENCES producto(id_producto), FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda), FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario))" },
             // compra.id_metodo_pago es legado: el nuevo diseño usa pago_compra (pagos múltiples)
             { q: "ALTER TABLE compra MODIFY COLUMN id_metodo_pago INT NULL" },
             // BANCO (POS): método virtual origen para traspasos desde Banco -> Punto de Venta

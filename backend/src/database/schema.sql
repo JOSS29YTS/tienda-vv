@@ -303,6 +303,21 @@ CREATE TABLE venta_borrador (
 );
 
 -- ==========================================================
+-- 10.1 AJUSTE DE INVENTARIO
+-- ==========================================================
+CREATE TABLE ajuste_inventario (
+    id_ajuste INT AUTO_INCREMENT PRIMARY KEY,
+    id_producto INT NOT NULL,
+    id_tienda INT NULL,
+    id_usuario INT NOT NULL,
+    cantidad_ajuste INT NOT NULL,
+    observacion VARCHAR(255),
+    fecha_ajuste DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_producto) REFERENCES producto(id_producto),
+    FOREIGN KEY (id_tienda) REFERENCES tienda(id_tienda),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+-- ==========================================================
 -- 11. DATOS INICIALES
 -- ==========================================================
 INSERT INTO rol (nb_rol) VALUES

@@ -7,6 +7,7 @@ exports.getInventory = async (req, res) => {
         const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
         const tiendaFilterSub = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
         const tiendaFilterSubV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterSubA = tiendaId ? ` AND a.id_tienda = ${tiendaId}` : '';
 
         const query = `
             SELECT 
@@ -17,7 +18,7 @@ exports.getInventory = async (req, res) => {
                 e.nb_estado as estado,
                 COALESCE(purchased.total_bought, 0) as real_bought,
                 COALESCE(sold.total_sold, 0) as real_sold,
-                (COALESCE(purchased.total_bought, 0) - COALESCE(sold.total_sold, 0)) as current_stock,
+                (COALESCE(purchased.total_bought, 0) - COALESCE(sold.total_sold, 0) + COALESCE(ajustes.total_ajuste, 0)) as current_stock,
                 COALESCE(purchased_real.total_bought, 0) as display_bought
             FROM producto p
             LEFT JOIN estado e ON p.id_estado = e.id_estado
@@ -44,6 +45,13 @@ exports.getInventory = async (req, res) => {
                 WHERE 1=1 ${tiendaFilterSubV}
                 GROUP BY dv.id_producto
             ) sold ON p.id_producto = sold.id_producto
+            -- Ajustes manuales
+            LEFT JOIN (
+                SELECT a.id_producto, SUM(a.cantidad_ajuste) as total_ajuste
+                FROM ajuste_inventario a
+                WHERE 1=1 ${tiendaFilterSubA}
+                GROUP BY a.id_producto
+            ) ajustes ON p.id_producto = ajustes.id_producto
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO' ${tiendaFilterP}
             ORDER BY p.nb_producto ASC
         `;
@@ -76,6 +84,7 @@ exports.getInventoryReport = async (req, res) => {
     const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
     const tiendaFilterSub = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
     const tiendaFilterSubV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
+    const tiendaFilterSubA = tiendaId ? ` AND a.id_tienda = ${tiendaId}` : '';
 
     try {
         // First day of current report month
@@ -93,13 +102,14 @@ exports.getInventoryReport = async (req, res) => {
                 p.precio, 
                 p.codigo_de_barra,
                 -- Initial Inventory (Balance strictly before startDate)
-                (COALESCE(purchased_before.total, 0) - COALESCE(sold_before.total, 0)) as inv_inicial,
+                (COALESCE(purchased_before.total, 0) - COALESCE(sold_before.total, 0) + COALESCE(ajustes_before.total, 0)) as inv_inicial,
                 -- Moves during the month
                 COALESCE(purchased_period.total, 0) as compras_periodo,
                 COALESCE(sold_period.total, 0) as ventas_periodo,
+                COALESCE(ajustes_period.total, 0) as ajustes_periodo,
                 -- Final Inventory (Balance strictly before endDate)
-                (COALESCE(purchased_before.total, 0) - COALESCE(sold_before.total, 0) + 
-                 COALESCE(purchased_period.total, 0) - COALESCE(sold_period.total, 0)) as inv_final
+                (COALESCE(purchased_before.total, 0) - COALESCE(sold_before.total, 0) + COALESCE(ajustes_before.total, 0) + 
+                 COALESCE(purchased_period.total, 0) - COALESCE(sold_period.total, 0) + COALESCE(ajustes_period.total, 0)) as inv_final
             FROM producto p
             -- Sub-query for total bought BEFORE period
             LEFT JOIN (
@@ -133,15 +143,55 @@ exports.getInventoryReport = async (req, res) => {
                 WHERE v.fecha_venta >= ? AND v.fecha_venta < ? ${tiendaFilterSubV}
                 GROUP BY dv.id_producto
             ) sold_period ON p.id_producto = sold_period.id_producto
+            -- Sub-query for total ajustes BEFORE period
+            LEFT JOIN (
+                SELECT a.id_producto, SUM(a.cantidad_ajuste) as total
+                FROM ajuste_inventario a
+                WHERE a.fecha_ajuste < ? ${tiendaFilterSubA}
+                GROUP BY a.id_producto
+            ) ajustes_before ON p.id_producto = ajustes_before.id_producto
+            -- Sub-query for total ajustes DURING period
+            LEFT JOIN (
+                SELECT a.id_producto, SUM(a.cantidad_ajuste) as total
+                FROM ajuste_inventario a
+                WHERE a.fecha_ajuste >= ? AND a.fecha_ajuste < ? ${tiendaFilterSubA}
+                GROUP BY a.id_producto
+            ) ajustes_period ON p.id_producto = ajustes_period.id_producto
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO' ${tiendaFilterP}
             ORDER BY p.nb_producto ASC
         `;
 
-        const [rows] = await pool.query(query, [startDate, startDate, startDate, endDate, startDate, endDate]);
+        const [rows] = await pool.query(query, [startDate, startDate, startDate, startDate, endDate, startDate, endDate, startDate, startDate, endDate]);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching inventory report:', error);
         res.status(500).json({ message: 'Error al obtener reporte de inventario' });
+    }
+};
+
+exports.adjustInventory = async (req, res) => {
+    try {
+        const { id_producto, newStock, currentStock, id_tienda } = req.body;
+        const id_usuario = req.user.id;
+        const tiendaId = id_tienda || req.user.id_tienda || null;
+
+        const cantidadAjuste = parseInt(newStock) - parseInt(currentStock);
+
+        if (cantidadAjuste === 0) {
+            return res.status(400).json({ message: 'La nueva cantidad es igual a la actual' });
+        }
+
+        const observacion = `Ajuste manual de ${currentStock} a ${newStock}`;
+
+        await pool.query(
+            'INSERT INTO ajuste_inventario (id_producto, id_tienda, id_usuario, cantidad_ajuste, observacion) VALUES (?, ?, ?, ?, ?)',
+            [id_producto, tiendaId, id_usuario, cantidadAjuste, observacion]
+        );
+
+        res.json({ message: 'Inventario ajustado exitosamente' });
+    } catch (error) {
+        console.error('Error ajustando inventario:', error);
+        res.status(500).json({ message: 'Error al ajustar inventario' });
     }
 };
 
