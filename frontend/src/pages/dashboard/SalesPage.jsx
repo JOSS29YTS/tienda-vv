@@ -252,12 +252,27 @@ const SalesPage = () => {
                     });
                 }
 
-                // 3. Sort correctly: Products first, by ID
+                // 3. Sort correctly:
+                // Group by User (Mi borrador primero) -> Con Producto -> Por fecha (ID)
                 finalMerged.sort((a, b) => {
+                    const currentUserId = String(user.id);
+                    const aUserId = a._userId ? String(a._userId) : currentUserId;
+                    const bUserId = b._userId ? String(b._userId) : currentUserId;
+
+                    // Yo voy primero
+                    if (aUserId === currentUserId && bUserId !== currentUserId) return -1;
+                    if (aUserId !== currentUserId && bUserId === currentUserId) return 1;
+
+                    // Agrupar a los demas por su ID
+                    if (aUserId !== bUserId) return aUserId.localeCompare(bUserId);
+
+                    // Misma persona: Los que tienen producto van primero
                     const aHasP = a.productId && a.quantity > 0;
                     const bHasP = b.productId && b.quantity > 0;
                     if (aHasP && !bHasP) return -1;
                     if (!aHasP && bHasP) return 1;
+
+                    // Finalmente por orden de creacion
                     return a.id - b.id;
                 });
 
@@ -867,7 +882,8 @@ const SalesPage = () => {
                                             <select
                                                 value={row.productId}
                                                 onChange={(e) => updateRow(row.id, 'productId', e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700"
+                                                disabled={row._isReadOnly}
+                                                className={`w-full bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 transition-all font-medium text-slate-700 ${row._isReadOnly ? 'opacity-70 cursor-not-allowed bg-slate-100' : ''}`}
                                             >
                                                 <option value="">Seleccionar Producto...</option>
                                                 {products.map(p => (
@@ -885,7 +901,8 @@ const SalesPage = () => {
                                                 min="0"
                                                 value={row.quantity}
                                                 onChange={(e) => updateRow(row.id, 'quantity', parseFloat(e.target.value))}
-                                                className={`w-full border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold focus:border-emerald-500 outline-none show-spinner bg-white text-slate-900`}
+                                                disabled={row._isReadOnly}
+                                                className={`w-full border border-slate-200 rounded px-2 py-1.5 text-center text-sm font-bold outline-none show-spinner text-slate-900 ${row._isReadOnly ? 'bg-slate-100 opacity-70 cursor-not-allowed' : 'focus:border-emerald-500 bg-white'}`}
                                             />
                                         </td>
 
@@ -915,11 +932,12 @@ const SalesPage = () => {
                                                 <select
                                                     value={row.paymentMethod}
                                                     onChange={(e) => updateRow(row.id, 'paymentMethod', e.target.value)}
+                                                    disabled={row._isReadOnly}
                                                     className={`w-full border rounded px-2 py-1.5 text-sm focus:border-emerald-500 outline-none transition-colors ${row.paymentMethod === 'PENDIENTE POR COBRAR' ? 'bg-yellow-100 text-yellow-800 font-bold border-yellow-300' :
                                                         row.paymentMethod === 'MIXTO' ? 'bg-blue-100 text-blue-800 font-bold border-blue-300' :
                                                             row.paymentMethod && row.paymentMethod !== '' ? 'bg-green-100 text-green-800 font-bold border-green-300' :
                                                                 'bg-white text-slate-700 border-slate-200'
-                                                        }`}
+                                                        } ${row._isReadOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                 >
                                                     <option value="">- Seleccionar -</option>
                                                     {paymentMethods
@@ -947,13 +965,15 @@ const SalesPage = () => {
 
                                         {/* Actions */}
                                         <td className="p-1 text-center">
-                                            <button
-                                                onClick={() => removeRow(row.id)}
-                                                className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                                                title="Eliminar fila"
-                                            >
-                                                <FaTrash size={14} />
-                                            </button>
+                                            {!row._isReadOnly && (
+                                                <button
+                                                    onClick={() => removeRow(row.id)}
+                                                    className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                                    title="Eliminar fila"
+                                                >
+                                                    <FaTrash size={14} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 );
