@@ -33,8 +33,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE"]
+        origin: allowedOrigins,
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true
     }
 });
 

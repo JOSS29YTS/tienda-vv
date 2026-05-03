@@ -4,7 +4,7 @@ exports.getInventory = async (req, res) => {
     try {
         const { tienda } = req.query;
         const tiendaId = tienda && tienda !== 'global' ? parseInt(tienda) : null;
-        const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
+        const tiendaFilterP = tiendaId ? ` AND (p.id_tienda = ${tiendaId} OR p.id_tienda IS NULL)` : '';
         const tiendaFilterSub = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
         const tiendaFilterSubV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
         const tiendaFilterSubA = tiendaId ? ` AND a.id_tienda = ${tiendaId}` : '';
@@ -81,7 +81,7 @@ exports.getInventoryReport = async (req, res) => {
     month = parseInt(month);
     year = parseInt(year);
     const tiendaId = tienda && tienda !== 'global' ? parseInt(tienda) : null;
-    const tiendaFilterP = tiendaId ? ` AND p.id_tienda = ${tiendaId}` : '';
+    const tiendaFilterP = tiendaId ? ` AND (p.id_tienda = ${tiendaId} OR p.id_tienda IS NULL)` : '';
     const tiendaFilterSub = tiendaId ? ` AND c.id_tienda = ${tiendaId}` : '';
     const tiendaFilterSubV = tiendaId ? ` AND v.id_tienda = ${tiendaId}` : '';
     const tiendaFilterSubA = tiendaId ? ` AND a.id_tienda = ${tiendaId}` : '';
