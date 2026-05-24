@@ -119,3 +119,10 @@ dist
 # Playwright Screenshots
 playwright-screenshots.js
 portfolio-screenshots/
+
+# Temporary & Backup Files (prevent sensitive dumps from being tracked)
+*.zip
+*.bak
+*.sql
+!backend/src/database/*.sql
+
