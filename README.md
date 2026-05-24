@@ -11,7 +11,7 @@ El sistema está diseñado de forma híbrida para operar localmente con **MySQL*
 Para probar la plataforma en tu despliegue de demostración o entorno local, puedes utilizar los siguientes usuarios autogenerados:
 
 ### 👤 1. Perfil: Administrador Global (Dueño)
-* **Correo Electrónico:** `admin@admin.com`
+* **Correo Electrónico:** `admin@tiendavv.com`
 * **Contraseña:** `admin123`
 * **Permisos:** Acceso completo a todas las sucursales, balances financieros globales, comisiones de todas las tiendas, gestión de inventario global y configuración de tasa cambiaria.
 

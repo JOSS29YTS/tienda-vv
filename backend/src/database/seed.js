@@ -27,13 +27,13 @@ async function runSeed() {
         const idRolVendedor = rolesVendedor.length > 0 ? rolesVendedor[0].id_rol : 3;
 
         // Validar e Insertar Administrador Global (sin tienda asignada)
-        const [existingAdmin] = await pool.query("SELECT * FROM usuario WHERE email = 'admin@admin.com'");
+        const [existingAdmin] = await pool.query("SELECT * FROM usuario WHERE email = 'admin@tiendavv.com'");
         if (existingAdmin.length === 0) {
             await pool.query(
                 "INSERT INTO usuario (nombre, apellido, email, password, id_rol, id_tienda, activo) VALUES (?, ?, ?, ?, ?, NULL, 1)",
-                ['ADMIN', 'DUEÑO', 'admin@admin.com', passwordAdmin, idRolAdmin]
+                ['ADMIN', 'DUEÑO', 'admin@tiendavv.com', passwordAdmin, idRolAdmin]
             );
-            console.log("  ✔ Usuario Administrador creado (admin@admin.com / admin123)");
+            console.log("  ✔ Usuario Administrador creado (admin@tiendavv.com / admin123)");
         } else {
             console.log("  • Usuario Administrador ya existía.");
         }
