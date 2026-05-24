@@ -113,8 +113,12 @@ server.listen(PORT, async () => {
 
     try {
         const [rows] = await pool.query('SELECT 1');
-        console.log('✅ Conexión a la base de datos exitosa');
-        console.log('📦 Base de datos: toda_las_tiendas_db');
+        console.log('📦 Base de datos conectada exitosamente');
+
+        if (pool.isPostgres) {
+            console.log('🚀 Base de datos PostgreSQL/Supabase detectada. Omitiendo migraciones locales automáticas.');
+            return;
+        }
 
         // Migraciones de compatibilidad (por si la DB ya existe)
         const migrations = [
