@@ -7,8 +7,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware - Solo local para pruebas
+// Middleware - Orígenes permitidos (local + producción)
 const allowedOrigins = [
+    // Local development
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:5175',
@@ -18,7 +19,12 @@ const allowedOrigins = [
     'http://[::1]:5173',
     'http://[::1]:5174',
     'http://[::1]:5175',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    // Producción en Vercel
+    'https://tienda-vv.vercel.app',
+    'https://tienda-vv-git-main-joss29ytss-projects.vercel.app',
+    // Variable de entorno para dominios extra (ej. dominio personalizado)
+    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [])
 ];
 
 app.use(cors({
