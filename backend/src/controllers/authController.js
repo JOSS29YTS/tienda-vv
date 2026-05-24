@@ -1,15 +1,22 @@
 const pool = require('../database/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { validationResult } = require('express-validator');
 const emailService = require('../services/emailService');
 
 exports.login = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            ok: false,
+            message: errors.array().map(e => e.msg).join(', '),
+            mensaje: errors.array().map(e => e.msg).join(', '),
+            errors: errors.array().map(e => e.msg)
+        });
+    }
+
     try {
         const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Por favor ingrese email y contraseña' });
-        }
 
         // Buscar usuario por email con su rol y tienda
         const [users] = await pool.query(`
@@ -39,8 +46,6 @@ exports.login = async (req, res) => {
                 message: 'Tu cuenta está pendiente. Por favor, contacta al administrador para más información.' 
             });
         }
-
-
 
         // Generar Token JWT
         const token = jwt.sign(
@@ -76,26 +81,26 @@ exports.login = async (req, res) => {
 };
 
 exports.registerInit = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            ok: false,
+            message: errors.array().map(e => e.msg).join(', '),
+            mensaje: errors.array().map(e => e.msg).join(', '),
+            errors: errors.array().map(e => e.msg)
+        });
+    }
+
     try {
         const { nombre, apellido, email, password } = req.body;
 
         const nombreUpper = nombre ? nombre.toUpperCase() : '';
         const apellidoUpper = apellido ? apellido.toUpperCase() : '';
 
-        if (!nombre || !apellido || !email || !password) {
-            return res.status(400).json({ message: 'Todos los campos son obligatorios' });
-        }
-
         // Check if user already exists
         const [existingUsers] = await pool.query('SELECT * FROM usuario WHERE email = ?', [email]);
         if (existingUsers.length > 0) {
             return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
-        }
-
-        // Check if email format is valid (basic regex)
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({ message: 'Formato de correo inválido.' });
         }
 
         // Generate 6 digit code
@@ -137,12 +142,18 @@ exports.registerInit = async (req, res) => {
 };
 
 exports.registerComplete = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            ok: false,
+            message: errors.array().map(e => e.msg).join(', '),
+            mensaje: errors.array().map(e => e.msg).join(', '),
+            errors: errors.array().map(e => e.msg)
+        });
+    }
+
     try {
         const { codigo, tempToken } = req.body;
-
-        if (!codigo || !tempToken) {
-            return res.status(400).json({ message: 'Código y token son necesarios' });
-        }
 
         // Verify token
         let decoded;
@@ -181,6 +192,16 @@ exports.registerComplete = async (req, res) => {
 };
 
 exports.forgotPassword = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            ok: false,
+            message: errors.array().map(e => e.msg).join(', '),
+            mensaje: errors.array().map(e => e.msg).join(', '),
+            errors: errors.array().map(e => e.msg)
+        });
+    }
+
     const { email } = req.body;
     try {
         const [users] = await pool.query('SELECT * FROM usuario WHERE email = ? AND activo = 1', [email]);
@@ -213,12 +234,18 @@ exports.forgotPassword = async (req, res) => {
 };
 
 exports.resetPassword = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            ok: false,
+            message: errors.array().map(e => e.msg).join(', '),
+            mensaje: errors.array().map(e => e.msg).join(', '),
+            errors: errors.array().map(e => e.msg)
+        });
+    }
+
     try {
         const { email, code, newPassword, recoveryToken } = req.body;
-
-        if (!email || !code || !newPassword || !recoveryToken) {
-            return res.status(400).json({ message: 'Faltan datos requeridos.' });
-        }
 
         // Verify Token
         let decoded;

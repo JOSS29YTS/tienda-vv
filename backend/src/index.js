@@ -3,6 +3,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
+const pool = require('./database/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -78,6 +79,38 @@ io.on('connection', (socket) => {
     });
 });
 
+// Middleware global para deshabilitar la caché en las respuestas de la API
+app.use('/api', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+});
+
+// Ruta de salud (Health Check)
+app.get('/api/health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({
+            ok: true,
+            message: '✔ Servidor y base de datos funcionando correctamente.',
+            mensaje: '✔ Servidor y base de datos funcionando correctamente.',
+            sistema: 'Todas las Tiendas API',
+            database: 'Conectada exitosamente',
+            version: '1.0.0',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            message: 'Error de salud en el servidor.',
+            mensaje: 'Error de salud en el servidor.',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -103,7 +136,9 @@ app.get('/', (req, res) => {
     res.json({ message: 'Bienvenido al API de Todas las Tiendas' });
 });
 
-const pool = require('./database/db');
+// Middleware global de manejo de errores (errorHandler)
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Services
 const whatsappService = require('./services/whatsappService');
