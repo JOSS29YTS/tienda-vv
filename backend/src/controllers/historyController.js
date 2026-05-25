@@ -8,7 +8,7 @@ exports.getHistory = async (req, res) => {
 
         const query = `
             SELECT 
-                DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
+                ${pool.isPostgres ? "TO_CHAR(fecha - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d')"} as fecha,
                 metodo,
                 ROUND(tasa_dia, 2) as tasa_dia,
                 type,
@@ -43,7 +43,7 @@ exports.getHistory = async (req, res) => {
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
                 WHERE tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO' ${tiendaFilterPF}
             ) AS daily_movements
-            GROUP BY DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(tasa_dia, 2), type
+            GROUP BY ${pool.isPostgres ? "TO_CHAR(fecha - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(fecha, INTERVAL 4 HOUR), '%Y-%m-%d')"}, metodo, ROUND(tasa_dia, 2), type
             ORDER BY fecha DESC
             LIMIT 100
         `;
@@ -51,7 +51,7 @@ exports.getHistory = async (req, res) => {
         // NEW: Fetch Pending Debts separately (since we don't store them in detalle_pago anymore)
         const debtQuery = `
             SELECT 
-                DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') as fecha,
+                ${pool.isPostgres ? "TO_CHAR(v.fecha_venta - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d')"} as fecha,
                 'PENDIENTE POR COBRAR' as metodo,
                 ROUND(v.tasa_dia, 2) as tasa_dia,
                 'DEBT' as type,
@@ -67,7 +67,7 @@ exports.getHistory = async (req, res) => {
             JOIN detalle_venta dv ON d.id_detalle_venta = dv.id_detalle_venta
             JOIN venta v ON dv.id_venta = v.id_venta
             WHERE 1=1 ${tiendaFilterV}
-            GROUP BY DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d'), metodo, ROUND(v.tasa_dia, 2), type
+            GROUP BY ${pool.isPostgres ? "TO_CHAR(v.fecha_venta - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d')"}, metodo, ROUND(v.tasa_dia, 2), type
         `;
 
         // Merge debtRows into rows if necessary, or process separately
@@ -176,7 +176,7 @@ exports.getDayDetail = async (req, res) => {
             JOIN venta v ON dv.id_venta = v.id_venta
             JOIN producto p ON dv.id_producto = p.id_producto
             LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
-            WHERE DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') = ?
+            WHERE ${pool.isPostgres ? "TO_CHAR(v.fecha_venta - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d')"} = ?
             AND UPPER(p.nb_producto) != 'AVANCE DE EFECTIVO'
             ${tiendaFilter}
             GROUP BY p.nb_producto, c.nb_categoria, dv.precio_unitario, v.tasa_dia
@@ -194,7 +194,7 @@ exports.getDayDetail = async (req, res) => {
             JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
             JOIN detalle_venta dv ON p.id_detalle_venta = dv.id_detalle_venta
             JOIN venta v ON dv.id_venta = v.id_venta
-            WHERE DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') = ?
+            WHERE ${pool.isPostgres ? "TO_CHAR(v.fecha_venta - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d')"} = ?
             AND UPPER(mp.nb_metodo_pago) != 'PENDIENTE POR COBRAR'
             ${tiendaFilter}
             GROUP BY mp.nb_metodo_pago, ROUND(p.tasa_dia, 2)
@@ -210,7 +210,7 @@ exports.getDayDetail = async (req, res) => {
             FROM detalle_venta dv
             JOIN venta v ON dv.id_venta = v.id_venta
             JOIN producto p ON dv.id_producto = p.id_producto
-            WHERE DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d') = ?
+            WHERE ${pool.isPostgres ? "TO_CHAR(v.fecha_venta - INTERVAL '4 hours', 'YYYY-MM-DD')" : "DATE_FORMAT(DATE_SUB(v.fecha_venta, INTERVAL 4 HOUR), '%Y-%m-%d')"} = ?
             AND UPPER(p.nb_producto) != 'AVANCE DE EFECTIVO'
             ${tiendaFilter}
             GROUP BY ROUND(v.tasa_dia, 2)

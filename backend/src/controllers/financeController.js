@@ -586,7 +586,7 @@ exports.getCommissions = async (req, res) => {
             SELECT COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) as total
             FROM detalle_venta dv
             JOIN venta v ON dv.id_venta = v.id_venta
-            WHERE MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?${tiendaFilter}
+            WHERE ${pool.isPostgres ? "EXTRACT(MONTH FROM v.fecha_venta) = ? AND EXTRACT(YEAR FROM v.fecha_venta) = ?" : "MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?"}${tiendaFilter}
         `, [month, year]);
 
         const totalSales = parseFloat(salesResult[0].total || 0);
@@ -599,7 +599,7 @@ exports.getCommissions = async (req, res) => {
         const [paymentsResult] = await pool.query(`
             SELECT nb_beneficiario, COALESCE(SUM(monto_usd), 0) as total_pagado
             FROM pago_comision
-            WHERE MONTH(fecha_pago) = ? AND YEAR(fecha_pago) = ?${tiendaId ? ` AND id_tienda = ${tiendaId}` : ''}
+            WHERE ${pool.isPostgres ? "EXTRACT(MONTH FROM fecha_pago) = ? AND EXTRACT(YEAR FROM fecha_pago) = ?" : "MONTH(fecha_pago) = ? AND YEAR(fecha_pago) = ?"}${tiendaId ? ` AND id_tienda = ${tiendaId}` : ''}
             GROUP BY nb_beneficiario
         `, [month, year]);
 

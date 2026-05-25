@@ -35,7 +35,7 @@ exports.getInventory = async (req, res) => {
                 SELECT dc.id_producto, SUM(dc.cantidad) as total_bought
                 FROM detalle_compra dc
                 JOIN compra c ON dc.id_compra = c.id_compra
-                WHERE YEAR(c.fecha_compra) > 2020 ${tiendaFilterSub}
+                WHERE ${pool.isPostgres ? "EXTRACT(YEAR FROM c.fecha_compra) > 2020" : "YEAR(c.fecha_compra) > 2020"} ${tiendaFilterSub}
                 GROUP BY dc.id_producto
             ) purchased_real ON p.id_producto = purchased_real.id_producto
             LEFT JOIN (
