@@ -1,8 +1,8 @@
-# 🏪 Todas las Tiendas - Sistema Multi-Tienda y Multi-Rol (Bodega App)
+# 🛍️ Tienda VV — Sistema Multi-Tienda de Ventas, Finanzas e Inventario en Tiempo Real
 
-Un sistema de gestión comercial moderno, multi-tienda y multi-rol diseñado para automatizar el inventario, control de compras, facturación, comisiones de vendedores y balances financieros (P&L) en tiempo real. 
+¡Bienvenido a **Tienda VV**! Este es un sistema integral y avanzado de gestión comercial multi-tienda diseñado para centralizar ventas, controlar inventarios de forma segura, administrar compras, realizar análisis financieros de pérdidas y ganancias, y facilitar la comunicación con clientes deudores en tiempo real. 
 
-El sistema está diseñado de forma híbrida para operar localmente con **MySQL** y escalar en producción utilizando **PostgreSQL** (Supabase).
+Este proyecto está estructurado con una arquitectura moderna de **Single Page Application (SPA)** en el Frontend y una **RESTful API con comunicación bidireccional (WebSockets)** en el Backend.
 
 ---
 
@@ -22,45 +22,103 @@ Para probar la plataforma en tu despliegue de demostración o entorno local, pue
 
 ---
 
-## ✨ Características Principales
+## 🚀 Características Clave
 
-* **🏢 Arquitectura Multi-Tienda:** Gestiona múltiples sucursales de forma aislada o consolidada.
-* **🔑 Control de Acceso por Roles (RBAC):** Roles definidos para Administradores, Gerentes y Vendedores.
-* **📈 Dashboard Financiero (P&L):** Gráficos dinámicos de ingresos, costos, comisiones, traspasos y ganancias netas.
-* **📦 Control de Inventario & Ajustes:** Catálogo con códigos de barra, categorías y logs de ajuste de inventario.
-* **🛡️ Seguridad & Estabilidad:**
-  * **Rate Limiting:** Middleware personalizado en memoria que protege de ataques de fuerza bruta y abusos de email (Resend) en el login.
-  * **Manejo Centralizado de Errores:** Middleware global de captura de excepciones en Express.
-  * **Validación Robusta:** Integración de `express-validator` para tipado y formato seguro de datos.
-  * **Pruebas Unitarias:** Blindaje con **Jest** para validaciones financieras de balances y fondos.
-  * **CORS & Caché:** Control estricto de CORS y deshabilitador de caché en la API para garantizar datos en tiempo real.
-* **🔌 Tiempo Real:** Notificaciones y sincronizaciones automáticas mediante **Socket.io**.
+### 👥 Administración y Control de Acceso (RBAC)
+* **Autenticación Segura:** Inicio de sesión y registro protegido mediante JSON Web Tokens (JWT).
+* **Control de Roles:** Autorización basada en roles (Gerentes, Administradores, Vendedores) con permisos granulares.
+* **Seguridad de Registro:** Flujo de verificación con códigos dinámicos de seguridad enviados por correo.
+* **Recuperación de Contraseña:** Sistema integrado de envío de códigos de recuperación de contraseña de uso único por email.
+
+### 🏪 Gestión Multi-Tienda
+* **Aislamiento de Tiendas:** Los usuarios visualizan y operan exclusivamente en las tiendas asignadas por la administración.
+* **Productos Globales e Inventario Local:** Catálogo global con stock e historial de movimientos administrados por tienda.
+* **Persistencia del Estado:** Selección de tienda persistida automáticamente a nivel de cliente para evitar pérdidas de contexto en recargas (F5).
+
+### 🛒 Ventas e Inventario en Tiempo Real
+* **Carrito Colaborativo:** Sincronización en tiempo real de carritos de compra mediante **Socket.io**.
+* **Control de Stock Auditado:** Registro detallado e histórico de ajustes manuales de inventario realizados por los administradores.
+* **Ventas por Usuario:** Agrupación y reportes de ventas filtrados por vendedor con restricciones de edición cruzada para auditorías internas.
+
+### 📈 Módulo de Finanzas y Análisis de Pérdidas y Ganancias (P&L)
+* **Dashboard Central:** Métricas clave de rendimiento comercial actualizadas al instante.
+* **Cuentas por Cobrar:** Gestión robusta de créditos a clientes e historial de abonos.
+* **Control de Comisiones e Impuestos:** Cálculos automáticos de comisiones para vendedores y conciliación de facturas de proveedores.
+* **Flujos de Caja:** Registro clasificado de gastos fijos y variables.
+
+### 🔔 Notificaciones y Recordatorios Automatizados
+* **Recordatorios de Deuda Semanales:** Tarea programada por servidor (**cron job**) para ejecutar notificaciones semanales automatizadas a clientes deudores.
+* **Notificaciones por Email:** Integrado con el servicio profesional de correos de **Resend**.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-### Backend (`/backend`)
-* **Core:** Node.js, Express, Socket.io
-* **Base de Datos:** PostgreSQL (Postgres/Supabase) y MySQL (Desarrollo local).
-* **Seguridad & Calidad:** `express-validator`, `bcrypt`, `jsonwebtoken`, **Jest** para testing.
-* **Servicios externos:** Resend (Correos transaccionales), WhatsApp Web API (Notificaciones).
+### Frontend
+* **Core:** [React](https://react.dev/) (v18+) con componentes funcionales y Hooks personalizados.
+* **Herramienta de Construcción:** [Vite](https://vite.dev/) para un desarrollo ultrarrápido y compilaciones optimizadas.
+* **Estilizado (CSS):** [Tailwind CSS](https://tailwindcss.com/) para interfaces responsivas y consistentes.
+* **Enrutamiento:** [React Router DOM](https://reactrouter.com/) (v6) para navegación fluida.
+* **Comunicación en Tiempo Real:** [Socket.io-client](https://socket.io/) para suscripción a eventos bidireccionales.
 
-### Frontend (`/frontend`)
-* **Core:** React, Vite
-* **Estilos:** CSS / TailwindCSS
-* **Estructura:** Gestión de rutas responsiva y layouts fluidos.
+### Backend
+* **Entorno de Ejecución:** [Node.js](https://nodejs.org/) & [Express](https://expressjs.com/) para estructurar la API REST.
+* **Base de Datos:** [MySQL](https://www.mysql.com/) con el driver de alto rendimiento `mysql2` utilizando Promesas.
+* **Comunicación Bidireccional:** [Socket.io](https://socket.io/) para coordinar carritos y eventos colaborativos.
+* **Seguridad:** `bcrypt` para el hashing seguro de contraseñas y `jsonwebtoken` (JWT) para la firma de tokens de sesión.
+* **Servicios de Terceros:**
+  * **Resend API:** Para envío confiable de correos electrónicos transaccionales.
+  * **Cron scheduling:** Mediante `node-cron` para procesos programados de auditoría de deudas en segundo plano.
 
 ---
 
-## 💻 Instalación y Configuración Local
+## 📁 Estructura del Proyecto
 
-### 1. Requisitos Previos
-* Node.js (v16 o superior) instalado.
-* MySQL corriendo localmente.
+El proyecto está organizado en un monorepositorio estructurado de la siguiente forma:
+
+```
+├── backend/
+│   ├── src/
+│   │   ├── controllers/   # Lógica de negocio (auth, sales, products, etc.)
+│   │   ├── database/      # Conexión al pool de MySQL y scripts de esquema
+│   │   ├── middleware/    # Validaciones y seguridad (JWT Auth)
+│   │   ├── routes/        # Definición de end-points HTTP
+│   │   ├── services/      # Servicios externos (emailService, whatsappService)
+│   │   └── utils/         # Funciones auxiliares financieras
+│   ├── migrations/        # Parches y actualizaciones de la base de datos
+│   ├── scripts/           # Scripts de mantenimiento (limpieza de borradores)
+│   ├── package.json
+│   └── .gitignore
+│
+├── frontend/
+│   ├── src/
+│   │   ├── assets/        # Recursos estáticos (imágenes y logos)
+│   │   ├── components/    # Componentes de UI comunes y layouts
+│   │   ├── context/       # Estados globales (Auth, Socket, Store, Rate)
+│   │   ├── pages/         # Vistas de la aplicación (Landing, Dashboard, etc.)
+│   │   └── config/        # Configuración del cliente API
+│   ├── public/            # Archivos públicos de redireccionamiento para producción (Vercel)
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── .gitignore
+```
+
+---
+
+## ⚙️ Instalación y Configuración Local
+
+### Prerrequisitos
+* Node.js instalado (v16 o superior).
+* Base de datos MySQL activa.
+
+### 1. Clonar el repositorio y acceder
+```bash
+git clone https://github.com/JOSS29YTS/tienda-vv.git
+cd tienda-vv
+```
 
 ### 2. Configurar el Backend
-1. Ve al directorio del backend:
+1. Entra a la carpeta de backend:
    ```bash
    cd backend
    ```
@@ -68,47 +126,45 @@ Para probar la plataforma en tu despliegue de demostración o entorno local, pue
    ```bash
    npm install
    ```
-3. Configura las variables de entorno en un archivo `.env` en la raíz de `backend/`:
+3. Crea un archivo `.env` en la raíz de la carpeta `backend/` tomando como referencia las siguientes variables:
    ```env
    PORT=3000
-   DB_HOST=localhost
-   DB_USER=tu_usuario_mysql
-   DB_PASSWORD=tu_contrasena_mysql
-   DB_NAME=toda_las_tiendas_db
-   JWT_SECRET=secreto_super_seguro
+   DB_HOST=tu_servidor_mysql
+   DB_USER=tu_usuario
+   DB_PASSWORD=tu_contraseña
+   DB_NAME=tienda_vv
+   DB_PORT=3306
+   JWT_SECRET=tu_secreto_super_seguro
+   RESEND_API_KEY=tu_api_key_de_resend
    ```
-4. Inicializa la estructura de la base de datos:
+4. Inicializa la base de datos ejecutando el script en `backend/src/database/schema.sql` en tu motor de base de datos.
+5. Inicia el servidor de desarrollo:
    ```bash
-   npm run init-db
-   ```
-5. **Alimenta el sistema con los datos demo (Usuarios, productos y ventas de prueba):**
-   ```bash
-   npm run seed
-   ```
-6. Inicia el servidor de desarrollo:
-   ```bash
-   npm run dev
+   npm start
    ```
 
 ### 3. Configurar el Frontend
-1. Ve al directorio del frontend:
+1. Abre una nueva terminal y ve a la carpeta del frontend:
    ```bash
-   cd ../frontend
+   cd frontend
    ```
 2. Instala las dependencias:
    ```bash
    npm install
    ```
-3. Inicia el cliente de desarrollo:
+3. Crea un archivo `.env` en la carpeta `frontend/` y añade la URL de tu API del Backend:
+   ```env
+   VITE_API_URL=http://localhost:3000
+   ```
+4. Inicia el servidor de desarrollo en modo local:
    ```bash
    npm run dev
    ```
 
 ---
 
-## 🧪 Pruebas Unitarias
-Para correr la suite de pruebas automáticas de la lógica de balance financiero:
-```bash
-cd backend
-npm test
-```
+## 🔒 Buenas Prácticas y Seguridad Implementadas
+* **Cero Hardcoding:** Todas las credenciales sensibles se manejan estrictamente a través de variables de entorno y no se guardan en el historial del repositorio.
+* **Consultas Seguras:** Uso extensivo de consultas parametrizadas con `mysql2` para mitigar riesgos de Inyección SQL.
+* **Encriptación Robusta:** Contraseñas encriptadas con salt dinámico usando `bcrypt`.
+* **Rutas Protegidas:** Implementación de guards y middlewares de autorización en React y Express para evitar accesos no autorizados a endpoints específicos.
