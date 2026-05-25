@@ -126,3 +126,7 @@ portfolio-screenshots/
 *.sql
 !backend/src/database/*.sql
 
+# Google API Credentials & local backups
+credentials.json
+backups/
+

@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
+import toast from 'react-hot-toast';
+import API_URL from '../../config/api';
 
 const SidebarItem = ({ to, icon: Icon, label, active }) => {
     return (
@@ -69,6 +71,69 @@ const DashboardLayout = () => {
             setSelectedTienda(tiendas[0]);
         }
     }, [location.pathname, tiendas, selectedTienda, canSwitchStore]);
+
+    // Descarga automática diaria del respaldo HTML de inventario
+    React.useEffect(() => {
+        if (!user) return;
+
+        const checkAndDownloadDailyBackup = async () => {
+            try {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayDate = `${yyyy}-${mm}-${dd}`;
+
+                const lastBackupDate = localStorage.getItem('backup_fecha_descarga');
+
+                if (lastBackupDate !== todayDate) {
+                    console.log('🔄 [BACKUP] Iniciando descarga automática del respaldo offline diario...');
+                    
+                    const token = localStorage.getItem('token');
+                    if (!token) return;
+
+                    const tiendaParam = user.id_tienda ? `?tienda=${user.id_tienda}` : '?tienda=global';
+                    const response = await fetch(`${API_URL}/api/backup/generate-html${tiendaParam}`, {
+                        headers: { 
+                            'Authorization': `Bearer ${token}` 
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Error al generar el respaldo de inventario');
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `inventario_offline_${todayDate}.html`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+
+                    // Guardar la fecha en localStorage para evitar descargas duplicadas hoy
+                    localStorage.setItem('backup_fecha_descarga', todayDate);
+                    
+                    toast.success("Respaldo diario offline descargado y sincronizado con Drive.", {
+                        duration: 5000,
+                        position: 'bottom-right'
+                    });
+                }
+            } catch (error) {
+                console.error('❌ [BACKUP] Error en descarga automática de respaldo:', error);
+            }
+        };
+
+        // Ejecutar la verificación con un pequeño retraso de 2 segundos para no interferir con la carga inicial
+        const timer = setTimeout(() => {
+            checkAndDownloadDailyBackup();
+        }, 2000);
+
+        return () => clearTimeout(timer);
+    }, [user]);
 
     let navItems = [
         { to: "/dashboard", icon: FaHome, label: "Inicio" }

@@ -124,6 +124,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/inventory', require('./routes/inventoryRoutes'));
+app.use('/api/backup', require('./routes/backupRoutes'));
 app.use('/api/history', require('./routes/historyRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/finances', require('./routes/financeRoutes'));

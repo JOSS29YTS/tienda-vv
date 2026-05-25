@@ -17,6 +17,7 @@ const InventoryPage = () => {
     const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
     const [reportYear, setReportYear] = useState(new Date().getFullYear());
     const [generatingReport, setGeneratingReport] = useState(false);
+    const [downloadingHTML, setDownloadingHTML] = useState(false);
 
     const { user } = useAuth();
     const { effectiveTiendaId, tiendas } = useStore();
@@ -128,6 +129,46 @@ const InventoryPage = () => {
             toast.error('Error al generar reporte');
         } finally {
             setGeneratingReport(false);
+        }
+    };
+
+    const handleDownloadHTMLBackup = async () => {
+        setDownloadingHTML(true);
+        try {
+            const token = localStorage.getItem('token');
+            const tiendaParam = effectiveTiendaId ? `?tienda=${effectiveTiendaId}` : '?tienda=global';
+            const response = await fetch(`${API_URL}/api/backup/generate-html${tiendaParam}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Error al obtener respaldo HTML');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const filename = `inventario_offline_${yyyy}-${mm}-${dd}.html`;
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            // Registrar fecha para que no se auto-descargue hoy si ya se hizo manual
+            localStorage.setItem('backup_fecha_descarga', `${yyyy}-${mm}-${dd}`);
+
+            toast.success('Respaldo HTML offline descargado y sincronizado con Drive.');
+        } catch (error) {
+            console.error('Error backup HTML:', error);
+            toast.error('Error al generar respaldo HTML offline');
+        } finally {
+            setDownloadingHTML(false);
         }
     };
 
@@ -247,12 +288,24 @@ const InventoryPage = () => {
                             onClick={handleDownloadReport}
                             disabled={generatingReport}
                             className="bg-emerald-500 hover:bg-emerald-600 text-white p-3 rounded-xl transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50"
-                            title="Descargar Reporte del Mes"
+                            title="Descargar Reporte Mensual (PDF)"
                         >
                             {generatingReport ? (
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <FaFileDownload size={18} />
+                            )}
+                        </button>
+                        <button
+                            onClick={handleDownloadHTMLBackup}
+                            disabled={downloadingHTML}
+                            className="bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-xl transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+                            title="Descargar Respaldo Offline (HTML)"
+                        >
+                            {downloadingHTML ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <FaFileDownload size={18} className="rotate-180" />
                             )}
                         </button>
                     </div>
