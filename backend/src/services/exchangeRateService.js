@@ -90,12 +90,21 @@ class ExchangeRateService {
                 // Update Database "configuracion" table
                 try {
                     const connection = await pool.getConnection();
-                    await connection.query(
-                        `INSERT INTO configuracion (clave, valor) 
-                         VALUES (?, ?) 
-                         ON DUPLICATE KEY UPDATE valor = ?`,
-                        ['tasa_dolar', newRate.toString(), newRate.toString()]
-                    );
+                    if (pool.isPostgres) {
+                        await connection.query(
+                            `INSERT INTO configuracion (clave, valor) 
+                             VALUES (?, ?) 
+                             ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor`,
+                            ['tasa_dolar', newRate.toString()]
+                        );
+                    } else {
+                        await connection.query(
+                            `INSERT INTO configuracion (clave, valor) 
+                             VALUES (?, ?) 
+                             ON DUPLICATE KEY UPDATE valor = ?`,
+                            ['tasa_dolar', newRate.toString(), newRate.toString()]
+                        );
+                    }
                     connection.release();
                     console.log(`[EXCHANGE RATE] Database successfully updated. New BCV Rate: ${newRate} Bs/$`);
                 } catch (dbError) {

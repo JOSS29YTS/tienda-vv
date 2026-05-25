@@ -23,10 +23,17 @@ exports.updateRate = async (req, res) => {
             return res.status(400).json({ message: 'Invalid rate' });
         }
 
-        await pool.query(
-            'INSERT INTO configuracion (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = ?',
-            ['tasa_dolar', rate.toString(), rate.toString()]
-        );
+        if (pool.isPostgres) {
+            await pool.query(
+                'INSERT INTO configuracion (clave, valor) VALUES (?, ?) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor',
+                ['tasa_dolar', rate.toString()]
+            );
+        } else {
+            await pool.query(
+                'INSERT INTO configuracion (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = ?',
+                ['tasa_dolar', rate.toString(), rate.toString()]
+            );
+        }
 
         res.json({ message: 'Rate updated successfully', rate: parseFloat(rate) });
 

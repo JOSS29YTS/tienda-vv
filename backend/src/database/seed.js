@@ -95,12 +95,25 @@ async function runSeed() {
         const tiposPagoFijo = ['ALQUILER', 'LUZ', 'INTERNET', 'ASEO', 'IMPUESTOS'];
         for (const t of tiposPagoFijo) {
             try {
-                await pool.query("INSERT IGNORE INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES (?)", [t]);
+                if (pool.isPostgres) {
+                    // For Postgres, we can first check or let catch handle it. 
+                    // Since it has no unique constraint, we can SELECT first or just insert if not exists.
+                    const [existing] = await pool.query("SELECT id_tipo_pago_fijo FROM tipo_pago_fijo WHERE nb_tipo_pago_fijo = ?", [t]);
+                    if (existing.length === 0) {
+                        await pool.query("INSERT INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES (?)", [t]);
+                    }
+                } else {
+                    await pool.query("INSERT IGNORE INTO tipo_pago_fijo (nb_tipo_pago_fijo) VALUES (?)", [t]);
+                }
             } catch (e) { /* Ya existe */ }
         }
 
         // Configuramos la tasa del dólar si está en 0 o 1
-        await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '45.50') ON DUPLICATE KEY UPDATE valor = '45.50'");
+        if (pool.isPostgres) {
+            await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '45.50') ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor");
+        } else {
+            await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '45.50') ON DUPLICATE KEY UPDATE valor = '45.50'");
+        }
 
         // Verificar si ya hay ventas en el sistema para no duplicar historial de prueba
         const [existingSales] = await pool.query("SELECT COUNT(*) as count FROM venta");
