@@ -19,10 +19,17 @@ exports.saveDraftSales = async (req, res) => {
         const tiendaId = id_tienda || req.user.id_tienda || null;
 
         // Delete existing draft for this user AND this store
-        await pool.query(
-            'DELETE FROM venta_borrador WHERE id_usuario = ? AND (id_tienda = ? OR (id_tienda IS NULL AND ? IS NULL))',
-            [userId, tiendaId, tiendaId]
-        );
+        if (tiendaId !== null) {
+            await pool.query(
+                'DELETE FROM venta_borrador WHERE id_usuario = ? AND id_tienda = ?',
+                [userId, tiendaId]
+            );
+        } else {
+            await pool.query(
+                'DELETE FROM venta_borrador WHERE id_usuario = ? AND id_tienda IS NULL',
+                [userId]
+            );
+        }
 
         // Insert new draft with store association
         await pool.query(
@@ -355,7 +362,11 @@ exports.closeSales = async (req, res) => {
         await connection.commit();
 
         // Clear all drafts upon closing the day's sales
-        await pool.query('DELETE FROM venta_borrador WHERE id_tienda = ? OR (id_tienda IS NULL AND ? IS NULL)', [tiendaId, tiendaId]);
+        if (tiendaId !== null) {
+            await pool.query('DELETE FROM venta_borrador WHERE id_tienda = ?', [tiendaId]);
+        } else {
+            await pool.query('DELETE FROM venta_borrador WHERE id_tienda IS NULL');
+        }
 
         const io = req.app.get('io');
         if (io) {
