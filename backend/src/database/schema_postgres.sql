@@ -366,6 +366,6 @@ INSERT INTO tienda (nb_tienda, descripcion, color) VALUES
 -- Inserción del usuario administrador de prueba (admin@tiendavv.com / admin123)
 -- Contraseña encriptada con bcrypt: admin123
 INSERT INTO usuario (nombre, apellido, email, password, id_rol, id_tienda, activo) VALUES
-('Usuario', 'Demo', 'admin@tiendavv.com', '$2b$10$gFrbX67uioP8S5ZHhB/VQ.tZ46HTdQ3weKO1dspMrMe5o6kBAYI7i', 1, NULL, 1);
+('Usuario', 'Demo', 'admin@tiendavv.com', '$2b$10$9JHXcXBkhpQXJFHM3Pqc4uA.al64VWadjyvbNKMpPrQDvFa776Rbm', 1, NULL, 1);
 
 INSERT INTO configuracion (clave, valor) VALUES ('tasa_dolar', '1.00');
