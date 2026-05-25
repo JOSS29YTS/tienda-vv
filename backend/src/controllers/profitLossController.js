@@ -234,11 +234,18 @@ exports.getProfitLoss = async (req, res) => {
         // ─────────────────────────────────────────────
         // 4. EGRESOS: Pagos de facturas de proveedor
         // ─────────────────────────────────────────────
-        const [invoicePayRows] = await pool.query(`
+        const invoicePayQuery = tiendaId ? `
             SELECT COALESCE(SUM(pfp.monto), 0) as total
             FROM pago_factura_proveedor pfp
-            WHERE ${applyFilter('pfp.fecha_pago')}${tiendaFilterPFP}
-        `, dateParams);
+            JOIN factura_proveedor fp ON pfp.id_factura_proveedor = fp.id_factura_proveedor
+            JOIN proveedor prov ON fp.id_proveedor = prov.id_proveedor
+            WHERE ${applyFilter('pfp.fecha_pago')} AND prov.id_tienda = ${tiendaId}
+        ` : `
+            SELECT COALESCE(SUM(pfp.monto), 0) as total
+            FROM pago_factura_proveedor pfp
+            WHERE ${applyFilter('pfp.fecha_pago')}
+        `;
+        const [invoicePayRows] = await pool.query(invoicePayQuery, dateParams);
         const totalPagosFacturas = parseFloat(invoicePayRows[0].total);
 
         // ─────────────────────────────────────────────
