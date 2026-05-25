@@ -27,7 +27,7 @@ exports.saveDraftSales = async (req, res) => {
         // Insert new draft with store association
         await pool.query(
             'INSERT INTO venta_borrador (id_usuario, id_tienda, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, ?, NOW(), ?, ?)',
-            [userId, tiendaId, JSON.stringify(rows), rate]
+            [userId, tiendaId, pool.isPostgres ? rows : JSON.stringify(rows), rate]
         );
 
         const io = req.app.get('io');
