@@ -28,26 +28,24 @@ exports.getProfitLoss = async (req, res) => {
         const prevMonthYear = prevMonthDate.getFullYear();
 
         if (period === 'month') {
-            dateFilter = 'MONTH({col}) = ? AND YEAR({col}) = ?';
+            dateFilter = pool.isPostgres ? 'EXTRACT(MONTH FROM {col}) = ? AND EXTRACT(YEAR FROM {col}) = ?' : 'MONTH({col}) = ? AND YEAR({col}) = ?';
             dateParams = [currentMonth, currentYear];
         } else if (period === 'prev_month') {
-            dateFilter = 'MONTH({col}) = ? AND YEAR({col}) = ?';
+            dateFilter = pool.isPostgres ? 'EXTRACT(MONTH FROM {col}) = ? AND EXTRACT(YEAR FROM {col}) = ?' : 'MONTH({col}) = ? AND YEAR({col}) = ?';
             dateParams = [prevMonth, prevMonthYear];
         } else if (period === 'year') {
-            dateFilter = 'YEAR({col}) = ?';
+            dateFilter = pool.isPostgres ? 'EXTRACT(YEAR FROM {col}) = ?' : 'YEAR({col}) = ?';
             dateParams = [currentYear];
         } else if (period === 'custom' && startDate && endDate) {
             dateFilter = '{col} >= ? AND {col} <= ?';
             dateParams = [startDate + ' 00:00:00', endDate + ' 23:59:59'];
         } else {
             // Default: current month
-            dateFilter = 'MONTH({col}) = ? AND YEAR({col}) = ?';
+            dateFilter = pool.isPostgres ? 'EXTRACT(MONTH FROM {col}) = ? AND EXTRACT(YEAR FROM {col}) = ?' : 'MONTH({col}) = ? AND YEAR({col}) = ?';
             dateParams = [currentMonth, currentYear];
         }
 
         const applyFilter = (col) => dateFilter.replace(/\{col\}/g, col);
-
-        await pool.query('CREATE TABLE IF NOT EXISTS pago_comision (id_pago_comision INT AUTO_INCREMENT PRIMARY KEY, id_usuario INT, nb_beneficiario VARCHAR(100), id_metodo_pago INT, monto_usd DECIMAL(10,2), tasa_dia DECIMAL(10,2), fecha_pago DATETIME, FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario), FOREIGN KEY (id_metodo_pago) REFERENCES metodo_pago(id_metodo_pago))');
 
         // ─────────────────────────────────────────────
         // 1. INGRESOS: Ventas cobradas (sin pendiente por cobrar)
@@ -274,7 +272,45 @@ exports.getProfitLoss = async (req, res) => {
         // ─────────────────────────────────────────────
         // 7. Resumen mensual para gráfico (Año 2026)
         // Add initial balance to February's income for the chart
-        const [monthlyIncome] = await pool.query(`
+        const monthlyIncomeQuery = pool.isPostgres ? `
+            SELECT 
+                mes,
+                TO_CHAR(TO_DATE(mes || '-01', 'YYYY-MM-DD'), 'Mon YYYY') as mes_label,
+                SUM(ingresos) as ingresos
+            FROM (
+                SELECT 
+                    TO_CHAR(v.fecha_venta, 'YYYY-MM') as mes,
+                    dp.monto as ingresos
+                FROM venta v
+                JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+                JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+                JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                WHERE EXTRACT(YEAR FROM v.fecha_venta) = 2026 ${tiendaFilter}
+                AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+
+                UNION ALL
+
+                SELECT 
+                    TO_CHAR(pr.fecha_prestamo, 'YYYY-MM') as mes,
+                    CASE 
+                        WHEN mp.nb_metodo_pago LIKE '%DIVISA%' 
+                          OR mp.nb_metodo_pago LIKE '%ZELLE%' 
+                          OR mp.nb_metodo_pago LIKE '%BINANCE%' 
+                          OR mp.nb_metodo_pago LIKE '%PAYPAL%' 
+                          OR mp.nb_metodo_pago LIKE '%USD%' 
+                          OR mp.nb_metodo_pago LIKE '%DOLAR%' 
+                          OR mp.nb_metodo_pago LIKE '%EFECTIVO ($)%' 
+                        THEN pr.monto_prestamo
+                        ELSE ROUND(pr.monto_prestamo / COALESCE(NULLIF(pr.tasa_dia, 0), 1), 2)
+                    END as ingresos
+                FROM prestamo pr
+                JOIN metodo_pago mp ON pr.id_metodo_pago = mp.id_metodo_pago
+                WHERE EXTRACT(YEAR FROM pr.fecha_prestamo) = 2026 ${tiendaFilterPP}
+            ) as all_income
+            GROUP BY mes
+            ORDER BY mes ASC
+        ` : `
             SELECT 
                 mes,
                 DATE_FORMAT(CONCAT(mes, '-01'), '%b %Y') as mes_label,
@@ -312,7 +348,8 @@ exports.getProfitLoss = async (req, res) => {
             ) as all_income
             GROUP BY mes
             ORDER BY mes ASC
-        `);
+        `;
+        const [monthlyIncome] = await pool.query(monthlyIncomeQuery);
 
         // Ensure February shows the initial balance in the chart even if no sales exist
         let foundFeb = false;
@@ -333,7 +370,63 @@ exports.getProfitLoss = async (req, res) => {
             chartIncomeData.sort((a, b) => a.mes.localeCompare(b.mes));
         }
 
-        const [monthlyExpenses] = await pool.query(`
+        const monthlyExpensesQuery = pool.isPostgres ? `
+            SELECT mes, SUM(total) as compras
+            FROM (
+                SELECT 
+                    TO_CHAR(fecha_compra, 'YYYY-MM') as mes,
+                    total_compra as total
+                FROM compra
+                WHERE EXTRACT(YEAR FROM fecha_compra) = 2026 ${tiendaFilterC}
+
+                UNION ALL
+
+                SELECT 
+                    TO_CHAR(fecha_pago_fijo, 'YYYY-MM') as mes,
+                    monto as total
+                FROM pago_fijo pf
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE EXTRACT(YEAR FROM fecha_pago_fijo) = 2026 ${tiendaFilterPF}
+                AND tpf.nb_tipo_pago_fijo != 'AVANCE DE EFECTIVO'
+
+                UNION ALL
+
+                SELECT 
+                    TO_CHAR(fecha_gasto_variable, 'YYYY-MM') as mes,
+                    monto_usd as total
+                FROM gasto_variable gv
+                WHERE EXTRACT(YEAR FROM fecha_gasto_variable) = 2026 ${tiendaFilterGV}
+
+                UNION ALL
+
+                SELECT 
+                    TO_CHAR(pp.fecha_pago, 'YYYY-MM') as mes,
+                    CASE 
+                        WHEN mp.nb_metodo_pago LIKE '%DIVISA%' 
+                          OR mp.nb_metodo_pago LIKE '%ZELLE%' 
+                          OR mp.nb_metodo_pago LIKE '%BINANCE%' 
+                          OR mp.nb_metodo_pago LIKE '%PAYPAL%' 
+                          OR mp.nb_metodo_pago LIKE '%USD%' 
+                          OR mp.nb_metodo_pago LIKE '%DOLAR%' 
+                          OR mp.nb_metodo_pago LIKE '%EFECTIVO ($)%' 
+                        THEN pp.monto
+                        ELSE ROUND(pp.monto / COALESCE(NULLIF(pp.tasa_dia, 0), 1), 2)
+                    END as total
+                FROM pago_prestamo pp
+                JOIN prestamo pr ON pp.id_prestamo = pr.id_prestamo
+                JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+                WHERE EXTRACT(YEAR FROM pp.fecha_pago) = 2026 ${tiendaFilterPP}
+
+                UNION ALL
+
+                SELECT 
+                    TO_CHAR(fecha_pago, 'YYYY-MM') as mes,
+                    monto_usd as total
+                FROM pago_comision pc
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026 ${tiendaFilterPC.replace('id_tienda', 'pc.id_tienda')}
+            ) as all_expenses
+            GROUP BY mes
+        ` : `
             SELECT mes, SUM(total) as compras
             FROM (
                 SELECT 
@@ -386,10 +479,11 @@ exports.getProfitLoss = async (req, res) => {
                     DATE_FORMAT(fecha_pago, '%Y-%m') as mes,
                     monto_usd as total
                 FROM pago_comision pc
-                WHERE YEAR(fecha_pago) = 2026 ${tiendaFilterPC.replace('id_tienda', 'pc.id_tienda')}
+                WHERE YEAR(fecha_pago) = 2026 \substitute_tienda_filter_pc
             ) as all_expenses
             GROUP BY mes
-        `);
+        `.replace('substitute_tienda_filter_pc', tiendaFilterPC.replace('id_tienda', 'pc.id_tienda'));
+        const [monthlyExpenses] = await pool.query(monthlyExpensesQuery);
 
         // Merge monthly data
         const monthlyMap = {};

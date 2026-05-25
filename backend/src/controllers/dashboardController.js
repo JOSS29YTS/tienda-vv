@@ -19,7 +19,18 @@ exports.getDashboardStats = async (req, res) => {
         // Helper to get total sales for a specific month/year
         // MODIFIED: Sum actual payments excluding "PENDIENTE POR COBRAR"
         const getTotalSales = async (month, year) => {
-            const query = `
+            const query = pool.isPostgres ? `
+                SELECT COALESCE(SUM(dp.monto), 0) as total
+                FROM venta v
+                JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+                JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+                JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+                JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+                WHERE EXTRACT(MONTH FROM v.fecha_venta) = ? 
+                AND EXTRACT(YEAR FROM v.fecha_venta) = ?
+                AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+                ${tiendaFilter}
+            ` : `
                 SELECT COALESCE(SUM(dp.monto), 0) as total
                 FROM venta v
                 JOIN detalle_venta dv ON v.id_venta = dv.id_venta
@@ -40,7 +51,15 @@ exports.getDashboardStats = async (req, res) => {
         // Subtract 'AVANCE DE EFECTIVO' cost (Principal) from Sales to reflect real revenue for advances
         // But IGNORE other expenses (like Internet)
         const getAdvanceExpenses = async (month, year) => {
-            const query = `
+            const query = pool.isPostgres ? `
+                SELECT COALESCE(SUM(pf.monto), 0) as total
+                FROM pago_fijo pf
+                JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
+                WHERE EXTRACT(MONTH FROM pf.fecha_pago_fijo) = ? 
+                AND EXTRACT(YEAR FROM pf.fecha_pago_fijo) = ?
+                AND tpf.nb_tipo_pago_fijo = 'AVANCE DE EFECTIVO'
+                ${tiendaFilterGeneric.replace('id_tienda', 'pf.id_tienda')}
+            ` : `
                 SELECT COALESCE(SUM(pf.monto), 0) as total
                 FROM pago_fijo pf
                 JOIN tipo_pago_fijo tpf ON pf.id_tipo_pago_fijo = tpf.id_tipo_pago_fijo
@@ -144,7 +163,23 @@ exports.getDashboardStats = async (req, res) => {
 
         // 5. Sales Chart (Last 12 Months)
         // MODIFIED: Sum actual payments excluding "PENDIENTE POR COBRAR"
-        const chartQuery = `
+        const chartQuery = pool.isPostgres ? `
+            SELECT 
+                TO_CHAR(MIN(v.fecha_venta), 'Mon') as month_name,
+                EXTRACT(MONTH FROM v.fecha_venta) as month_num,
+                EXTRACT(YEAR FROM v.fecha_venta) as year_num,
+                COALESCE(SUM(dp.monto), 0) as total
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE v.fecha_venta >= NOW() - INTERVAL '12 months'
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            ${tiendaFilter}
+            GROUP BY EXTRACT(YEAR FROM v.fecha_venta), EXTRACT(MONTH FROM v.fecha_venta)
+            ORDER BY EXTRACT(YEAR FROM v.fecha_venta), EXTRACT(MONTH FROM v.fecha_venta)
+        ` : `
             SELECT 
                 DATE_FORMAT(MIN(v.fecha_venta), '%b') as month_name,
                 MONTH(v.fecha_venta) as month_num,
@@ -184,25 +219,35 @@ exports.getDashboardStats = async (req, res) => {
         }
 
         let chartData = chartDataResults.map(row => {
-            if (row.year_num === 2026 && row.month_num === 2) {
+            if (parseFloat(row.year_num) === 2026 && parseFloat(row.month_num) === 2) {
                 return { ...row, total: parseFloat(row.total) + initialUSD };
             }
             return row;
         });
 
         // Add Feb row if missing
-        if (!chartData.some(d => d.year_num === 2026 && d.month_num === 2)) {
+        if (!chartData.some(d => parseFloat(d.year_num) === 2026 && parseFloat(d.month_num) === 2)) {
             chartData.push({
                 month_name: 'Feb',
                 month_num: 2,
                 year_num: 2026,
                 total: initialUSD
             });
-            chartData.sort((a, b) => (a.year_num - b.year_num) || (a.month_num - b.month_num));
+            chartData.sort((a, b) => (parseFloat(a.year_num) - parseFloat(b.year_num)) || (parseFloat(a.month_num) - parseFloat(b.month_num)));
         }
 
         // 6. Ventas de Hoy (excluyendo PENDIENTE POR COBRAR)
-        const [todayRows] = await pool.query(`
+        const todayQuery = pool.isPostgres ? `
+            SELECT COALESCE(SUM(dp.monto), 0) as total
+            FROM venta v
+            JOIN detalle_venta dv ON v.id_venta = dv.id_venta
+            JOIN pago p ON dv.id_detalle_venta = p.id_detalle_venta
+            JOIN detalle_pago dp ON p.id_pago = dp.id_pago
+            JOIN metodo_pago mp ON dp.id_metodo_pago = mp.id_metodo_pago
+            WHERE v.fecha_venta::date = CURRENT_DATE
+            AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
+            ${tiendaFilter}
+        ` : `
             SELECT COALESCE(SUM(dp.monto), 0) as total
             FROM venta v
             JOIN detalle_venta dv ON v.id_venta = dv.id_venta
@@ -212,11 +257,27 @@ exports.getDashboardStats = async (req, res) => {
             WHERE DATE(v.fecha_venta) = CURDATE()
             AND mp.nb_metodo_pago != 'PENDIENTE POR COBRAR'
             ${tiendaFilter}
-        `);
+        `;
+        const [todayRows] = await pool.query(todayQuery);
         const todaySales = parseFloat(todayRows[0].total);
 
         // 7. Top Products (Current Month)
-        const topProductsQuery = `
+        const topProductsQuery = pool.isPostgres ? `
+            SELECT 
+                p.nb_producto as name, 
+                COALESCE(c.nb_categoria, 'Sin Categoría') as category,
+                SUM(dv.cantidad) as sold
+            FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
+            JOIN producto p ON dv.id_producto = p.id_producto
+            LEFT JOIN categoria c ON p.id_categoria = c.id_categoria
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+            AND EXTRACT(MONTH FROM v.fecha_venta) = ? AND EXTRACT(YEAR FROM v.fecha_venta) = ?
+            ${tiendaFilter}
+            GROUP BY p.id_producto, p.nb_producto, c.nb_categoria
+            ORDER BY sold DESC
+            LIMIT 5
+        ` : `
             SELECT 
                 p.nb_producto as name, 
                 COALESCE(c.nb_categoria, 'Sin Categoría') as category,
@@ -228,14 +289,22 @@ exports.getDashboardStats = async (req, res) => {
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
             ${tiendaFilter}
-            GROUP BY p.id_producto
+            GROUP BY p.id_producto, p.nb_producto, c.nb_categoria
             ORDER BY sold DESC
             LIMIT 5
         `;
         const [topProducts] = await pool.query(topProductsQuery, [currentMonth, currentYear]);
 
         // 8. Total Products Sold (Current Month)
-        const [totalSoldRows] = await pool.query(`
+        const totalSoldQuery = pool.isPostgres ? `
+            SELECT COALESCE(SUM(dv.cantidad), 0) as total
+            FROM detalle_venta dv
+            JOIN venta v ON dv.id_venta = v.id_venta
+            JOIN producto p ON dv.id_producto = p.id_producto
+            WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
+            AND EXTRACT(MONTH FROM v.fecha_venta) = ? AND EXTRACT(YEAR FROM v.fecha_venta) = ?
+            ${tiendaFilter}
+        ` : `
             SELECT COALESCE(SUM(dv.cantidad), 0) as total
             FROM detalle_venta dv
             JOIN venta v ON dv.id_venta = v.id_venta
@@ -243,7 +312,8 @@ exports.getDashboardStats = async (req, res) => {
             WHERE p.nb_producto != 'AVANCE DE EFECTIVO'
             AND MONTH(v.fecha_venta) = ? AND YEAR(v.fecha_venta) = ?
             ${tiendaFilter}
-        `, [currentMonth, currentYear]);
+        `;
+        const [totalSoldRows] = await pool.query(totalSoldQuery, [currentMonth, currentYear]);
         const totalProductsSold = parseInt(totalSoldRows[0].total) || 0;
 
 

@@ -247,7 +247,42 @@ exports.getRecentTransactions = async (req, res) => {
         const tiendaFilterTR = tiendaId ? `AND tr.id_tienda = ${tiendaId}` : '';
         const tiendaFilterPR = tiendaId ? `AND p.id_tienda = ${tiendaId}` : '';
 
-        const query = `
+        const query = pool.isPostgres ? `
+            SELECT 'Venta' as type, v.id_venta as id, v.fecha_venta as date, SUM(dv.cantidad * dv.precio_unitario) as amount, u.nombre as user, 'Ingreso' as category, 
+            (SELECT string_agg(DISTINCT REPLACE(mp.nb_metodo_pago, 'BANCO (POS)', 'PUNTO DE VENTA'), ', ') FROM pago p JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta WHERE dv1.id_venta = v.id_venta) as payment_method, NULL::numeric as exchange_rate, NULL::varchar as descripcion, 'venta' as source_module
+            FROM venta v JOIN detalle_venta dv ON v.id_venta = dv.id_venta JOIN usuario u ON v.id_usuario = u.id_usuario
+            WHERE EXTRACT(YEAR FROM v.fecha_venta) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM v.fecha_venta) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterV}
+            GROUP BY v.id_venta, v.fecha_venta, u.nombre
+            UNION ALL
+            SELECT 'Compra' as type, c.id_compra as id, c.fecha_compra as date, c.total_compra as amount, u.nombre as user, 'Egreso' as category, COALESCE(ec.nb_estado_compra, 'PAGADA') as payment_method, NULL::numeric as exchange_rate, NULL::varchar as descripcion, 'compra' as source_module
+            FROM compra c JOIN usuario u ON c.id_usuario = u.id_usuario LEFT JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
+            WHERE EXTRACT(YEAR FROM c.fecha_compra) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM c.fecha_compra) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterC}
+            UNION ALL
+            SELECT t.nb_tipo_pago_fijo as type, p.id_pago_fijo as id, p.fecha_pago_fijo as date, p.monto as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, p.tasa_dia as exchange_rate, p.descripcion as descripcion, 'pago_fijo' as source_module
+            FROM pago_fijo p JOIN tipo_pago_fijo t ON p.id_tipo_pago_fijo = t.id_tipo_pago_fijo JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE EXTRACT(YEAR FROM p.fecha_pago_fijo) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM p.fecha_pago_fijo) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterPF}
+            UNION ALL
+            SELECT tgv.nb_gasto_variable as type, gv.id_gasto_variable as id, gv.fecha_gasto_variable as date, gv.monto_usd as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, gv.tasa_dia as exchange_rate, gv.descripcion as descripcion, 'gasto_variable' as source_module
+            FROM gasto_variable gv JOIN tipo_gasto_variable tgv ON gv.id_tipo_gasto_variable = tgv.id_tipo_gasto_variable JOIN usuario u ON gv.id_usuario = u.id_usuario JOIN metodo_pago mp ON gv.id_metodo_pago = mp.id_metodo_pago
+            WHERE EXTRACT(YEAR FROM gv.fecha_gasto_variable) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM gv.fecha_gasto_variable) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterGV}
+            UNION ALL
+            SELECT 'Traspaso' as type, tr.id_traspaso as id, tr.fecha_traspaso as date, tr.monto as amount, u.nombre as user, 'Traspaso' as category, CASE WHEN mo.nb_metodo_pago = 'BANCO (POS)' THEN CONCAT(ti_tr.nb_tienda, ' -> ', md.nb_metodo_pago) ELSE CONCAT(mo.nb_metodo_pago, ' -> ', md.nb_metodo_pago) END as payment_method, tr.tasa_dia as exchange_rate, NULL::varchar as descripcion, 'traspaso' as source_module
+            FROM traspaso tr JOIN usuario u ON tr.id_usuario = u.id_usuario JOIN metodo_pago mo ON tr.id_metodo_origen = mo.id_metodo_pago JOIN metodo_pago md ON tr.id_metodo_destino = md.id_metodo_pago LEFT JOIN tienda ti_tr ON tr.id_tienda = ti_tr.id_tienda
+            WHERE EXTRACT(YEAR FROM tr.fecha_traspaso) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM tr.fecha_traspaso) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterTR}
+            UNION ALL
+            SELECT 'Préstamo' as type, p.id_prestamo as id, p.fecha_prestamo as date, p.monto_prestamo as amount, u.nombre as user, 'Ingreso' as category, CASE WHEN p.motivo IS NOT NULL AND p.motivo != '' THEN CONCAT(mp.nb_metodo_pago, ' - ', p.motivo) ELSE mp.nb_metodo_pago END as payment_method, p.tasa_dia as exchange_rate, p.motivo as descripcion, 'prestamo' as source_module
+            FROM prestamo p JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            WHERE EXTRACT(YEAR FROM p.fecha_prestamo) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM p.fecha_prestamo) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterPR}
+            UNION ALL
+            SELECT 'Pago Préstamo' as type, pp.id_pago_prestamo as id, pp.fecha_pago as date, pp.monto as amount, u.nombre as user, 'Egreso' as category, CONCAT('Pago a Préstamo (', mp.nb_metodo_pago, ')') as payment_method, pp.tasa_dia as exchange_rate, NULL::varchar as descripcion, 'pago_prestamo' as source_module
+            FROM pago_prestamo pp JOIN prestamo p ON pp.id_prestamo = p.id_prestamo JOIN usuario u ON p.id_usuario = u.id_usuario JOIN metodo_pago mp ON pp.id_metodo_pago = mp.id_metodo_pago
+            WHERE EXTRACT(YEAR FROM pp.fecha_pago) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM pp.fecha_pago) = EXTRACT(MONTH FROM NOW())
+            UNION ALL
+            SELECT 'Pago Comisión' as type, pc.id_pago_comision as id, pc.fecha_pago as date, pc.monto_usd as amount, u.nombre as user, 'Egreso' as category, mp.nb_metodo_pago as payment_method, pc.tasa_dia as exchange_rate, pc.nb_beneficiario as descripcion, 'pago_comision' as source_module
+            FROM pago_comision pc JOIN usuario u ON pc.id_usuario = u.id_usuario JOIN metodo_pago mp ON pc.id_metodo_pago = mp.id_metodo_pago
+            WHERE EXTRACT(YEAR FROM pc.fecha_pago) = EXTRACT(YEAR FROM NOW()) AND EXTRACT(MONTH FROM pc.fecha_pago) = EXTRACT(MONTH FROM NOW()) ${tiendaFilterPC}
+            ORDER BY date DESC, id DESC LIMIT ?
+        ` : `
             SELECT 'Venta' as type, v.id_venta as id, v.fecha_venta as date, SUM(dv.cantidad * dv.precio_unitario) as amount, u.nombre as user, 'Ingreso' as category, 
             (SELECT GROUP_CONCAT(DISTINCT REPLACE(mp.nb_metodo_pago, 'BANCO (POS)', 'PUNTO DE VENTA') SEPARATOR ', ') FROM pago p JOIN detalle_pago dp_sub ON p.id_pago = dp_sub.id_pago JOIN metodo_pago mp ON dp_sub.id_metodo_pago = mp.id_metodo_pago LEFT JOIN detalle_venta dv1 ON p.id_detalle_venta = dv1.id_detalle_venta WHERE dv1.id_venta = v.id_venta) as payment_method, NULL as exchange_rate, NULL as descripcion, 'venta' as source_module
             FROM venta v JOIN detalle_venta dv ON v.id_venta = dv.id_venta JOIN usuario u ON v.id_usuario = u.id_usuario
