@@ -32,10 +32,17 @@ exports.saveDraftSales = async (req, res) => {
         }
 
         // Insert new draft with store association
-        await pool.query(
-            'INSERT INTO venta_borrador (id_usuario, id_tienda, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, ?, NOW(), ?, ?)',
-            [userId, tiendaId, pool.isPostgres ? rows : JSON.stringify(rows), rate]
-        );
+        if (pool.isPostgres) {
+            await pool.query(
+                'INSERT INTO venta_borrador (id_usuario, id_tienda, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, ?, NOW(), ?::json, ?)',
+                [userId, tiendaId, JSON.stringify(rows), rate]
+            );
+        } else {
+            await pool.query(
+                'INSERT INTO venta_borrador (id_usuario, id_tienda, fecha_actualizacion, datos_venta, tasa_dia) VALUES (?, ?, NOW(), ?, ?)',
+                [userId, tiendaId, JSON.stringify(rows), rate]
+            );
+        }
 
         const io = req.app.get('io');
         if (io) {
@@ -117,6 +124,11 @@ exports.getDraftSales = async (req, res) => {
                 }
             } else {
                 datosFinales = draft.datos_venta;
+            }
+
+            // Defensive check: ensure datos_venta is strictly a JSON Array to prevent frontend crashes
+            if (!Array.isArray(datosFinales)) {
+                datosFinales = [];
             }
 
             return {
