@@ -4,6 +4,7 @@ import { FaMoneyBillWave, FaSearch, FaTimes, FaPlus, FaCheckCircle, FaExclamatio
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
+import { IS_DEMO_MODE } from '../../config/demoMode';
 
 const InvoicesPage = () => {
     const { rate } = useRate();
@@ -430,12 +431,14 @@ const InvoicesPage = () => {
                                         </div>
                                     </div>
 
-                                    <button
-                                        onClick={() => openPaymentModal(loan, 'loan')}
-                                        className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                                    >
-                                        <FaMoneyBillWave /> Pagar Préstamo
-                                    </button>
+                                    {!IS_DEMO_MODE && (
+                                        <button
+                                            onClick={() => openPaymentModal(loan, 'loan')}
+                                            className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                        >
+                                            <FaMoneyBillWave /> Pagar Préstamo
+                                        </button>
+                                    )}
                                 </motion.div>
                             )
                         })}
@@ -510,12 +513,14 @@ const InvoicesPage = () => {
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => openPaymentModal(inv)}
-                            className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                        >
-                            <FaMoneyBillWave /> Pagar Factura
-                        </button>
+                        {!IS_DEMO_MODE && (
+                            <button
+                                onClick={() => openPaymentModal(inv)}
+                                className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                            >
+                                <FaMoneyBillWave /> Pagar Factura
+                            </button>
+                        )}
                     </motion.div>
                 ))}
 

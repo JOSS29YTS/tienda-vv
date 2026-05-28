@@ -6,6 +6,7 @@ import {
     FaTag, FaCreditCard, FaMobileAlt, FaExchangeAlt, FaMoneyBill, FaSpinner, FaHandHoldingUsd, FaFilePdf
 } from 'react-icons/fa';
 import { useRate } from '../../context/RateContext';
+import { IS_DEMO_MODE } from '../../config/demoMode';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -488,12 +489,14 @@ const GastosPage = () => {
                     >
                         <FaFilePdf /> Reporte
                     </button>
-                    <button
-                        onClick={handleLoanClick}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20"
-                    >
-                        <FaHandHoldingUsd /> Préstamo
-                    </button>
+                    {!IS_DEMO_MODE && (
+                        <button
+                            onClick={handleLoanClick}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20"
+                        >
+                            <FaHandHoldingUsd /> Préstamo
+                        </button>
+                    )}
                     <button
                         onClick={openFixedModal}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20"

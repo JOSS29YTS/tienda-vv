@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
 import { useRate } from '../../context/RateContext';
+import { IS_DEMO_MODE } from '../../config/demoMode';
 
 const StatCard = ({ title, bgClass, textClass, icon: Icon, stats, onPay }) => {
     const { rate } = useRate();
@@ -60,12 +61,14 @@ const StatCard = ({ title, bgClass, textClass, icon: Icon, stats, onPay }) => {
                             </div>
                         </div>
                     </div>
-                    <button
-                        onClick={() => onPay(title, stats.total)}
-                        className="w-full mt-4 py-3 bg-white text-slate-800 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
-                    >
-                        Pagar {title}
-                    </button>
+                    {!IS_DEMO_MODE && (
+                        <button
+                            onClick={() => onPay(title, stats.total)}
+                            className="w-full mt-4 py-3 bg-white text-slate-800 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            Pagar {title}
+                        </button>
+                    )}
                 </div>
             </div>
         </motion.div>

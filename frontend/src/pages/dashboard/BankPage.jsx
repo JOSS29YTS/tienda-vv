@@ -5,6 +5,7 @@ import { useRate } from '../../context/RateContext';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import API_URL from '../../config/api';
+import { IS_DEMO_MODE } from '../../config/demoMode';
 
 // Store accent colors by id_tienda
 const STORE_STYLES = {
@@ -213,17 +214,18 @@ const BankPage = () => {
                                         ))}
                                     </div>
 
-                                    {/* Transfer button */}
-                                    <button
-                                        onClick={() => openTransfer(store)}
-                                        disabled={store.neto_bs <= 0}
-                                        className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${store.neto_bs > 0
-                                            ? `bg-gradient-to-r ${style.gradient} text-white shadow-md hover:shadow-lg hover:-translate-y-0.5`
-                                            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                            }`}
-                                    >
-                                        <FaExchangeAlt /> Traspasar a Cuenta
-                                    </button>
+                                    {!IS_DEMO_MODE && (
+                                        <button
+                                            onClick={() => openTransfer(store)}
+                                            disabled={store.neto_bs <= 0}
+                                            className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${store.neto_bs > 0
+                                                ? `bg-gradient-to-r ${style.gradient} text-white shadow-md hover:shadow-lg hover:-translate-y-0.5`
+                                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                }`}
+                                        >
+                                            <FaExchangeAlt /> Traspasar a Cuenta
+                                        </button>
+                                    )}
                                 </div>
                             </motion.div>
                         );

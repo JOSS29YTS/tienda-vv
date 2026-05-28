@@ -4,6 +4,7 @@ import { FaUserCog, FaSearch, FaCheckCircle, FaExclamationCircle, FaTrash } from
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 import API_URL from '../../config/api';
+import { IS_DEMO_MODE } from '../../config/demoMode';
 
 const UsersPage = () => {
     const [users, setUsers] = useState([]);
@@ -220,7 +221,7 @@ const UsersPage = () => {
                                             <select
                                                 value={user.rol}
                                                 onChange={(e) => handleRoleChange(user.id_usuario, e.target.value)}
-                                                disabled={(currentUser && user.id_usuario === currentUser.id_usuario) || (currentUser && currentUser.rol !== 'Administrador')}
+                                                disabled={IS_DEMO_MODE || (currentUser && user.id_usuario === currentUser.id_usuario) || (currentUser && currentUser.rol !== 'Administrador')}
                                                 className={`
                                                     appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-sm font-bold shadow-sm outline-none transition-all cursor-pointer
                                                     ${user.rol.toLowerCase() === 'administrativo' || user.rol.toLowerCase() === 'administrador' ? 'bg-purple-50 text-purple-700 border-purple-200 focus:ring-purple-200' : ''}
@@ -243,7 +244,7 @@ const UsersPage = () => {
                                             <select
                                                 value={user.id_tienda || 'null'}
                                                 onChange={(e) => handleStoreChange(user.id_usuario, e.target.value)}
-                                                disabled={(currentUser && user.id_usuario === currentUser.id_usuario) || (currentUser && currentUser.rol !== 'Administrador')}
+                                                disabled={IS_DEMO_MODE || (currentUser && user.id_usuario === currentUser.id_usuario) || (currentUser && currentUser.rol !== 'Administrador')}
                                                 className={`
                                                     appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-xs font-bold shadow-sm outline-none transition-all cursor-pointer bg-white
                                                     ${user.id_tienda ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 focus:ring-slate-200'}
@@ -277,16 +278,17 @@ const UsersPage = () => {
                                                 <button
                                                     onClick={() => handleActivateUser(user)}
                                                     className="text-emerald-500 hover:text-emerald-700 transition-colors"
-                                                    title="Reactivar Usuario"
+                                                    title={IS_DEMO_MODE ? 'No disponible en demo' : 'Reactivar Usuario'}
+                                                    disabled={IS_DEMO_MODE}
                                                 >
                                                     <FaCheckCircle size={18} />
                                                 </button>
                                             ) : (
                                                 <button
                                                     onClick={() => handleDeleteUser(user)}
-                                                    disabled={currentUser && user.id_usuario === currentUser.id_usuario}
+                                                    disabled={IS_DEMO_MODE || (currentUser && user.id_usuario === currentUser.id_usuario)}
                                                     className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-30 disabled:hover:text-slate-400"
-                                                    title="Eliminar Usuario"
+                                                    title={IS_DEMO_MODE ? 'No disponible en demo' : 'Eliminar Usuario'}
                                                 >
                                                     <FaTrash size={16} />
                                                 </button>
