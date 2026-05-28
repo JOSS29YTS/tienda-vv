@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const { authLimiter } = require('../middleware/rateLimiter');
+const { restrictLoginToDemo, blockIfDemoMode } = require('../middleware/demoMiddleware');
 const authController = require('../controllers/authController');
 
 // POST /api/auth/login -> Iniciar sesión
 router.post(
   '/login',
   authLimiter,
+  restrictLoginToDemo,
   [
     body('email').isEmail().withMessage('Por favor ingrese un correo electrónico válido.'),
     body('password').notEmpty().withMessage('La contraseña es requerida.')
@@ -15,10 +17,18 @@ router.post(
   authController.login
 );
 
+// POST /api/auth/demo-login -> Acceso directo a cuenta demo (solo en DEMO_MODE)
+router.post(
+  '/demo-login',
+  authLimiter,
+  authController.demoLogin
+);
+
 // POST /api/auth/register-init -> Iniciar solicitud de registro (envío de código por correo)
 router.post(
   '/register-init',
   authLimiter,
+  blockIfDemoMode,
   [
     body('nombre').notEmpty().withMessage('El nombre es requerido.'),
     body('apellido').notEmpty().withMessage('El apellido es requerido.'),
@@ -32,6 +42,7 @@ router.post(
 router.post(
   '/register-verify',
   authLimiter,
+  blockIfDemoMode,
   [
     body('codigo').isLength({ min: 6, max: 6 }).withMessage('El código de verificación debe ser de 6 dígitos.'),
     body('tempToken').notEmpty().withMessage('El token temporal es requerido.')
@@ -43,6 +54,7 @@ router.post(
 router.post(
   '/forgot-password',
   authLimiter,
+  blockIfDemoMode,
   [
     body('email').isEmail().withMessage('Por favor ingrese un correo electrónico válido.')
   ],
@@ -53,6 +65,7 @@ router.post(
 router.post(
   '/reset-password',
   authLimiter,
+  blockIfDemoMode,
   [
     body('email').isEmail().withMessage('Por favor ingrese un correo electrónico válido.'),
     body('code').isLength({ min: 6, max: 6 }).withMessage('El código de verificación debe ser de 6 dígitos.'),

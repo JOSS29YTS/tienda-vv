@@ -80,6 +80,64 @@ exports.login = async (req, res) => {
     }
 };
 
+exports.demoLogin = async (req, res) => {
+    const { isDemoMode, getDemoEmail } = require('../config/demoMode');
+
+    if (!isDemoMode()) {
+        return res.status(404).json({ ok: false, message: 'Ruta no disponible.' });
+    }
+
+    try {
+        const demoEmail = getDemoEmail();
+        const [users] = await pool.query(`
+            SELECT u.*, r.nb_rol as rol, t.nb_tienda
+            FROM usuario u 
+            LEFT JOIN rol r ON u.id_rol = r.id_rol
+            LEFT JOIN tienda t ON u.id_tienda = t.id_tienda
+            WHERE u.email = ? AND u.activo = 1
+        `, [demoEmail]);
+
+        if (users.length === 0) {
+            return res.status(503).json({
+                ok: false,
+                message: 'La cuenta de demostración no está configurada. Ejecuta el seed de la base de datos.'
+            });
+        }
+
+        const user = users[0];
+        const token = jwt.sign(
+            {
+                id: user.id_usuario,
+                rol: user.rol,
+                nombre: user.nombre,
+                apellido: user.apellido,
+                id_tienda: user.id_tienda
+            },
+            process.env.JWT_SECRET || 'secreto_super_seguro',
+            { expiresIn: '8h' }
+        );
+
+        res.json({
+            ok: true,
+            message: 'Acceso de demostración iniciado.',
+            token,
+            user: {
+                id: user.id_usuario,
+                nombre: user.nombre,
+                apellido: user.apellido,
+                email: user.email,
+                rol: user.rol,
+                id_tienda: user.id_tienda,
+                nb_tienda: user.nb_tienda
+            }
+        });
+
+    } catch (error) {
+        console.error('[AUTH] Error en demo-login:', error);
+        res.status(500).json({ ok: false, message: 'Error interno del servidor.' });
+    }
+};
+
 exports.registerInit = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

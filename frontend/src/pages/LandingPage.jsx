@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaBoxOpen, FaChartLine, FaUsers, FaArrowRight } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-
-
+import { IS_DEMO_MODE } from '../config/demoMode';
 
 const LandingPage = () => {
     const { user } = useAuth();
@@ -39,11 +38,13 @@ const LandingPage = () => {
                     ) : (
                         <>
                             <Link to="/login" className="hidden sm:inline-block px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm font-medium">
-                                Iniciar Sesión
+                                {IS_DEMO_MODE ? 'Probar demostración' : 'Iniciar Sesión'}
                             </Link>
-                            <Link to="/register" className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-all text-sm font-bold shadow-lg shadow-orange-900/20">
-                                Registrarse
-                            </Link>
+                            {!IS_DEMO_MODE && (
+                                <Link to="/register" className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-all text-sm font-bold shadow-lg shadow-orange-900/20">
+                                    Registrarse
+                                </Link>
+                            )}
                         </>
                     )}
                 </div>
@@ -78,8 +79,8 @@ const LandingPage = () => {
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-2 justify-center lg:justify-start">
-                        <Link to={user ? "/dashboard" : "/register"} className="px-8 py-3.5 rounded-lg bg-white text-slate-950 font-bold text-base hover:bg-slate-100 transition-transform hover:scale-105 flex items-center justify-center gap-2 shadow-xl shadow-white/5">
-                            {user ? "Ir al Perfil" : "Comenzar Ahora"}
+                        <Link to={user ? "/dashboard" : (IS_DEMO_MODE ? "/login" : "/register")} className="px-8 py-3.5 rounded-lg bg-white text-slate-950 font-bold text-base hover:bg-slate-100 transition-transform hover:scale-105 flex items-center justify-center gap-2 shadow-xl shadow-white/5">
+                            {user ? "Ir al Perfil" : IS_DEMO_MODE ? "Probar demostración" : "Comenzar Ahora"}
                             <FaArrowRight className="text-sm" />
                         </Link>
                     </div>

@@ -15,6 +15,42 @@ Para probar la plataforma en tu despliegue de demostración o entorno local, pue
 * **Contraseña:** `admin123`
 * **Permisos:** Acceso a la visualización de sucursales, balances financieros, comisiones, gestión de inventario y configuración. *(Nota: Por seguridad en el portafolio, las funciones críticas de administración como eliminar usuarios o alterar roles de seguridad están desactivadas para este perfil y reservadas exclusivamente para la cuenta de Administrador Privado del dueño)*.
 
+### 🌐 Modo Demostración (Portafolio Público)
+
+El sistema incluye un **Modo Demostración** que restringe funcionalidades sensibles para desplegarse como portafolio público:
+
+#### Características del Modo Demo
+- **Login restringido:** Solo permite iniciar sesión con la cuenta demo (`admin@tiendavv.com`).
+- **Botón "Probar demo" (One-Click):** Autenticación directa sin necesidad de contraseña mediante el endpoint `/api/auth/demo-login`.
+- **Registro bloqueado:** Las rutas de registro y recuperación de contraseña redirigen al login.
+- **Badge "Demo" visible:** Indicador persistente en el dashboard cuando el modo está activo.
+- **Backend bloqueado:** Middlewares `blockIfDemoMode` y `restrictLoginToDemo` protegen los endpoints de registro y recuperación.
+
+#### Cómo habilitarlo (Producción)
+
+**Backend (Render/Railway):**
+```env
+DEMO_MODE=true
+DEMO_EMAIL=admin@tiendavv.com
+```
+
+**Frontend (Vercel):**
+```env
+VITE_DEMO_MODE=true
+```
+
+#### Archivos implementados
+| Archivo | Propósito |
+|---|---|
+| `backend/src/config/demoMode.js` | Funciones `isDemoMode()`, `getDemoEmail()` |
+| `backend/src/middleware/demoMiddleware.js` | Middlewares `blockIfDemoMode`, `restrictLoginToDemo` |
+| `backend/src/controllers/authController.js` | Handler `demoLogin` para autenticación one-click |
+| `frontend/src/config/demoMode.js` | Constantes `IS_DEMO_MODE`, `DEMO_EMAIL` |
+| `frontend/src/App.jsx` | Componente `DemoPublicRoute` que protege rutas públicas |
+| `frontend/src/pages/auth/LoginPage.jsx` | Banner, botón demo, UI condicional |
+| `frontend/src/pages/LandingPage.jsx` | Textos condicionales ("Probar demostración") |
+| `frontend/src/components/layout/DashboardLayout.jsx` | Badge "Demo" en el header |
+
 ---
 
 ## 🚀 Características Clave

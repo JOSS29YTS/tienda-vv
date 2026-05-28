@@ -44,6 +44,14 @@ import { SocketProvider } from './context/SocketContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import { Toaster } from 'react-hot-toast';
+import { IS_DEMO_MODE } from './config/demoMode';
+
+function DemoPublicRoute({ children }) {
+  if (IS_DEMO_MODE) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
 
 function App() {
   return (
@@ -77,8 +85,12 @@ function App() {
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/register" element={
+                <DemoPublicRoute><RegisterPage /></DemoPublicRoute>
+              } />
+              <Route path="/forgot-password" element={
+                <DemoPublicRoute><ForgotPasswordPage /></DemoPublicRoute>
+              } />
 
               {/* Protected Dashboard Routes */}
               <Route path="/dashboard" element={

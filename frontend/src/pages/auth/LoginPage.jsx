@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaPlay } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import API_URL from '../../config/api';
+import { IS_DEMO_MODE, DEMO_EMAIL } from '../../config/demoMode';
 
 const LoginPage = () => {
     const navigate = useNavigate();
     const { login, user, loading: authLoading } = useAuth();
     const [formData, setFormData] = useState({
-        email: '',
+        email: IS_DEMO_MODE ? DEMO_EMAIL : '',
         password: ''
     });
     const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +29,32 @@ const LoginPage = () => {
             [e.target.name]: e.target.value
         });
         setError(''); // Clear error on typing
+    };
+
+    const handleDemoLogin = async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch(`${API_URL}/api/auth/demo-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Error al iniciar demostración');
+            }
+
+            login(data.user, data.token);
+            navigate('/dashboard');
+
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleLogin = async (e) => {
@@ -93,9 +120,23 @@ const LoginPage = () => {
                             </div>
                         </div>
 
-                        <h2 className="text-3xl font-bold text-white font-heading tracking-tight">Bienvenido</h2>
-                        <p className="text-slate-400 mt-2 font-light text-sm">Inicia sesión en tu cuenta Tienda VV</p>
+                        <h2 className="text-3xl font-bold text-white font-heading tracking-tight">{IS_DEMO_MODE ? 'Demostración del Sistema' : 'Bienvenido'}</h2>
+                        <p className="text-slate-400 mt-2 font-light text-sm">{IS_DEMO_MODE ? 'Explora el sistema con una cuenta de prueba' : 'Inicia sesión en tu cuenta Tienda VV'}</p>
                     </div>
+
+                    {IS_DEMO_MODE && (
+                        <div style={{
+                            background: 'rgba(99,102,241,0.12)',
+                            border: '1px solid rgba(99,102,241,0.35)',
+                            borderRadius: '8px', padding: '12px 14px',
+                            marginBottom: 16, fontSize: 13,
+                            color: '#cbd5e1', lineHeight: 1.5,
+                        }}>
+                            Modo demostración — cuenta de prueba con permisos
+                            de Gerente. Usa el botón de abajo para
+                            explorar el sistema sin registrarte.
+                        </div>
+                    )}
 
                     {error && (
                         <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm mb-6 flex items-center gap-2">
@@ -117,6 +158,8 @@ const LoginPage = () => {
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all text-sm font-medium"
                                     placeholder="Ingresa tu usuario"
                                     required
+                                    readOnly={IS_DEMO_MODE}
+                                    style={IS_DEMO_MODE ? { opacity: 0.85, cursor: 'not-allowed' } : undefined}
                                 />
                             </div>
                         </div>
@@ -144,29 +187,53 @@ const LoginPage = () => {
                             </div>
                         </div>
 
-                        <div className="flex justify-end pt-1">
-                            <Link to="/forgot-password" className="text-xs text-orange-500 hover:text-orange-400 font-semibold transition-colors">¿Olvidaste tu contraseña?</Link>
-                        </div>
+                        {IS_DEMO_MODE ? (
+                            <div className="flex justify-end pt-1">
+                                <span className="text-xs text-slate-500 font-semibold">La recuperación de contraseña no está disponible en demo</span>
+                            </div>
+                        ) : (
+                            <div className="flex justify-end pt-1">
+                                <Link to="/forgot-password" className="text-xs text-orange-500 hover:text-orange-400 font-semibold transition-colors">¿Olvidaste tu contraseña?</Link>
+                            </div>
+                        )}
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-base shadow-lg shadow-orange-900/20 hover:shadow-orange-700/30 transform hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                        {IS_DEMO_MODE && (
+                            <button type="button" disabled={loading}
+                                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base shadow-lg shadow-indigo-900/20 hover:shadow-indigo-700/30 transform hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
+                                onClick={handleDemoLogin}
+                            >
+                                {loading ? (
+                                    <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                                ) : (
+                                    <><FaPlay size={14} /> Probar demo</>
+                                )}
+                            </button>
+                        )}
+
+                        <button type="submit" disabled={loading}
+                            className={`w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-base shadow-lg shadow-orange-900/20 hover:shadow-orange-700/30 transform hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed mt-2`}
                         >
-                            {loading ? 'Iniciando...' : 'Iniciar Sesión'}
+                            {loading ? 'Iniciando...' : IS_DEMO_MODE ? 'Iniciar con contraseña' : 'Iniciar Sesión'}
                         </button>
                     </form>
 
-                    <div className="mt-8 text-center text-slate-500 text-xs font-medium">
-                        ¿No tienes una cuenta? {' '}
-                        <Link to="/register" className="text-white hover:text-orange-400 transition-colors ml-0.5 font-bold">
-                            Regístrate aquí
-                        </Link>
-                    </div>
+                    {!IS_DEMO_MODE && (
+                        <div className="mt-8 text-center text-slate-500 text-xs font-medium">
+                            ¿No tienes una cuenta? {' '}
+                            <Link to="/register" className="text-white hover:text-orange-400 transition-colors ml-0.5 font-bold">
+                                Regístrate aquí
+                            </Link>
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-6 text-center">
-                    <p className="text-[10px] text-slate-600">© 2026 Tienda VV. Todos los derechos reservados.</p>
+                    <p className="text-[10px] text-slate-600">
+                        {IS_DEMO_MODE
+                            ? 'Entorno de demostración — los datos pueden restablecerse periódicamente'
+                            : '© 2026 Tienda VV. Todos los derechos reservados.'
+                        }
+                    </p>
                 </div>
             </motion.div>
         </div>

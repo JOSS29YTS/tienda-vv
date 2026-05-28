@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useRate } from '../../context/RateContext';
 import { useStore } from '../../context/StoreContext';
+import { IS_DEMO_MODE } from '../../config/demoMode';
 import toast from 'react-hot-toast';
 import API_URL from '../../config/api';
 
@@ -257,6 +258,18 @@ const DashboardLayout = () => {
                         <h1 className="text-2xl font-bold text-slate-800 font-heading">
                             {navItems.find(i => isActive(i.to))?.label || 'Dashboard'}
                         </h1>
+                        {IS_DEMO_MODE && (
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                background: 'rgba(245,158,11,0.15)',
+                                border: '1px solid rgba(245,158,11,0.3)',
+                                borderRadius: '6px', padding: '4px 10px',
+                                fontSize: 11.5, fontWeight: 600, color: '#FBBF24',
+                                letterSpacing: '0.03em', whiteSpace: 'nowrap',
+                            }}>
+                                Demo
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-4">
