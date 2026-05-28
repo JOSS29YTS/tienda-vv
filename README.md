@@ -15,11 +15,6 @@ Para probar la plataforma en tu despliegue de demostración o entorno local, pue
 * **Contraseña:** `admin123`
 * **Permisos:** Acceso a la visualización de sucursales, balances financieros, comisiones, gestión de inventario y configuración. *(Nota: Por seguridad en el portafolio, las funciones críticas de administración como eliminar usuarios o alterar roles de seguridad están desactivadas para este perfil y reservadas exclusivamente para la cuenta de Administrador Privado del dueño)*.
 
-### 👤 2. Perfil: Vendedor (Asignado a Tienda A)
-* **Correo Electrónico:** `vendedor@vendedor.com`
-* **Contraseña:** `vendedor123`
-* **Permisos:** Registro de ventas de la Tienda A, consulta de inventario local, caja diaria del vendedor y visualización de comisiones ganadas de forma individual.
-
 ---
 
 ## 🚀 Características Clave
