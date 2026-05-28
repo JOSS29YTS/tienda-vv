@@ -19,4 +19,11 @@ function restrictLoginToDemo(req, res, next) {
   next()
 }
 
-module.exports = { blockIfDemoMode, restrictLoginToDemo }
+function blockWriteInDemo(req, res, next) {
+  if (isDemoMode()) {
+    return res.status(403).json({ ok: false, mensaje: 'Función no disponible en modo demostración.' })
+  }
+  next()
+}
+
+module.exports = { blockIfDemoMode, restrictLoginToDemo, blockWriteInDemo }
