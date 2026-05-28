@@ -220,7 +220,7 @@ const UsersPage = () => {
                                             <select
                                                 value={user.rol}
                                                 onChange={(e) => handleRoleChange(user.id_usuario, e.target.value)}
-                                                disabled={currentUser && user.id_usuario === currentUser.id_usuario}
+                                                disabled={(currentUser && user.id_usuario === currentUser.id_usuario) || (currentUser && currentUser.rol !== 'Administrador')}
                                                 className={`
                                                     appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-sm font-bold shadow-sm outline-none transition-all cursor-pointer
                                                     ${user.rol.toLowerCase() === 'administrativo' || user.rol.toLowerCase() === 'administrador' ? 'bg-purple-50 text-purple-700 border-purple-200 focus:ring-purple-200' : ''}
@@ -243,7 +243,7 @@ const UsersPage = () => {
                                             <select
                                                 value={user.id_tienda || 'null'}
                                                 onChange={(e) => handleStoreChange(user.id_usuario, e.target.value)}
-                                                disabled={currentUser && user.id_usuario === currentUser.id_usuario}
+                                                disabled={(currentUser && user.id_usuario === currentUser.id_usuario) || (currentUser && currentUser.rol !== 'Administrador')}
                                                 className={`
                                                     appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-xs font-bold shadow-sm outline-none transition-all cursor-pointer bg-white
                                                     ${user.id_tienda ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200' : 'bg-slate-50 text-slate-600 border-slate-200 focus:ring-slate-200'}
@@ -271,7 +271,9 @@ const UsersPage = () => {
                                     </td>
                                     <td className="p-4 text-center">
                                         <div className="flex justify-center gap-2">
-                                            {user.activo === 0 ? (
+                                            {currentUser && currentUser.rol !== 'Administrador' ? (
+                                                <span className="text-xs text-slate-400 font-bold tracking-wide">Sin permisos</span>
+                                            ) : user.activo === 0 ? (
                                                 <button
                                                     onClick={() => handleActivateUser(user)}
                                                     className="text-emerald-500 hover:text-emerald-700 transition-colors"

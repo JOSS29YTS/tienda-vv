@@ -10,10 +10,10 @@ Este proyecto está estructurado con una arquitectura moderna de **Single Page A
 
 Para probar la plataforma en tu despliegue de demostración o entorno local, puedes utilizar los siguientes usuarios autogenerados:
 
-### 👤 1. Perfil: Administrador Global (Dueño)
+### 👤 1. Perfil: Gerente Global (Demo Portafolio)
 * **Correo Electrónico:** `admin@tiendavv.com`
 * **Contraseña:** `admin123`
-* **Permisos:** Acceso completo a todas las sucursales, balances financieros globales, comisiones de todas las tiendas, gestión de inventario global y configuración de tasa cambiaria.
+* **Permisos:** Acceso a la visualización de sucursales, balances financieros, comisiones, gestión de inventario y configuración. *(Nota: Por seguridad en el portafolio, las funciones críticas de administración como eliminar usuarios o alterar roles de seguridad están desactivadas para este perfil y reservadas exclusivamente para la cuenta de Administrador Privado del dueño)*.
 
 ### 👤 2. Perfil: Vendedor (Asignado a Tienda A)
 * **Correo Electrónico:** `vendedor@vendedor.com`

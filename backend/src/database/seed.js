@@ -19,23 +19,53 @@ async function runSeed() {
         const passwordAdmin = await bcrypt.hash('admin123', 10);
         const passwordVendedor = await bcrypt.hash('vendedor123', 10);
 
-        // Obtener el ID del rol Administrador y Vendedor
+        // Obtener el ID del rol Administrador, Gerente y Vendedor
         const [rolesAdmin] = await pool.query("SELECT id_rol FROM rol WHERE nb_rol = 'Administrador'");
+        const [rolesGerente] = await pool.query("SELECT id_rol FROM rol WHERE nb_rol = 'Gerente'");
         const [rolesVendedor] = await pool.query("SELECT id_rol FROM rol WHERE nb_rol = 'Vendedor'");
 
         const idRolAdmin = rolesAdmin.length > 0 ? rolesAdmin[0].id_rol : 1;
+        const idRolGerente = rolesGerente.length > 0 ? rolesGerente[0].id_rol : 2;
         const idRolVendedor = rolesVendedor.length > 0 ? rolesVendedor[0].id_rol : 3;
 
-        // Validar e Insertar Administrador Global (sin tienda asignada)
-        const [existingAdmin] = await pool.query("SELECT * FROM usuario WHERE email = 'admin@tiendavv.com'");
-        if (existingAdmin.length === 0) {
+        // Validar e Insertar Gerente Demo para el Portafolio (admin@tiendavv.com / admin123)
+        const [existingDemoGerente] = await pool.query("SELECT * FROM usuario WHERE email = 'admin@tiendavv.com'");
+        if (existingDemoGerente.length === 0) {
             await pool.query(
                 "INSERT INTO usuario (nombre, apellido, email, password, id_rol, id_tienda, activo) VALUES (?, ?, ?, ?, ?, NULL, 1)",
-                ['ADMIN', 'DUEÑO', 'admin@tiendavv.com', passwordAdmin, idRolAdmin]
+                ['GERENTE', 'DEMO', 'admin@tiendavv.com', passwordAdmin, idRolGerente]
             );
-            console.log("  ✔ Usuario Administrador creado (admin@tiendavv.com / admin123)");
+            console.log("  ✔ Usuario Gerente Demo creado para Portafolio (admin@tiendavv.com / admin123)");
         } else {
-            console.log("  • Usuario Administrador ya existía.");
+            // Actualizar rol del usuario admin@tiendavv.com a Gerente y su nombre
+            await pool.query(
+                "UPDATE usuario SET id_rol = ?, nombre = ?, apellido = ? WHERE email = 'admin@tiendavv.com'",
+                [idRolGerente, 'GERENTE', 'DEMO']
+            );
+            console.log("  • Usuario demo actualizado a rol Gerente y nombre GERENTE DEMO.");
+        }
+
+        // Validar e Insertar Administrador Privado (del dueño)
+        const privateAdminEmail = process.env.PRIVATE_ADMIN_EMAIL || 'alejandro@admin.com';
+        const privateAdminPass = process.env.PRIVATE_ADMIN_PASSWORD || 'admin_privado_2026';
+        const privateAdminName = process.env.PRIVATE_ADMIN_NAME || 'Alejandro';
+        const privateAdminLastName = process.env.PRIVATE_ADMIN_APELLIDO || 'Villa';
+
+        const [existingPrivateAdmin] = await pool.query("SELECT * FROM usuario WHERE email = ?", [privateAdminEmail]);
+        if (existingPrivateAdmin.length === 0) {
+            const passwordPrivateAdmin = await bcrypt.hash(privateAdminPass, 10);
+            await pool.query(
+                "INSERT INTO usuario (nombre, apellido, email, password, id_rol, id_tienda, activo) VALUES (?, ?, ?, ?, ?, NULL, 1)",
+                [privateAdminName, privateAdminLastName, privateAdminEmail, passwordPrivateAdmin, idRolAdmin]
+            );
+            console.log(`  ✔ Usuario Administrador Privado creado (${privateAdminEmail} / [CONTRASENA CONFIGURADA])`);
+        } else {
+            // Asegurar que el usuario administrador privado tenga el rol de Administrador
+            await pool.query(
+                "UPDATE usuario SET id_rol = ? WHERE email = ?",
+                [idRolAdmin, privateAdminEmail]
+            );
+            console.log("  • Usuario Administrador Privado ya existía (se aseguró rol Administrador).");
         }
 
         // Validar e Insertar Vendedor (asignado a Tienda A - ID 1)
