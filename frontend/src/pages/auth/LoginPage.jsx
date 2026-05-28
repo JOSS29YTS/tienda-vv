@@ -210,11 +210,13 @@ const LoginPage = () => {
                             </button>
                         )}
 
-                        <button type="submit" disabled={loading}
-                            className={`w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-base shadow-lg shadow-orange-900/20 hover:shadow-orange-700/30 transform hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed mt-2`}
-                        >
-                            {loading ? 'Iniciando...' : IS_DEMO_MODE ? 'Iniciar con contraseña' : 'Iniciar Sesión'}
-                        </button>
+                        {!IS_DEMO_MODE && (
+                            <button type="submit" disabled={loading}
+                                className={`w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-base shadow-lg shadow-orange-900/20 hover:shadow-orange-700/30 transform hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed mt-2`}
+                            >
+                                {loading ? 'Iniciando...' : 'Iniciar Sesión'}
+                            </button>
+                        )}
                     </form>
 
                     {!IS_DEMO_MODE && (

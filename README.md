@@ -12,7 +12,6 @@ Para probar la plataforma en tu despliegue de demostración o entorno local, pue
 
 ### 👤 1. Perfil: Gerente Global (Demo Portafolio)
 * **Correo Electrónico:** `admin@tiendavv.com`
-* **Contraseña:** `admin123`
 * **Permisos:** Acceso a la visualización de sucursales, balances financieros, comisiones, gestión de inventario y configuración. *(Nota: Por seguridad en el portafolio, las funciones críticas de administración como eliminar usuarios o alterar roles de seguridad están desactivadas para este perfil y reservadas exclusivamente para la cuenta de Administrador Privado del dueño)*.
 
 ### 🌐 Modo Demostración (Portafolio Público)
