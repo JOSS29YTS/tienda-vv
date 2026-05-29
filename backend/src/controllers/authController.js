@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const emailService = require('../services/emailService');
+const { isDemoMode, getDemoEmail } = require('../config/demoMode');
 
 exports.login = async (req, res) => {
     const errors = validationResult(req);
@@ -81,8 +82,6 @@ exports.login = async (req, res) => {
 };
 
 exports.demoLogin = async (req, res) => {
-    const { isDemoMode, getDemoEmail } = require('../config/demoMode');
-
     if (!isDemoMode()) {
         return res.status(404).json({ ok: false, message: 'Ruta no disponible.' });
     }
