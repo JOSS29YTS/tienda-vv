@@ -4,6 +4,10 @@
 
 Este proyecto está estructurado con una arquitectura moderna de **Single Page Application (SPA)** en el Frontend y una **RESTful API con comunicación bidireccional (WebSockets)** en el Backend.
 
+> [!NOTE]
+> **⏱️ Nota sobre el Despliegue en Render (Free Tier):**
+> Debido a que el Backend está alojado en el plan gratuito de **Render**, el servidor se suspende automáticamente tras un período de inactividad. Si es la primera vez que cargas la página (o después de un tiempo sin usarla), el backend puede tardar aproximadamente **50 segundos** en "despertar" y responder a las peticiones. Te agradecemos la paciencia mientras arranca.
+
 ---
 
 ## 🚀 Credenciales de Demostración (Demo Accounts)
