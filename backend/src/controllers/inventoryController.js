@@ -161,7 +161,17 @@ exports.getInventoryReport = async (req, res) => {
             ORDER BY p.nb_producto ASC
         `;
 
-        const [rows] = await pool.query(query, [startDate, startDate, startDate, startDate, endDate, startDate, endDate, startDate, startDate, endDate]);
+        const [rows] = await pool.query(query, [
+            startDate, -- 1. purchased_before
+            startDate, -- 2. sold_before
+            startDate, -- 3. purchased_period >=
+            endDate,   -- 4. purchased_period <
+            startDate, -- 5. sold_period >=
+            endDate,   -- 6. sold_period <
+            startDate, -- 7. ajustes_before
+            startDate, -- 8. ajustes_period >=
+            endDate    -- 9. ajustes_period <
+        ]);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching inventory report:', error);
