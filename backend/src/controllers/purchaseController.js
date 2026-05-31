@@ -112,7 +112,7 @@ exports.createPurchase = async (req, res) => {
         // Note: id_metodo_pago removed or set NULL
         const [compraResult] = await connection.query(
             `INSERT INTO compra (id_usuario, id_tienda, tasa_dia, fecha_compra, id_estado_compra, total_compra) 
-             VALUES (?, ?, ?, ?, (SELECT id_estado_compra FROM estado_compra WHERE nb_estado_compra = ? LIMIT 1), ?)`,
+             VALUES (?, ?, ?, ?, (SELECT id_estado_compra FROM estado_compra WHERE UPPER(nb_estado_compra) = UPPER(?) LIMIT 1), ?)`,
             [userId, tiendaId, rate, finalDate, purchaseStatus, totalPurchaseCost]
         );
         const compraId = compraResult.insertId;

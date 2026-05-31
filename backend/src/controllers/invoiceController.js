@@ -15,7 +15,7 @@ exports.getPendingInvoices = async (req, res) => {
             JOIN proveedor p ON fp.id_proveedor = p.id_proveedor
             JOIN compra c ON fp.id_compra = c.id_compra
             JOIN estado_compra ec ON c.id_estado_compra = ec.id_estado_compra
-            WHERE ec.nb_estado_compra = 'Pendiente' ${tiendaFilter}
+            WHERE UPPER(ec.nb_estado_compra) = 'PENDIENTE' ${tiendaFilter}
             ORDER BY fp.fecha_finalizacion ASC
         `);
 
